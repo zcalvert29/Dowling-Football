@@ -91,7 +91,9 @@ def evaluate_options(yards_to_goal, distance, score_diff, seconds_remaining,
     opp_ytg_after_punt = float(np.clip(100 - (yards_to_goal - net), 1, 99))
     wp_punt = 1 - wp_of(opp_ytg_after_punt, 1, 10, -score_diff, 1 - is_home_pos)
 
-    wp = {"Go for it": wp_go, "Field goal": wp_fg, "Punt": wp_punt}
+    wp = {"Go for it": wp_go, "Field goal": wp_fg}
+    if yards_to_goal > 35:
+        wp["Punt"] = wp_punt
     return {"wp": wp, "p_conv": p_conv, "p_fg": p_fg}
 
 
@@ -124,14 +126,14 @@ with st.sidebar:
     st.header("Game Situation")
     off_abbr = st.text_input("Offense (team with the ball)", "DCHS").upper()[:4]
     def_abbr = st.text_input("Defense", "VHS").upper()[:4]
-    off_score = st.number_input(f"{off_abbr} score", 0, 99, 17)
-    def_score = st.number_input(f"{def_abbr} score", 0, 99, 13)
-    quarter = st.selectbox("Quarter", [1, 2, 3, 4], index=2)
-    minutes = st.number_input("Minutes remaining in quarter", 0, 15, 7)
+    off_score = st.number_input(f"{off_abbr} score", 0, 99, 0)
+    def_score = st.number_input(f"{def_abbr} score", 0, 99, 0)
+    quarter = st.selectbox("Quarter", [1, 2, 3, 4], index=0)
+    minutes = st.number_input("Minutes remaining in quarter", 0, 15, 11)
     seconds = st.number_input("Seconds", 0, 59, 30)
-    yards_to_goal = st.slider("Yards to opponent's goal line", 1, 99, 40,
-                               help="1 = at the goal line, 99 = pinned at own 1")
-    distance = st.slider("Yards to go for 1st down", 1, 25, 2)
+    yards_to_goal = st.number_input("Yards to opponent's goal line", 1, 99, 65,
+                                     help="1 = at the goal line, 99 = pinned at own 1")
+    distance = st.number_input("Yards to go for 1st down", 1, 30, 2)
     off_timeouts = st.selectbox("Offense timeouts remaining", [0, 1, 2, 3], index=3)
     def_timeouts = st.selectbox("Defense timeouts remaining", [0, 1, 2, 3], index=3)
     is_home = st.checkbox("Offense is the home team", value=True)
@@ -187,17 +189,28 @@ st.write("#### Decision chart")
 st.caption(f"Go-for-it recommendation across field position and distance, at the current score/time. "
            f"The dot marks the current situation: 4th & {distance} {spot}.")
 
-ytg_grid = np.arange(1, 100, 4)
-dist_grid = np.arange(1, 21, 2)
-Z = np.zeros((len(dist_grid), len(ytg_grid)))
-
-with st.spinner("Building decision chart..."):
-    for i, d in enumerate(dist_grid):
-        for j, y in enumerate(ytg_grid):
-            r = evaluate_options(y, min(d, y), score_diff, seconds_remaining_in_game,
-                                  off_timeouts, def_timeouts, int(is_home))
+@st.cache_data(show_spinner="Building decision chart...")
+def build_decision_chart(score_diff_, seconds_remaining_, off_timeouts_, def_timeouts_, is_home_pos_):
+    # Coarser grid than a naive 1-yard sweep — cuts model calls from 250+ down to
+    # ~90 while still giving a clear picture of the go/kick/punt boundaries.
+    ytg_grid_ = np.arange(1, 100, 8)
+    dist_grid_ = np.arange(1, 21, 3)
+    Z_ = np.zeros((len(dist_grid_), len(ytg_grid_)))
+    for i, d in enumerate(dist_grid_):
+        for j, y in enumerate(ytg_grid_):
+            r = evaluate_options(y, min(d, y), score_diff_, seconds_remaining_,
+                                  off_timeouts_, def_timeouts_, is_home_pos_)
             best = max(r["wp"], key=r["wp"].get)
-            Z[i, j] = {"Go for it": 1, "Field goal": 0, "Punt": -1}[best]
+            Z_[i, j] = {"Go for it": 1, "Field goal": 0, "Punt": -1}[best]
+    return ytg_grid_, dist_grid_, Z_
+
+
+# Cached on the situation variables that actually change the grid — so dragging
+# the current down/distance, editing team names, or tweaking the score/clock
+# elsewhere on a rerun that doesn't touch these values won't recompute it.
+ytg_grid, dist_grid, Z = build_decision_chart(
+    score_diff, seconds_remaining_in_game, off_timeouts, def_timeouts, int(is_home)
+)
 
 fig, ax = plt.subplots(figsize=(7, 4))
 cmap = plt.matplotlib.colors.ListedColormap(["#4C72B0", "#DD8452", "#C44E52"])
