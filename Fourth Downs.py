@@ -29,10 +29,12 @@ def conversion_prob(distance):
 
 
 def fg_prob(yards_to_goal):
-    # Gives 85% chance at 30 yards, 65% chance at 40 yards, and 35% chance at 50 yards
+    # Gives 85% chance at 30 yards, 65% chance at 40 yards, and 35% chance at 50 yards.
+    # No hard floor here anymore — let the logistic curve keep decaying for very
+    # long attempts instead of pinning everything past 55 yards to a flat 2%
+    # (that flat floor was actually propping up the make-probability for kicks
+    # that should be essentially impossible, e.g. from your own 10-yard line).
     kick_distance = yards_to_goal + 17
-    if kick_distance > 55:
-        return 0.02
     c = 0.1156
     return 1 / (1 + np.exp(c * (kick_distance - 45)))
 
@@ -46,6 +48,13 @@ def punt_net_yards(yards_to_goal):
 # ==============================================================================
 # 4TH DOWN OPTION EVALUATION — now calling the real (or fallback) WP model
 # ==============================================================================
+
+# Longest field goal ever converted at any level is in the high-60s of yards;
+# beyond that it's not a real coaching option. Excluding it here (same pattern
+# as the Punt cutoff below) is what actually fixes the "FG recommended from
+# your own 10" bug — before, a kick this long still got priced with a
+# probability instead of being taken off the table entirely.
+MAX_FG_KICK_DISTANCE = 62  # yards_to_goal + 17
 
 def evaluate_options(yards_to_goal, distance, score_diff, seconds_remaining,
                       off_timeouts=3, def_timeouts=3, is_home_pos=1):
@@ -76,6 +85,7 @@ def evaluate_options(yards_to_goal, distance, score_diff, seconds_remaining,
     wp_go = p_conv * wp_go_success + (1 - p_conv) * wp_go_fail
 
     # ---- FIELD GOAL ----
+    kick_distance = yards_to_goal + 17
     p_fg = fg_prob(yards_to_goal)
     # Made FG -> ensuing kickoff, OPPONENT takes over at their own 25. Same
     # perspective-flip as above — this was a real bug in an earlier draft
@@ -91,10 +101,20 @@ def evaluate_options(yards_to_goal, distance, score_diff, seconds_remaining,
     opp_ytg_after_punt = float(np.clip(100 - (yards_to_goal - net), 1, 99))
     wp_punt = 1 - wp_of(opp_ytg_after_punt, 1, 10, -score_diff, 1 - is_home_pos)
 
-    wp = {"Go for it": wp_go, "Field goal": wp_fg}
+    options = {
+        "Go for it": {"wp": wp_go, "success_prob": p_conv,
+                       "wp_success": wp_go_success, "wp_fail": wp_go_fail},
+    }
+    if kick_distance <= MAX_FG_KICK_DISTANCE:
+        options["Field goal"] = {"wp": wp_fg, "success_prob": p_fg,
+                                  "wp_success": wp_fg_make, "wp_fail": wp_fg_miss}
     if yards_to_goal > 35:
-        wp["Punt"] = wp_punt
-    return {"wp": wp, "p_conv": p_conv, "p_fg": p_fg}
+        # Punt has no modeled success/fail split — it's a single outcome here.
+        options["Punt"] = {"wp": wp_punt, "success_prob": None,
+                            "wp_success": None, "wp_fail": None}
+
+    wp = {k: v["wp"] for k, v in options.items()}
+    return {"wp": wp, "options": options, "p_conv": p_conv, "p_fg": p_fg}
 
 
 def field_spot_label(yards_to_goal, off_abbr, def_abbr):
@@ -168,15 +188,34 @@ Recommendation ({tier}): {emoji} {best_option} (+{margin_pts:.1f} WP)
 """
 st.markdown(tweet_lines)
 
-# ---- gt-style results table ----
+# ---- gt-style results table (rbsdm/nfl4th style: success prob + WP on each branch) ----
 st.write("#### Win probability by option")
-table_df = pd.DataFrame({
-    "Option": list(wp.keys()),
-    "Win Probability": [f"{v*100:.1f}%" for v in wp.values()],
-    "vs. best (pts)": [f"{(v - best_wp)*100:+.1f}" for v in wp.values()],
-})
+options_detail = result["options"]
+rows = []
+for opt, w in wp.items():
+    d = options_detail[opt]
+    if d["success_prob"] is None:
+        success_pct, wp_success, wp_fail = "—", "—", "—"
+    else:
+        success_pct = f"{d['success_prob']*100:.0f}%"
+        wp_success = f"{d['wp_success']*100:.1f}%"
+        wp_fail = f"{d['wp_fail']*100:.1f}%"
+    rows.append({
+        "Option": opt,
+        "Win Probability": f"{w*100:.1f}%",
+        "Success %": success_pct,
+        "WP if Success": wp_success,
+        "WP if Fail": wp_fail,
+        "vs. best (pts)": f"{(w - best_wp)*100:+.1f}",
+    })
+table_df = pd.DataFrame(rows)
 table_df.loc[table_df["Option"] == best_option, "Option"] = "👉 " + best_option
 st.dataframe(table_df, hide_index=True, use_container_width=True)
+st.caption(
+    "\"Success %\" is the conversion/make probability driving that option; "
+    "\"WP if Success\"/\"WP if Fail\" are the win probabilities on each branch "
+    "(Punt has no success/fail split in this model)."
+)
 
 st.caption(
     f"Estimated 4th & {distance} conversion rate: **{result['p_conv']*100:.0f}%** · "
@@ -213,13 +252,13 @@ ytg_grid, dist_grid, Z = build_decision_chart(
 )
 
 fig, ax = plt.subplots(figsize=(7, 4))
-cmap = plt.matplotlib.colors.ListedColormap(["#4C72B0", "#DD8452", "#C44E52"])
+cmap = plt.matplotlib.colors.ListedColormap(["#C44E52", "#4C72B0", "#55A868"])
 ax.pcolormesh(ytg_grid, dist_grid, Z, cmap=cmap, vmin=-1, vmax=1, shading="nearest")
 ax.plot(yards_to_goal, distance, "o", color="white", markeredgecolor="black", markersize=10)
 ax.invert_xaxis()
 ax.set_xlabel("Yards to opponent's goal (own goal ← → opp goal)")
 ax.set_ylabel("Yards to go")
-ax.set_title("Blue = Punt · Orange = Field goal · Red = Go for it", fontsize=10)
+ax.set_title("Green = Go for it · Blue = Field goal · Red = Punt", fontsize=10)
 st.pyplot(fig)
 
 st.divider()
