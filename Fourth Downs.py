@@ -28,26 +28,28 @@ def conversion_prob(distance):
     return 1 / (1 + np.exp(b * (distance - d0)))
 
 
-WIND_THRESHOLD_MPH = 10  # wind has no modeled effect at/below this speed
+WIND_THRESHOLD_MPH = 10  # wind has no modeled effect below this speed
 
-# Rate of FG probability change per 10 mph of wind ABOVE the threshold, by
-# direction. Into/crosswind hurt, tailwind helps (less than into hurts, per
-# the headwind/tailwind asymmetry seen in golf/ballistics wind studies).
+# Rate of FG probability change per 10 mph of wind, by direction — applied to
+# TOTAL wind speed (not excess above the threshold) once at/above the
+# threshold, so the full rate is already in effect exactly at 10 mph (e.g.
+# Into hits -5% right at 10 mph, then another -5% by 20 mph, etc.), and scales
+# linearly and continuously above that (so 10 mph and 12 mph differ). Into
+# and crosswind hurt, tailwind helps — crosswind hurts more than a pure
+# headwind since it's a lateral-miss problem kickers have less way to correct
+# for than a straight distance loss.
 WIND_RATE_PER_10MPH = {
     "Into": -0.05,
     "With": 0.03,
-    "Crosswind": -0.05,
+    "Crosswind": -0.08,
 }
 
 
 def wind_adjustment(wind_speed, wind_direction):
-    # Linear in the EXCESS mph above the threshold (not total mph), so the
-    # adjustment is continuous and zero at/below 10 mph, rather than jumping
-    # the moment you cross 10 — e.g. 10 mph and 12 mph now give genuinely
-    # different (but both small) adjustments instead of an on/off switch.
-    excess_mph = max(wind_speed - WIND_THRESHOLD_MPH, 0)
+    if wind_speed < WIND_THRESHOLD_MPH:
+        return 0.0
     rate = WIND_RATE_PER_10MPH.get(wind_direction, 0.0)
-    return rate * (excess_mph / 10)
+    return rate * (wind_speed / 10)
 
 
 def weather_adjustment(wind_speed, wind_direction, rain, snow):
@@ -330,9 +332,10 @@ with st.expander("Model notes & limitations"):
   hand-calibrated heuristics — no trained model exists for those yet.
 - FG probability weather adjustment (hand-calibrated, applied on top of the
   distance-based curve, then clipped to [0, 100]%): rain −5 pts, snow −10 pts.
-  Wind has no effect at or below 10 mph; above that, it scales linearly with
-  mph over the threshold at −5 pts/10 mph into the wind, +3 pts/10 mph with
-  the wind, and −5 pts/10 mph on a crosswind.
+  Wind has no effect below 10 mph; at/above that, it scales linearly with
+  total mph at −5 pts/10 mph into the wind (so exactly −5 pts at 10 mph, −10
+  pts at 20 mph, etc.), +3 pts/10 mph with the wind, and −8 pts/10 mph on a
+  crosswind.
 - "Go for it" success and "field goal make" outcomes are evaluated by
   chaining your real EP model's output into your real WP model, the same
   way cfbfastR's own pipeline does internally.
