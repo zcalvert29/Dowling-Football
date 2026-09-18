@@ -28,15 +28,51 @@ def conversion_prob(distance):
     return 1 / (1 + np.exp(b * (distance - d0)))
 
 
-def fg_prob(yards_to_goal):
-    # Gives 85% chance at 30 yards, 65% chance at 40 yards, and 35% chance at 50 yards.
+WIND_THRESHOLD_MPH = 10  # wind has no modeled effect at/below this speed
+
+# Rate of FG probability change per 10 mph of wind ABOVE the threshold, by
+# direction. Into/crosswind hurt, tailwind helps (less than into hurts, per
+# the headwind/tailwind asymmetry seen in golf/ballistics wind studies).
+WIND_RATE_PER_10MPH = {
+    "Into": -0.05,
+    "With": 0.03,
+    "Crosswind": -0.05,
+}
+
+
+def wind_adjustment(wind_speed, wind_direction):
+    # Linear in the EXCESS mph above the threshold (not total mph), so the
+    # adjustment is continuous and zero at/below 10 mph, rather than jumping
+    # the moment you cross 10 — e.g. 10 mph and 12 mph now give genuinely
+    # different (but both small) adjustments instead of an on/off switch.
+    excess_mph = max(wind_speed - WIND_THRESHOLD_MPH, 0)
+    rate = WIND_RATE_PER_10MPH.get(wind_direction, 0.0)
+    return rate * (excess_mph / 10)
+
+
+def weather_adjustment(wind_speed, wind_direction, rain, snow):
+    # Total additive adjustment (probability units, e.g. -0.05 = -5 points)
+    # to apply on top of a clean/no-weather FG probability estimate.
+    adj = wind_adjustment(wind_speed, wind_direction)
+    if rain:
+        adj -= 0.05
+    if snow:
+        adj -= 0.10
+    return adj
+
+
+def fg_prob(yards_to_goal, wind_speed=0, wind_direction="Into", rain=False, snow=False):
+    # Gives 85% chance at 30 yards, 65% chance at 40 yards, and 35% chance at 50 yards
+    # (before any weather adjustment).
     # No hard floor here anymore — let the logistic curve keep decaying for very
     # long attempts instead of pinning everything past 55 yards to a flat 2%
     # (that flat floor was actually propping up the make-probability for kicks
     # that should be essentially impossible, e.g. from your own 10-yard line).
     kick_distance = yards_to_goal + 17
     c = 0.1156
-    return 1 / (1 + np.exp(c * (kick_distance - 45)))
+    base = 1 / (1 + np.exp(c * (kick_distance - 45)))
+    adjusted = base + weather_adjustment(wind_speed, wind_direction, rain, snow)
+    return float(np.clip(adjusted, 0.0, 1.0))
 
 
 def punt_net_yards(yards_to_goal):
@@ -57,7 +93,8 @@ def punt_net_yards(yards_to_goal):
 MAX_FG_KICK_DISTANCE = 62  # yards_to_goal + 17
 
 def evaluate_options(yards_to_goal, distance, score_diff, seconds_remaining,
-                      off_timeouts=3, def_timeouts=3, is_home_pos=1):
+                      off_timeouts=3, def_timeouts=3, is_home_pos=1,
+                      wind_speed=0, wind_direction="Into", rain=False, snow=False):
     half_seconds = min(seconds_remaining, 1800)
     p_conv = conversion_prob(distance)
 
@@ -86,7 +123,7 @@ def evaluate_options(yards_to_goal, distance, score_diff, seconds_remaining,
 
     # ---- FIELD GOAL ----
     kick_distance = yards_to_goal + 17
-    p_fg = fg_prob(yards_to_goal)
+    p_fg = fg_prob(yards_to_goal, wind_speed, wind_direction, rain, snow)
     # Made FG -> ensuing kickoff, OPPONENT takes over at their own 25. Same
     # perspective-flip as above — this was a real bug in an earlier draft
     # (it kept the scoring team's own perspective instead of flipping to the
@@ -158,12 +195,21 @@ with st.sidebar:
     def_timeouts = st.selectbox("Defense timeouts remaining", [0, 1, 2, 3], index=3)
     is_home = st.checkbox("Offense is the home team", value=True)
 
+    st.header("Weather")
+    wind_speed = st.number_input("Wind speed (mph)", 0, 40, 0,
+                                  help="No modeled effect at or below 10 mph.")
+    wind_direction = st.selectbox("Wind direction", ["Into", "With", "Crosswind"], index=0)
+    rain = st.checkbox("Rain")
+    snow = st.checkbox("Snow")
+
 quarters_left_after_this = 4 - quarter
 seconds_remaining_in_game = quarters_left_after_this * 15 * 60 + minutes * 60 + seconds
 score_diff = off_score - def_score
 
 result = evaluate_options(yards_to_goal, distance, score_diff, seconds_remaining_in_game,
-                           off_timeouts, def_timeouts, is_home_pos=int(is_home))
+                           off_timeouts, def_timeouts, is_home_pos=int(is_home),
+                           wind_speed=wind_speed, wind_direction=wind_direction,
+                           rain=rain, snow=snow)
 wp = result["wp"]
 ranked = sorted(wp.items(), key=lambda kv: -kv[1])
 best_option, best_wp = ranked[0]
@@ -217,9 +263,11 @@ st.caption(
     "(Punt has no success/fail split in this model)."
 )
 
+weather_pts = weather_adjustment(wind_speed, wind_direction, rain, snow) * 100
+weather_note = f" (weather: {weather_pts:+.1f} pts)" if weather_pts != 0 else ""
 st.caption(
     f"Estimated 4th & {distance} conversion rate: **{result['p_conv']*100:.0f}%** · "
-    f"Estimated FG make rate from here: **{result['p_fg']*100:.0f}%**"
+    f"Estimated FG make rate from here: **{result['p_fg']*100:.0f}%**{weather_note}"
 )
 
 # ---- Decision chart (heatmap across distance x field position) ----
@@ -229,7 +277,8 @@ st.caption(f"Go-for-it recommendation across field position and distance, at the
            f"The dot marks the current situation: 4th & {distance} {spot}.")
 
 @st.cache_data(show_spinner="Building decision chart...")
-def build_decision_chart(score_diff_, seconds_remaining_, off_timeouts_, def_timeouts_, is_home_pos_):
+def build_decision_chart(score_diff_, seconds_remaining_, off_timeouts_, def_timeouts_, is_home_pos_,
+                          wind_speed_, wind_direction_, rain_, snow_):
     # Coarser grid than a naive 1-yard sweep — cuts model calls from 250+ down to
     # ~90 while still giving a clear picture of the go/kick/punt boundaries.
     ytg_grid_ = np.arange(1, 100, 8)
@@ -238,7 +287,9 @@ def build_decision_chart(score_diff_, seconds_remaining_, off_timeouts_, def_tim
     for i, d in enumerate(dist_grid_):
         for j, y in enumerate(ytg_grid_):
             r = evaluate_options(y, min(d, y), score_diff_, seconds_remaining_,
-                                  off_timeouts_, def_timeouts_, is_home_pos_)
+                                  off_timeouts_, def_timeouts_, is_home_pos_,
+                                  wind_speed=wind_speed_, wind_direction=wind_direction_,
+                                  rain=rain_, snow=snow_)
             best = max(r["wp"], key=r["wp"].get)
             Z_[i, j] = {"Go for it": 1, "Field goal": 0, "Punt": -1}[best]
     return ytg_grid_, dist_grid_, Z_
@@ -248,7 +299,8 @@ def build_decision_chart(score_diff_, seconds_remaining_, off_timeouts_, def_tim
 # the current down/distance, editing team names, or tweaking the score/clock
 # elsewhere on a rerun that doesn't touch these values won't recompute it.
 ytg_grid, dist_grid, Z = build_decision_chart(
-    score_diff, seconds_remaining_in_game, off_timeouts, def_timeouts, int(is_home)
+    score_diff, seconds_remaining_in_game, off_timeouts, def_timeouts, int(is_home),
+    wind_speed, wind_direction, rain, snow
 )
 
 fig, ax = plt.subplots(figsize=(7, 4))
@@ -276,6 +328,11 @@ with st.expander("Model notes & limitations"):
   **{"real trained models" if mu.USING_REAL_MODELS else "heuristic fallback"}**.
 - Conversion probability, FG probability, and punt distance are still
   hand-calibrated heuristics — no trained model exists for those yet.
+- FG probability weather adjustment (hand-calibrated, applied on top of the
+  distance-based curve, then clipped to [0, 100]%): rain −5 pts, snow −10 pts.
+  Wind has no effect at or below 10 mph; above that, it scales linearly with
+  mph over the threshold at −5 pts/10 mph into the wind, +3 pts/10 mph with
+  the wind, and −5 pts/10 mph on a crosswind.
 - "Go for it" success and "field goal make" outcomes are evaluated by
   chaining your real EP model's output into your real WP model, the same
   way cfbfastR's own pipeline does internally.
