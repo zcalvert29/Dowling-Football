@@ -195,7 +195,9 @@ if any(pg is p for group in SCOUTING_PAGES.values() for p in group):
         sel_downs = dropdown_multiselect("Down", ALL_DOWNS, key="f_down")
         sel_dist = dropdown_multiselect("Distance", v.DISTANCE_ORDER, key="f_dist")
         sel_weeks = dropdown_multiselect("Week", ALL_WEEKS, key="f_week", fmt=lambda w: f"Week {w}")
-        opponent = st.selectbox("Opponent", OPPONENTS, key="f_opp")
+        # Opponent only matters on the Scouting section's pages
+        if any(pg is p for p in SCOUTING_PAGES["Scouting"]):
+            opponent = st.selectbox("Opponent", OPPONENTS, key="f_opp")
 
     df = filtered()                          # most visuals
     df_any_down = filtered(use_down=False)   # 3rd/4th down tables set their own down

@@ -189,14 +189,13 @@ with st.sidebar:
     off_score = st.number_input(f"{off_abbr} score", 0, 99, 0, key="fd_off_score")
     def_score = st.number_input(f"{def_abbr} score", 0, 99, 0, key="fd_def_score")
     quarter = st.selectbox("Quarter", [1, 2, 3, 4], index=0, key="fd_quarter")
-    minutes = st.number_input("Minutes remaining in quarter", 0, 15, 11, key="fd_minutes")
+    minutes = st.number_input("Minutes remaining in quarter", 0, 12, 11, key="fd_minutes")
     seconds = st.number_input("Seconds", 0, 59, 30, key="fd_seconds")
     yards_to_goal = st.number_input("Yards to opponent's goal line", 1, 99, 65,
                                      help="1 = at the goal line, 99 = pinned at own 1", key="fd_ytg")
     distance = st.number_input("Yards to go for 1st down", 1, 30, 2, key="fd_distance")
     off_timeouts = st.selectbox("Offense timeouts remaining", [0, 1, 2, 3], index=3, key="fd_off_to")
     def_timeouts = st.selectbox("Defense timeouts remaining", [0, 1, 2, 3], index=3, key="fd_def_to")
-    is_home = st.checkbox("Offense is the home team", value=True, key="fd_is_home")
 
     st.header("Weather")
     wind_speed = st.number_input("Wind speed (mph)", 0, 40, 0,
@@ -205,12 +204,21 @@ with st.sidebar:
     rain = st.checkbox("Rain", key="fd_rain")
     snow = st.checkbox("Snow", key="fd_snow")
 
+# The offense is always treated as the home team. After a change of possession,
+# evaluate_options() flips this to 0 so the other team is modeled as the visitor.
+OFFENSE_IS_HOME = 1
+
 quarters_left_after_this = 4 - quarter
+if minutes == 12:
+    seconds = 0  # quarters are 12:00 max; 12:30 isn't a real clock time
+
+# Note: the WP model was trained on 15-minute college quarters and this math is
+# left as-is. Only the inputs are limited to 12-minute quarters.
 seconds_remaining_in_game = quarters_left_after_this * 15 * 60 + minutes * 60 + seconds
 score_diff = off_score - def_score
 
 result = evaluate_options(yards_to_goal, distance, score_diff, seconds_remaining_in_game,
-                           off_timeouts, def_timeouts, is_home_pos=int(is_home),
+                           off_timeouts, def_timeouts, is_home_pos=OFFENSE_IS_HOME,
                            wind_speed=wind_speed, wind_direction=wind_direction,
                            rain=rain, snow=snow)
 wp = result["wp"]
@@ -302,7 +310,7 @@ def build_decision_chart(score_diff_, seconds_remaining_, off_timeouts_, def_tim
 # the current down/distance, editing team names, or tweaking the score/clock
 # elsewhere on a rerun that doesn't touch these values won't recompute it.
 ytg_grid, dist_grid, Z = build_decision_chart(
-    score_diff, seconds_remaining_in_game, off_timeouts, def_timeouts, int(is_home),
+    score_diff, seconds_remaining_in_game, off_timeouts, def_timeouts, OFFENSE_IS_HOME,
     wind_speed, wind_direction, rain, snow
 )
 

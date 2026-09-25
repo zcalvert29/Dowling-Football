@@ -4,3 +4,4 @@ numpy
 openpyxl
 altair
 matplotlib
+xgboost
