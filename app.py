@@ -16,6 +16,7 @@ Folder layout (everything sits next to this file):
 import streamlit as st
 
 import visuals as v
+st.sidebar.caption(f"visuals: {v.__file__} | has new tables: {hasattr(v, 'render_o_pass_game_detail')}")
 
 DATA_PATH = "curated-pbp.xlsx"
 
