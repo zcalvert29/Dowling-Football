@@ -85,7 +85,6 @@ METRICS = {
     "Avg Yards Gained": lambda g: g["GN/LS"].mean(),
     "Success Rate": lambda g: g["success"].mean(),
     "EPA per Play": lambda g: g["epa"].mean(),
-    "Chunk Rate": lambda g: g["chunk_play"].mean(),
     "Explosive Rate": lambda g: g["explosive_play"].mean(),
     "3rd Down Conversions": lambda g: g["THIRD_DOWN_CONVERTED"].sum(),
     "3rd Down Conversion Rate": lambda g: g["THIRD_DOWN_CONVERTED"].sum() / g["PLAY #"].count(),
@@ -98,7 +97,7 @@ FORMATS = {
     "3rd Down Conversions": "{:,.0f}",
     "Avg Yards Gained": "{:.1f}",
     "EPA per Play": "{:.2f}",
-    **{m: PCT for m in ["Pass Rate", "Rush Rate", "Success Rate", "Chunk Rate", "Explosive Rate",
+    **{m: PCT for m in ["Pass Rate", "Rush Rate", "Success Rate", "Explosive Rate",
                         "3rd Down Conversion Rate", "4th Down Conversion Rate"]},
 }
 
@@ -165,7 +164,7 @@ def render_dchs_offense(df):
         d = keep(d, "dchs_offense", "RESULT")
     else:
         d = d[~d["RESULT"].isin(["Penalty", "Timeout"])]
-    t = crosstab(d, "PLAY TYPE", ["Avg Yards Gained", "Success Rate", "EPA per Play", "Chunk Rate", "Explosive Rate", "Plays"])
+    t = crosstab(d, "PLAY TYPE", ["Avg Yards Gained", "Success Rate", "EPA per Play", "Explosive Rate", "Plays"])
     show_table("DCHS O Stats", t)
 
 
@@ -190,14 +189,14 @@ def render_dchs_offense_4th_downs(df):
 def render_dchs_formations(df):
     d = keep(run_pass(df[df["offense"] == TEAM]), "dchs_formations", "OFF FORM")
     t = crosstab(d, "OFF FORM", ["Pass Rate", "Rush Rate", "Avg Yards Gained", "Success Rate", "EPA per Play",
-                                 "Chunk Rate", "Explosive Rate", "Plays"], sort_by_count=True)
+                                 "Explosive Rate", "Plays"], sort_by_count=True)
     show_table("DCHS Formations", t)
 
 
 def render_run_scheme_detail(df):
     d = downs(run_pass(df[df["offense"] == TEAM], ["Run"]))
     d = keep(d[d["Distance"].notna()], "run_scheme", "RUN SCHEME")
-    t = crosstab(d, "RUN SCHEME", ["Avg Yards Gained", "Success Rate", "EPA per Play", "Chunk Rate", "Explosive Rate", "Plays"], sort_by_count=True)
+    t = crosstab(d, "RUN SCHEME", ["Avg Yards Gained", "Success Rate", "EPA per Play", "Explosive Rate", "Plays"], sort_by_count=True)
     show_table("DCHS O Run Scheme Detail", t)
 
 
@@ -254,7 +253,7 @@ def render_weekly_rush_success(df):
 # ---------------------------------------------------------------------------
 def render_dchs_defense(df):
     d = run_pass(df[df["defense"] == TEAM])
-    t = crosstab(d, "PLAY TYPE", ["Avg Yards Gained", "Success Rate", "EPA per Play", "Chunk Rate", "Explosive Rate", "Plays"])
+    t = crosstab(d, "PLAY TYPE", ["Avg Yards Gained", "Success Rate", "EPA per Play", "Explosive Rate", "Plays"])
     show_table("DCHS D Stats", t)
 
 
@@ -271,7 +270,7 @@ def render_d_rush_vs_box(df):
 def render_d_pass_coverage(df):
     d = downs(run_pass(df[df["defense"] == TEAM], ["Pass"]))
     d = keep(d[d["Distance"].notna()], "d_pass_coverage", "COVERAGE")
-    t = crosstab(d, "COVERAGE", ["Avg Yards Gained", "EPA per Play", "Success Rate", "Chunk Rate", "Explosive Rate", "Plays"],
+    t = crosstab(d, "COVERAGE", ["Avg Yards Gained", "EPA per Play", "Success Rate", "Explosive Rate", "Plays"],
                  sort_by_count=True)
     show_table("DCHS D Pass Coverage Stats", t)
 
@@ -280,7 +279,7 @@ def render_d_vs_formation(df):
     d = downs(run_pass(df[df["defense"] == TEAM]))
     d = keep(d[d["Distance"].notna()], "d_vs_formation", "OFF FORM")
     t = crosstab(d, "OFF FORM", ["Pass Rate", "Rush Rate", "Avg Yards Gained", "Success Rate", "EPA per Play",
-                                 "Chunk Rate", "Explosive Rate", "Plays"], sort_by_count=True)
+                                 "Explosive Rate", "Plays"], sort_by_count=True)
     show_table("DCHS D vs Formation Stats", t)
 
 

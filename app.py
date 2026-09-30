@@ -30,34 +30,22 @@ for _k in list(st.session_state.keys()):
 
 
 # ---- Shared page text -----------------------------------------------------
-BENCHMARKS = {
-    # "team"/"offense" pages: elite offensive numbers. "defense": elite defensive numbers.
-    "offense": dict(success="> 50%", pass_epa="> 0.35", rush_epa="> 0.2", pass_chunk="> 17%",
-                    rush_chunk="> 13%", pass_expl="> 15%", rush_expl="> 8%"),
-    "defense": dict(success="< 35%", pass_epa="< -0.05", rush_epa="< -0.12", pass_chunk="< 13%",
-                    rush_chunk="< 5%", pass_expl="< 8%", rush_expl="< 3%"),
-}
-
 DEFINITIONS = """
 **Definitions:**
 
-**Success:** a 1st down play that gains 40% of yards for the first down, a 2nd down play that gains 60% of yards for the first down, and a 3rd/4th down play that gains a first down are successful plays. An elite College Football {unit} has success rates {success}.
+**Success:** a 1st down play that gains 40% of yards for the first down, a 2nd down play that gains 70% of yards for the first down, and a 3rd/4th down play that gains a first down are successful plays.
 
-**EPA:** Expected Points Added, which measures how many points a play was worth by comparing your chances of scoring before and after the snap, based on down, distance, and field position. An elite College Football {unit} has a Pass EPA per Play {pass_epa} and a Rush EPA per Play {rush_epa}.
+**EPA:** Expected Points Added, which measures how many points a play was worth by comparing your chances of scoring before and after the snap, based on down, distance, and field position.
 
-**Chunk Rate:** % of plays that gain between 10 and 19 yards. An elite College Football {unit} has a Passing Chunk Rate {pass_chunk} and a Rushing Chunk Rate {rush_chunk}.
-
-**Explosive Rate:** % of plays that gain 20+ yards. An elite College Football {unit} has a Passing Explosive Rate {pass_expl} and a Rushing Explosive Rate {rush_expl}.
+**Explosive Rate:** % of plays that are a rush of 10+ yards or a pass of 20+ yards.
 """
 
 
 def page_header(title: str, definitions: str | None = None) -> None:
-    """definitions: None (no text), "team", "offense", or "defense"."""
+    """definitions: None (no text), or "team", "offense", or "defense" to show the definitions."""
     st.title(title)
     if definitions:
-        bench = BENCHMARKS["defense" if definitions == "defense" else "offense"]
-        text = DEFINITIONS.format(unit=definitions, **bench)
-        st.caption(text.replace("<", "\\<").replace(">", "\\>"))  # keep < and > literal in Markdown
+        st.caption(DEFINITIONS.replace("<", "\\<").replace(">", "\\>"))  # keep < and > literal in Markdown
 
 
 # ---- Pages ----------------------------------------------------------------
