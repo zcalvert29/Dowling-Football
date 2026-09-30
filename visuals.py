@@ -35,6 +35,22 @@ SNAPSHOT_FILTERS = {
     "men_in_box": {"MEN IN BOX": [5, 6, 7, 8, 9]},
     "dchs_offense": {"RESULT": ["Complete", "Complete, Fumble", "Complete, TD", "Fumble", "Incomplete",
                                 "Interception", "Rush", "Rush, TD", "Sack", "Scramble"]},
+    "d_run_play_results": {"OFF PLAY": ["FOLD", "GIVE @ 1", "GIVE @ 2", "JET", "POWER", "QB COUNTER",
+                                        "TACKLE FOLD", "TOSS", "TOWARD"]},
+    "d_pass_play_results": {"OFF PLAY": ["BOOT @ 8", "BOOT @ 9", "FLOOD", "HB SCREEN", "LEVELS", "MESH",
+                                         "STICK", "TE DELAY", "VERTICAL"]},
+    "o_pass_play_results": {"OFF PLAY": [
+        "BOUND COVER", "BOUND COVER LOW", "BOUND FEVER", "BOUND HOOK AND GO", "BOUND NILE", "BOUND PETRINO",
+        "BOUND PIPE COVER SWITCH", "BOUND PIPE DIVA SWITCH", "BOUND PIPE FLOODS", "BOUND PIPE MILLS COVER",
+        "BOUND PIPE MILLS SWITCH", "BOUND SWAP STICK", "BOUND UNCOIL COVER", "BOUND UNCOIL DIVA",
+        "BOUND UNCOIL DIVA SWITCH", "BOUND VOLS", "BOUND VOLS SWITCH", "BOUND VOLS SWITCH LOW",
+        "BREAK LEAK COVER", "BREAK LEAK COVER SWITCH", "BREAK LEAK DIVA SWITCH", "BREAK Q HAWKEYES H PIPE",
+        "BREAK SPRAY JOHN C", "BREAK SWAP STICK", "BREAK UNCOIL DIVA", "FLASH DRAGON", "FLASH LIZARD",
+        "HAIL MARY", "HAWKEYES C", "HAWKEYES KEY 2", "HAWKEYES OZZY", "HERKY", "HERKY OZZY", "ICE ALABAMA",
+        "MIRROR BULLDOGS", "MIRROR BULLDOGS SLICE EGYPT", "MIRROR PATRIOTS TEAL", "PATRIOTS C",
+        "PATRIOTS JAGUARS", "PATRIOTS KEY 3", "PIPE JUKE", "RAIN", "SEARCH JUKE", "SNAP BEAU POST",
+        "TEAR ICE COVER", "TECH SEARCH DIVA SWITCH",
+    ]},
 }
 
 DISTANCE_ORDER = ["Short (1-3 yards)", "Medium (4-6 yds)", "Long (7-10 yds)", "Extra Long (11+ yds)"]
@@ -100,6 +116,10 @@ FORMATS = {
     **{m: PCT for m in ["Pass Rate", "Rush Rate", "Success Rate", "Explosive Rate",
                         "3rd Down Conversion Rate", "4th Down Conversion Rate"]},
 }
+
+
+# Columns shared by the per-play-call "Game Detail" tables
+PLAY_RESULT_MEASURES = ["Avg Yards Gained", "Success Rate", "EPA per Play", "Explosive Rate", "Plays"]
 
 
 # ---------------------------------------------------------------------------
@@ -200,6 +220,14 @@ def render_run_scheme_detail(df):
     show_table("DCHS O Run Scheme Detail", t)
 
 
+def render_o_pass_game_detail(df):
+    """Tableau sheet: DCHS O Pass Play Results (sorted by play count, like the Tableau shelf sort)."""
+    d = run_pass(df[df["offense"] == TEAM], ["Pass"])
+    d = keep(d, "o_pass_play_results", "OFF PLAY")
+    t = crosstab(d, "OFF PLAY", PLAY_RESULT_MEASURES, sort_by_count=True)
+    show_table("DCHS O Pass Game Detail", t)
+
+
 def render_dchs_intended_pass_distance(df):
     d = downs(df[df["offense"] == TEAM])
     counts = d.dropna(subset=["AIR YARDS"]).groupby("Air Yards Bin", observed=True)["AIR YARDS"].count()
@@ -273,6 +301,22 @@ def render_d_pass_coverage(df):
     t = crosstab(d, "COVERAGE", ["Avg Yards Gained", "EPA per Play", "Success Rate", "Explosive Rate", "Plays"],
                  sort_by_count=True)
     show_table("DCHS D Pass Coverage Stats", t)
+
+
+def render_d_run_game_detail(df):
+    """Tableau sheet: DCHS D Run Play Results."""
+    d = run_pass(df[df["defense"] == TEAM], ["Run"])
+    d = keep(d, "d_run_play_results", "OFF PLAY")
+    t = crosstab(d, "OFF PLAY", PLAY_RESULT_MEASURES)
+    show_table("DCHS D Run Game Detail", t)
+
+
+def render_d_pass_game_detail(df):
+    """Tableau sheet: DCHS D Pass Play Results."""
+    d = run_pass(df[df["defense"] == TEAM], ["Pass"])
+    d = keep(d, "d_pass_play_results", "OFF PLAY")
+    t = crosstab(d, "OFF PLAY", PLAY_RESULT_MEASURES)
+    show_table("DCHS D Pass Game Detail", t)
 
 
 def render_d_vs_formation(df):

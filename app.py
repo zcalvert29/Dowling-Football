@@ -66,6 +66,7 @@ def dchs_o_run_game():
 
 def dchs_o_pass_game():
     page_header("DCHS O Pass Game")
+    v.render_o_pass_game_detail(df)
     v.render_dchs_intended_pass_distance(df)
     v.render_pass_vs_box(df)
 
@@ -91,11 +92,13 @@ def dchs_d_overview():
 def dchs_d_run_game():
     page_header("DCHS D Run Game", definitions="defense")
     v.render_d_rush_vs_box(df)
+    v.render_d_run_game_detail(df)
 
 
 def dchs_d_pass_game():
     page_header("DCHS D Pass Game")
     v.render_d_pass_coverage(df)
+    v.render_d_pass_game_detail(df)
 
 
 def scout_opposing_offense():
