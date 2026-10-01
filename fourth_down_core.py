@@ -1,7 +1,8 @@
 """
 fourth_down_core.py — the 4th Down Bot's decision math, with no Streamlit
 code, so other pages (e.g. the 4th-down decision review) can reuse it.
-Moved here unchanged from Fourth_Downs.py, which now imports it.
+Fourth_Downs.py imports it; the 4th-down review on the Win Probability page
+uses the same functions.
 """
 import numpy as np
 
@@ -68,10 +69,39 @@ def fg_prob(yards_to_goal, wind_speed=0, wind_direction="Into", rain=False, snow
     return float(np.clip(adjusted, 0.0, 1.0))
 
 
+# Net punt from deep in your own territory. Measured from the curated data:
+# through week 5, Dowling netted 31.5 per punt and opponents 30.9, so the old
+# college-style 35 overstated what a high school punt is worth.
+DEEP_PUNT_NET = 32.0
+
+
 def punt_net_yards(yards_to_goal):
     if yards_to_goal > 60:
-        return 35.0 # 35 net yards on punt
+        return DEEP_PUNT_NET
     return float(np.clip(yards_to_goal - 20, 5, 40))
+
+
+# ==============================================================================
+# CLOCK: high school quarters are 12 minutes; the WP model was trained on
+# 15-minute college quarters. Scale the whole high school clock by 15/12 so the
+# model sees the same share of the game remaining (e.g. 6:00 left in a high
+# school 4th quarter = 7:30 left in a college 4th quarter).
+# ==============================================================================
+HS_QUARTER_SECONDS = 12 * 60
+MODEL_QUARTER_SECONDS = 15 * 60
+CLOCK_SCALE = MODEL_QUARTER_SECONDS / HS_QUARTER_SECONDS
+
+
+def model_seconds_remaining(quarter, hs_seconds_left_in_quarter):
+    """High school clock (quarter 1-4, seconds left in it) -> model game seconds remaining."""
+    q = min(max(int(quarter), 1), 4)
+    return (4 - q) * MODEL_QUARTER_SECONDS + float(hs_seconds_left_in_quarter) * CLOCK_SCALE
+
+
+def half_seconds_from_game(seconds_remaining):
+    """Seconds left in the current half, from game seconds remaining (model clock)."""
+    half = MODEL_QUARTER_SECONDS * 2
+    return seconds_remaining - half if seconds_remaining > half else seconds_remaining
 
 
 # ==============================================================================
@@ -88,7 +118,9 @@ MAX_FG_KICK_DISTANCE = 62  # yards_to_goal + 17
 def evaluate_options(yards_to_goal, distance, score_diff, seconds_remaining,
                       off_timeouts=3, def_timeouts=3, is_home_pos=1,
                       wind_speed=0, wind_direction="Into", rain=False, snow=False):
-    half_seconds = min(seconds_remaining, 1800)
+    # Seconds left in the HALF. (This used to be min(game seconds, 1800), which
+    # told the model a full half remained for every 2nd-quarter snap.)
+    half_seconds = half_seconds_from_game(seconds_remaining)
     p_conv = conversion_prob(distance)
 
     def wp_of(yards_to_goal_, down_, distance_, score_diff_, is_home_pos_):
@@ -145,3 +177,28 @@ def evaluate_options(yards_to_goal, distance, score_diff, seconds_remaining,
 
     wp = {k: v["wp"] for k, v in options.items()}
     return {"wp": wp, "options": options, "p_conv": p_conv, "p_fg": p_fg}
+
+
+# ==============================================================================
+# Neutral site: the WP model includes home-field advantage. When home/away
+# isn't known (the 4th-down review) average the two so neither team gets it.
+# ==============================================================================
+def evaluate_neutral(yards_to_goal, distance, score_diff, seconds_remaining, **kwargs):
+    kwargs.pop("is_home_pos", None)
+    home = evaluate_options(yards_to_goal, distance, score_diff, seconds_remaining, is_home_pos=1, **kwargs)
+    away = evaluate_options(yards_to_goal, distance, score_diff, seconds_remaining, is_home_pos=0, **kwargs)
+    options = {}
+    for k, h in home["options"].items():
+        a = away["options"][k]
+        avg = lambda x, y: None if x is None else (x + y) / 2
+        options[k] = {f: avg(h[f], a[f]) for f in h}
+    return {"wp": {k: v["wp"] for k, v in options.items()}, "options": options,
+            "p_conv": home["p_conv"], "p_fg": home["p_fg"]}
+
+
+def evaluate_site(site, yards_to_goal, distance, score_diff, seconds_remaining, **kwargs):
+    """site: "home", "away", or "neutral" (from the offense's point of view)."""
+    if site == "neutral":
+        return evaluate_neutral(yards_to_goal, distance, score_diff, seconds_remaining, **kwargs)
+    return evaluate_options(yards_to_goal, distance, score_diff, seconds_remaining,
+                            is_home_pos=1 if site == "home" else 0, **kwargs)

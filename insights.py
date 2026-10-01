@@ -553,10 +553,16 @@ def _table_html(t: pd.DataFrame, fmt: dict, index: bool = True) -> str:
     return (sty if index else sty.hide(axis="index")).to_html()
 
 
-def build_report_html(df: pd.DataFrame, df_any_down: pd.DataFrame, opponent: str, filters_text: str) -> str:
+def build_report_html(df: pd.DataFrame, df_any_down: pd.DataFrame, opponent: str, filters_text: str,
+                      notes: str = "") -> str:
+    import html as _html
+
     ink = "#31333F"
     sections = [f"<h1>{opponent} offense scouting report</h1>",
                 f'<p class="sub">{TEAM} · {filters_text} · generated {_date.today():%b %d, %Y}</p>']
+    if notes:
+        sections.append(f'<div class="block"><h2>Staff notes</h2><p style="white-space:pre-wrap">'
+                        f'{_html.escape(notes)}</p></div>')
     dd = v.dd_tendency_html(df_any_down, opponent, ink)
     if dd:
         sections.append(f'<div class="block"><h2>Down and distance tendencies</h2>{dd}</div>')
@@ -605,6 +611,7 @@ def _tag_scope(df: pd.DataFrame, scope: str) -> pd.DataFrame:
     return rp
 
 
+@st.cache_data(show_spinner=False)
 def tagging_coverage(df: pd.DataFrame) -> pd.DataFrame:
     rows = {}
     for gid in games(df):
@@ -653,12 +660,12 @@ def render_tagging_coverage(df: pd.DataFrame) -> None:
 # Win probability and 4th-down review
 #
 # The data has no game clock, so the clock is estimated by spreading each
-# quarter's plays evenly across the quarter. Time is converted the same way
-# the 4th Down Bot does it (12-minute current quarter, 15-minute quarters
-# after it), and home/away is unknown, so is_home_pos = 0 throughout.
+# quarter's scrimmage plays evenly across the 12-minute quarter. That high
+# school clock is then scaled by 15/12 for the model (trained on 15-minute
+# college quarters), exactly like the 4th Down Bot page. Home/away isn't in
+# the data, so every evaluation is neutral-site (home and away averaged).
 # ---------------------------------------------------------------------------
 HS_QUARTER = 12 * 60
-MODEL_QUARTER = 15 * 60
 
 
 def _with_pre_snap_score(g: pd.DataFrame) -> pd.DataFrame:
@@ -684,27 +691,28 @@ def _scrimmage(g: pd.DataFrame) -> pd.DataFrame:
 
 
 def _estimate_clock(d: pd.DataFrame) -> pd.DataFrame:
+    import fourth_down_core as fd
+
     d = d.copy()
-    d["_i"] = d.groupby("QTR").cumcount()
-    d["_n"] = d.groupby("QTR")["QTR"].transform("size")
+    d["_i"] = d.groupby(["game_id", "QTR"]).cumcount()
+    d["_n"] = d.groupby(["game_id", "QTR"])["QTR"].transform("size")
     secs_in_q = HS_QUARTER * (1 - (d["_i"] + 0.5) / d["_n"])
-    q = d["QTR"].clip(upper=4)
-    d["seconds_remaining"] = (4 - q) * MODEL_QUARTER + secs_in_q
-    d["half_seconds"] = d["seconds_remaining"].clip(upper=1800)
+    d["seconds_remaining"] = [fd.model_seconds_remaining(q, s) for q, s in zip(d["QTR"], secs_in_q)]
+    d["half_seconds"] = [fd.half_seconds_from_game(s) for s in d["seconds_remaining"]]
     d["clock"] = [f"Q{int(qq)} {int(s // 60)}:{int(s % 60):02d}" for qq, s in zip(d["QTR"], secs_in_q)]
     return d.drop(columns=["_i", "_n"])
 
 
 def _predict_wp(d: pd.DataFrame) -> np.ndarray:
-    """Offense win probability for each row (vectorized model_utils.predict_wp_chained)."""
+    """Offense win probability for each row, neutral site (vectorized predict_wp_chained)."""
     import model_utils as mu
 
     ytg = d["YARDLINE_100"].astype(float).to_numpy()
     dist = d["DIST"].astype(float).to_numpy()
     down = d["DN"].astype(int).to_numpy()
     sd = (d["pre_off_score"] - d["pre_def_score"]).astype(float).to_numpy()
-    half = d["half_seconds"].to_numpy()
-    game = d["seconds_remaining"].to_numpy()
+    half = d["half_seconds"].to_numpy(dtype=float)
+    game = d["seconds_remaining"].to_numpy(dtype=float)
     dummies = np.stack([(down == k).astype(float) for k in (1, 2, 3, 4)], axis=1)
     to = np.full(len(d), 3.0)
 
@@ -714,12 +722,16 @@ def _predict_wp(d: pd.DataFrame) -> np.ndarray:
                                 (dist >= ytg).astype(float)])
         ep = mu._ep_booster.predict(xgb.DMatrix(ep_x, feature_names=mu.EP_FEATURE_ORDER))
         ratio = sd / (game / 60 + 1)
-        wp_x = np.column_stack([ep, sd, ytg, dummies, dist, half, game, to, to, np.zeros(len(d)), ratio])
-        return mu._wp_booster.predict(xgb.DMatrix(wp_x, feature_names=mu.WP_FEATURE_ORDER))
+        out = []
+        for home in (0.0, 1.0):
+            wp_x = np.column_stack([ep, sd, ytg, dummies, dist, half, game, to, to, np.full(len(d), home), ratio])
+            out.append(mu._wp_booster.predict(xgb.DMatrix(wp_x, feature_names=mu.WP_FEATURE_ORDER)))
+        return (out[0] + out[1]) / 2
     ep = np.array([mu._heuristic_ep(y) for y in ytg])
     return np.array([mu._heuristic_wp(s, gs, e) for s, gs, e in zip(sd, game, ep)])
 
 
+@st.cache_data(show_spinner=False)
 def win_probability(g: pd.DataFrame) -> pd.DataFrame:
     """Dowling's win probability before each scrimmage play of one game."""
     d = _estimate_clock(_scrimmage(g))
@@ -747,8 +759,8 @@ def render_win_probability(g: pd.DataFrame, opponent: str) -> None:
     chart = alt.layer(
         alt.Chart(pd.DataFrame({"y": [0.5]})).mark_rule(color=GRAY, strokeDash=[2, 4]).encode(y="y:Q"),
         alt.Chart(q_marks).mark_rule(color=GRAY, opacity=0.4).encode(x="play_n:Q"),
-        alt.Chart(q_marks).mark_text(align="left", dx=4, dy=-120, color=GRAY).encode(
-            x="play_n:Q", text=alt.Text("QTR:Q", format="d")),
+        alt.Chart(q_marks.assign(lab=lambda x: "Q" + x["QTR"].astype(int).astype(str))).mark_text(
+            align="left", dx=4, color=GRAY).encode(x="play_n:Q", y=alt.value(10), text="lab:N"),
         alt.Chart(line).mark_line(color="#185FA5", strokeWidth=2.5, interpolate="step-after").encode(
             x=alt.X("play_n:Q", title="Play"),
             y=alt.Y("dchs_wp:Q", title=f"{TEAM} win probability", scale=alt.Scale(domain=[0, 1]),
@@ -757,11 +769,12 @@ def render_win_probability(g: pd.DataFrame, opponent: str) -> None:
     ).properties(height=320)
     st.altair_chart(chart, width="stretch")
     mode = "trained models" if mu.USING_REAL_MODELS else "fallback heuristic (model files not found)"
-    st.caption(f"Uses the 4th Down Bot's {mode}. There's no game clock in the data, so time is estimated by "
-               f"spreading each quarter's plays evenly. Treat it as the shape of the game, not exact numbers.")
+    st.caption(f"Uses the 4th Down Bot's {mode}, neutral site. There's no game clock in the data, so time is "
+               f"estimated by spreading each quarter's plays evenly. Treat it as the shape of the game, not exact "
+               f"numbers.")
 
     nxt = np.append(d["dchs_wp"].to_numpy()[1:], final)
-    d["swing"] = nxt - d["dchs_wp"].to_numpy()
+    d = d.assign(swing=nxt - d["dchs_wp"].to_numpy())
     top = d.reindex(d["swing"].abs().sort_values(ascending=False).index).head(5)
     t = plays_table(top).assign(**{"Est. clock": top["clock"].to_numpy(), "Offense": top["offense"].to_numpy(),
                                    "WP swing": top["swing"].to_numpy()})
@@ -777,59 +790,280 @@ def render_win_probability(g: pd.DataFrame, opponent: str) -> None:
                  .apply(color, subset=["WP swing"]), width="stretch", hide_index=True)
 
 
+# ---------------------------------------------------------------------------
+# 4th-down decision review: ledger, map, and one card per decision
+# ---------------------------------------------------------------------------
+TOSS_UP_PTS = 1.0   # under 1 point of win probability = either call is fine (nfl4th's cutoff)
+OPTION_SHORT = {"Go for it": "Go", "Field goal": "FG", "Punt": "Punt"}
+
+
+def _spot_text(ytg: float, opp: str) -> str:
+    ytg = int(round(ytg))
+    if ytg == 50:
+        return "the 50"
+    return f"own {100 - ytg}" if ytg > 50 else f"{opp} {ytg}"
+
+
+@st.cache_data(show_spinner="Checking every 4th down...")
 def fourth_down_review(df: pd.DataFrame) -> pd.DataFrame:
-    """Every Dowling 4th down: what we did vs what the 4th Down Bot recommends."""
+    """Every Dowling 4th down: what we did vs what the 4th Down Bot recommends (neutral site)."""
     import fourth_down_core as fd
+    import model_utils as mu
 
     rows = []
     for gid in games(df):
         g = df[df["game_id"] == gid]
+        opp = opponent_of(gid)
         d = _estimate_clock(_scrimmage(g))
         d = d[(d["offense"] == TEAM) & (d["DN"] == 4)]
         for _, r in d.iterrows():
             pt = r["PLAY TYPE"]
             did = "Punt" if pt in PUNT_TYPES else "Field goal" if pt in FG_TYPES else "Go for it"
-            res = fd.evaluate_options(
-                yards_to_goal=float(r["YARDLINE_100"]), distance=float(max(r["DIST"], 1)),
-                score_diff=float(r["pre_off_score"] - r["pre_def_score"]),
-                seconds_remaining=float(r["seconds_remaining"]), is_home_pos=0,
-            )
+            sd = float(r["pre_off_score"] - r["pre_def_score"])
+            res = fd.evaluate_neutral(float(r["YARDLINE_100"]), float(max(r["DIST"], 1)), sd,
+                                      float(r["seconds_remaining"]))
             wp = res["wp"]
-            best = max(wp, key=wp.get)
+            ranked = sorted(wp.items(), key=lambda kv: -kv[1])
+            best, best_wp = ranked[0]
+            margin = (best_wp - ranked[1][1]) * 100 if len(ranked) > 1 else 100.0
             chosen = wp.get(did, np.nan)
+            left = (best_wp - chosen) * 100 if pd.notna(chosen) else np.nan
+            if pd.isna(chosen):
+                category = "Not modeled"
+            elif did == best or left < TOSS_UP_PTS:
+                category = "Agreed" if did == best else "Toss-up"
+            else:
+                category = "Costly"
+            us, them = int(r["pre_off_score"]), int(r["pre_def_score"])
+            score = f"up {us}-{them}" if us > them else f"down {us}-{them}" if us < them else f"tied {us}-{them}"
             rows.append({
-                "Game": game_label(df, gid), "Est. clock": r["clock"], "Score": f'{int(r["pre_off_score"])}-'
-                f'{int(r["pre_def_score"])}', "Down & dist": f'4th & {int(r["DIST"])}',
-                "Spot": _yard_label(100 - r["YARDLINE_100"]), "We chose": did, "Bot says": best,
-                "WP if we": chosen, "WP if bot": wp[best], "WP left": wp[best] - chosen if pd.notna(chosen) else np.nan,
-                "Result": r["RESULT"],
+                "game": gid, "Game": game_label(df, gid), "opp": opp, "Est. clock": r["clock"], "score_text": score,
+                "dist": int(r["DIST"]), "ytg": float(r["YARDLINE_100"]),
+                "Situation": f"4th & {int(r['DIST'])} at {_spot_text(r['YARDLINE_100'], opp)}",
+                "We chose": did, "Model": best, "Strength": mu.strength_tier(margin),
+                "WP if we": chosen, "WP if model": best_wp, "WP left (pts)": left, "category": category,
+                "options": res["options"], "Result": r["RESULT"],
             })
     return pd.DataFrame(rows)
 
 
+# --- Ledger ------------------------------------------------------------------
+def ledger_html(t: pd.DataFrame) -> str:
+    n = len(t)
+    agreed = int((t["category"] == "Agreed").sum())
+    costly = t[t["category"] == "Costly"]
+    toss = int((t["category"] == "Toss-up").sum())
+    left = costly["WP left (pts)"].sum()
+    kpi = "".join(
+        f'<div style="background:rgba(128,128,128,.08);border-radius:8px;padding:8px 12px">'
+        f'<div style="font-size:12px;opacity:.65">{k}</div><div style="font-size:20px;font-weight:600">{v}</div></div>'
+        for k, v in [("4th downs", n), ("Agreed with the model", agreed), ("Costly disagreements", len(costly)),
+                     ("Win prob. left on the table", f"{left:.1f} pts")])
+    seg = lambda c, k: f'<span style="width:{k / n * 100:.1f}%;background:{c}"></span>' if n and k else ""
+    bar = (f'<div style="display:flex;height:14px;border-radius:4px;overflow:hidden;margin:12px 0 6px">'
+           f'{seg(GREEN, agreed)}{seg(RED, len(costly))}{seg("#B4B2A9", toss)}</div>')
+    legend = (f'<div style="display:flex;flex-wrap:wrap;gap:14px;font-size:12px;opacity:.75;margin-bottom:14px">'
+              f'<span>■ <span style="color:{GREEN}">Agreed ({agreed})</span></span>'
+              f'<span>■ <span style="color:{RED}">Disagreed, cost 1+ point ({len(costly)})</span></span>'
+              f'<span>■ <span style="opacity:.8">Disagreed, toss-up under 1 point ({toss})</span></span></div>')
+    dis = t[t["category"].isin(["Costly", "Toss-up"])].sort_values("WP left (pts)", ascending=False)
+    rows = []
+    for _, r in dis.iterrows():
+        o = r["options"].get(r["Model"], {})
+        if r["Model"] == "Go for it":
+            odds = f'{o.get("success_prob", 0):.0%} to convert'
+        elif r["Model"] == "Field goal":
+            odds = f'{o.get("success_prob", 0):.0%} to make'
+        else:
+            odds = "punt"
+        pts = r["WP left (pts)"]
+        faded = "" if r["category"] == "Costly" else "opacity:.55;"
+        rows.append(
+            f'<div style="display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1.1fr) 150px;gap:12px;'
+            f'align-items:center;padding:9px 0;border-top:0.5px solid rgba(128,128,128,.3);font-size:13px;{faded}">'
+            f'<div><div style="font-weight:600">{r["Situation"]}</div>'
+            f'<div style="font-size:12px;opacity:.7">{r["Game"]} · {r["Est. clock"]} · {r["score_text"]}</div></div>'
+            f'<div style="font-size:12px"><span style="padding:1px 8px;border-radius:999px;background:rgba(128,128,128,.15)">'
+            f'We: {OPTION_SHORT[r["We chose"]]}</span> → <span style="padding:1px 8px;border-radius:999px;'
+            f'background:#E1F5EE;color:#085041">Model: {OPTION_SHORT[r["Model"]]}</span>'
+            f'<div style="opacity:.7;margin-top:3px">{odds}</div></div>'
+            f'<div><div style="font-weight:600;margin-bottom:3px">{"&lt; 0.1" if pts < 0.05 else f"+{pts:.1f}"} pts</div>'
+            f'<div style="height:12px;background:rgba(128,128,128,.12);border-radius:3px">'
+            f'<div style="height:12px;border-radius:3px;width:{max(min(pts / 8, 1) * 100, 2):.0f}%;'
+            f'background:{RED if r["category"] == "Costly" else "#B4B2A9"}"></div></div></div></div>')
+    body = "".join(rows) if rows else '<div style="font-size:13px;opacity:.7">Every decision agreed with the model.</div>'
+    return (f'<div style="font-family:inherit"><div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));'
+            f'gap:8px">{kpi}</div>{bar}{legend}'
+            f'<div style="font-size:12px;opacity:.6;display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1.1fr) '
+            f'150px;gap:12px;padding-bottom:4px"><span>Disagreements</span><span>Our call vs model</span>'
+            f'<span>Win prob. at stake</span></div>{body}</div>')
+
+
+# --- Map ---------------------------------------------------------------------
+MAP_YTG = list(range(5, 100, 5))
+MAP_DIST = list(range(1, 16))
+MAP_COLORS = {"G": "#9FE1CB", "F": "#FAC775", "P": "#D3D1C7", "T": "rgba(128,128,128,.10)"}
+
+
+@st.cache_data(show_spinner="Building the decision map (first load only)...", persist="disk")
+def decision_map_grid(score_diff: int = 0) -> list[list[str]]:
+    """Model's call for each (yards to goal, distance): tie game, start of Q3, neutral site."""
+    import fourth_down_core as fd
+
+    secs = fd.model_seconds_remaining(3, HS_QUARTER)
+    grid = []
+    for ytg in MAP_YTG:
+        row = []
+        for dist in MAP_DIST:
+            if dist > ytg:
+                row.append("")
+                continue
+            wp = fd.evaluate_neutral(float(ytg), float(dist), float(score_diff), secs)["wp"]
+            ranked = sorted(wp.items(), key=lambda kv: -kv[1])
+            toss = len(ranked) > 1 and (ranked[0][1] - ranked[1][1]) * 100 < TOSS_UP_PTS
+            row.append("T" if toss else ranked[0][0][0])
+        grid.append(row)
+    return grid
+
+
+def decision_map_html(t: pd.DataFrame, grid: list[list[str]]) -> str:
+    max_d = len(MAP_DIST)
+    cells = []
+    for i, ytg in enumerate(MAP_YTG):
+        for j, c in enumerate(grid[i]):
+            if not c:
+                continue
+            cells.append(f'<span style="position:absolute;left:{100 - ytg - 2.5}%;width:5%;bottom:{j / max_d * 100}%;'
+                         f'height:{100 / max_d}%;background:{MAP_COLORS[c]}"></span>')
+    lines = "".join(f'<span style="position:absolute;top:0;bottom:0;left:{x}%;border-left:{"1.5px" if x == 50 else "0.5px"} '
+                    f'solid rgba(255,255,255,.7)"></span>' for x in range(10, 100, 10))
+    seen, dots = {}, []
+    for _, r in t.iterrows():
+        key = (round(r["ytg"]), min(r["dist"], 15))
+        k = seen[key] = seen.get(key, 0) + 1
+        col = GREEN if r["category"] == "Agreed" else RED if r["category"] == "Costly" else GRAY
+        tip = (f'{r["Game"]} {r["Est. clock"]} · {r["score_text"]} · {r["Situation"]}&#10;We: {r["We chose"]} · '
+               f'Model: {r["Model"]}' + ("" if r["category"] == "Agreed" else f' ({r["WP left (pts)"]:.1f} pts)'))
+        x = 100 - r["ytg"] + (k - 1) * 2.2
+        y = (min(r["dist"], 15) - 0.5) / max_d * 100
+        dots.append(f'<span title="{tip}" style="position:absolute;left:{x}%;bottom:{y}%;width:22px;height:22px;'
+                    f'margin:0 0 -11px -11px;border-radius:50%;display:flex;align-items:center;justify-content:center;'
+                    f'font-size:10px;font-weight:600;color:#fff;background:{col};border:2px solid #fff;cursor:default">'
+                    f'{OPTION_SHORT[r["We chose"]][0]}</span>')
+    yticks = "".join(f'<span style="position:absolute;right:4px;bottom:{(d - 0.5) / max_d * 100}%;transform:translateY(50%)">'
+                     f'{d}{"+" if d == 15 else ""}</span>' for d in (1, 5, 10, 15))
+    xticks = "".join(f'<span style="position:absolute;left:{x}%;transform:translateX(-50%)">'
+                     f'{"50" if x == 50 else ("Own " + str(x)) if x < 50 else ("Opp " + str(100 - x))}</span>'
+                     for x in range(10, 100, 10))
+    sw = lambda c, lab: (f'<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:12px;height:12px;'
+                         f'border-radius:2px;background:{c};border:0.5px solid rgba(128,128,128,.4)"></span>{lab}</span>')
+    dot = lambda c, lab: (f'<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:12px;'
+                          f'height:12px;border-radius:50%;background:{c}"></span>{lab}</span>')
+    return (
+        f'<div style="font-family:inherit;font-size:12px">'
+        f'<div style="display:flex;flex-wrap:wrap;gap:14px;margin-bottom:6px;opacity:.8"><span>Model\'s call (tie game, '
+        f'start of Q3, neutral site):</span>{sw(MAP_COLORS["G"], "Go")}{sw(MAP_COLORS["F"], "Field goal")}'
+        f'{sw(MAP_COLORS["P"], "Punt")}{sw(MAP_COLORS["T"], "Toss-up")}</div>'
+        f'<div style="display:flex;flex-wrap:wrap;gap:14px;margin-bottom:8px;opacity:.8"><span>Our decisions '
+        f'(letter = what we did):</span>{dot(GREEN, "Agreed")}{dot(RED, "Disagreed, cost 1+ point")}'
+        f'{dot(GRAY, "Disagreed, toss-up")}</div>'
+        f'<div style="display:grid;grid-template-columns:34px 1fr;gap:6px">'
+        f'<div style="position:relative;height:330px;opacity:.6">{yticks}</div>'
+        f'<div><div style="position:relative;height:330px;border-radius:6px;overflow:hidden">{"".join(cells)}{lines}'
+        f'{"".join(dots)}</div><div style="position:relative;height:16px;opacity:.6">{xticks}</div></div></div>'
+        f'<div style="opacity:.6;margin-top:6px">Up = longer to go; right = closer to the opponent\'s goal. A dot can '
+        f'disagree with the background because the real score and clock change the call. Hover a dot for details.</div>'
+        f'</div>')
+
+
+# --- Decision card -----------------------------------------------------------
+def decision_card_html(r: pd.Series) -> str:
+    ytg, dist = r["ytg"], r["dist"]
+    pos = lambda x: 6 + x * 0.88
+    ball, line = pos(100 - ytg), pos(min(100 - ytg + dist, 100))
+    field = ('<div style="position:relative;height:28px;border-radius:6px;background:rgba(128,128,128,.10);overflow:hidden">'
+             '<span style="position:absolute;top:0;bottom:0;left:0;width:6%;background:rgba(128,128,128,.18)"></span>'
+             '<span style="position:absolute;top:0;bottom:0;right:0;width:6%;background:rgba(128,128,128,.18)"></span>'
+             + "".join(f'<span style="position:absolute;top:0;bottom:0;left:{pos(x)}%;border-left:'
+                       f'{"1px solid rgba(128,128,128,.6)" if x == 50 else "0.5px solid rgba(128,128,128,.35)"}"></span>'
+                       for x in range(10, 100, 10))
+             + f'<span style="position:absolute;top:5px;height:18px;left:{ball}%;width:{line - ball}%;'
+               f'background:rgba(239,159,39,.22)"></span>'
+             f'<span style="position:absolute;top:0;bottom:0;left:{ball}%;border-left:2px solid #185FA5"></span>'
+             f'<span style="position:absolute;top:0;bottom:0;left:{line}%;border-left:2px solid #EF9F27"></span></div>')
+    did, best, cat = r["We chose"], r["Model"], r["category"]
+    verb = {"Go for it": "went for it", "Field goal": "kicked the field goal", "Punt": "punted"}[did]
+    if cat == "Agreed":
+        box, text = ("#E1F5EE", "#085041"), f'We {verb}, and the model agrees ({r["Strength"].lower()}).'
+    elif cat == "Toss-up":
+        box, text = ("rgba(128,128,128,.12)", "inherit"), (f'We {verb}; the model slightly prefers '
+                                                            f'{best.lower()}, but it\'s a toss-up (under 1 point).')
+    elif cat == "Costly":
+        box, text = ("#FAEEDA", "#633806"), (f'We {verb}. The model says <b>{best.lower()}</b>, worth '
+                                             f'+{r["WP left (pts)"]:.1f} win probability points.')
+    else:
+        box, text = ("rgba(128,128,128,.12)", "inherit"), f"We {verb}; that option isn't modeled from this spot."
+    opts = []
+    for name in ("Go for it", "Field goal", "Punt"):
+        o = r["options"].get(name)
+        chips = ""
+        if name == best:
+            chips += '<span style="font-size:11px;padding:1px 8px;border-radius:999px;background:#E1F5EE;color:#085041;margin-right:4px">Model\'s call</span>'
+        if name == did:
+            chips += '<span style="font-size:11px;padding:1px 8px;border-radius:999px;background:rgba(128,128,128,.18)">Our call</span>'
+        if o is None:
+            why = "Not an option inside the 35" if name == "Punt" else "Out of field goal range"
+            opts.append(f'<div style="display:grid;grid-template-columns:120px 1fr 60px;gap:12px;align-items:center;'
+                        f'padding:10px 0;border-top:0.5px solid rgba(128,128,128,.3);opacity:.55">'
+                        f'<div style="font-weight:600">{name}</div><div style="font-size:13px">{why}</div><div></div></div>')
+            continue
+        if o["success_prob"] is None:
+            bars = (f'<div style="display:flex;height:24px;border-radius:5px;overflow:hidden;font-size:12px">'
+                    f'<span style="width:100%;background:rgba(128,128,128,.18);display:flex;align-items:center;'
+                    f'padding:0 8px">Punt → {o["wp"]:.0%} WP</span></div>')
+        else:
+            ok, bad = ("Convert", "Stopped") if name == "Go for it" else ("Make", "Miss")
+            p = o["success_prob"]
+            bars = (f'<div style="display:flex;height:24px;border-radius:5px;overflow:hidden;font-size:12px">'
+                    f'<span style="width:{p * 100:.0f}%;background:#9FE1CB;color:#04342C;display:flex;align-items:center;'
+                    f'padding:0 8px;white-space:nowrap;overflow:hidden">{ok} {p:.0%} → {o["wp_success"]:.0%}</span>'
+                    f'<span style="width:{(1 - p) * 100:.0f}%;background:#F7C1C1;color:#501313;display:flex;'
+                    f'align-items:center;padding:0 8px;white-space:nowrap;overflow:hidden">{bad} → {o["wp_fail"]:.0%}</span></div>')
+        opts.append(f'<div style="display:grid;grid-template-columns:120px 1fr 60px;gap:12px;align-items:center;'
+                    f'padding:10px 0;border-top:0.5px solid rgba(128,128,128,.3)">'
+                    f'<div><div style="font-weight:600">{name}</div>{chips}</div>{bars}'
+                    f'<div style="font-size:20px;font-weight:600;text-align:right">{o["wp"]:.0%}</div></div>')
+    return (f'<div style="font-family:inherit;max-width:760px">'
+            f'<div style="display:flex;flex-wrap:wrap;gap:6px 16px;align-items:baseline;margin-bottom:6px">'
+            f'<span style="font-size:20px;font-weight:600">{r["Situation"]}</span>'
+            f'<span style="font-size:13px;opacity:.7">{r["Game"]} · {r["Est. clock"]} (est.) · Dowling {r["score_text"]}'
+            f' · result: {r["Result"]}</span></div>{field}'
+            f'<div style="background:{box[0]};color:{box[1]};border-radius:8px;padding:10px 14px;margin:12px 0;'
+            f'font-size:14px">{text}</div>{"".join(opts)}'
+            f'<div style="font-size:12px;opacity:.6;margin-top:8px">Bar width = chance of each outcome; arrows show '
+            f'win probability after it. The number on the right is the option\'s overall win probability. Blue line = '
+            f'ball, orange = line to gain.</div></div>')
+
+
 def render_fourth_down_review(df: pd.DataFrame) -> None:
-    st.markdown("**4th-down decisions vs the 4th Down Bot**")
     t = fourth_down_review(df)
     if t.empty:
         st.info("No Dowling 4th downs in the selected games.")
         return
-    agree = (t["We chose"] == t["Bot says"]).sum()
-    c = st.columns(3)
-    c[0].metric("4th downs", len(t))
-    c[1].metric("Agreed with the bot", f"{agree} of {len(t)}")
-    c[2].metric("WP left on the table", f'{t["WP left"].sum() * 100:.1f} pts')
-
-    def color(row):
-        ok = row["We chose"] == row["Bot says"]
-        style = "background-color:#E1F5EE;color:#085041" if ok else "background-color:#FCEBEB;color:#791F1F"
-        return [style if c in ("We chose", "Bot says") else "" for c in row.index]
-
-    st.dataframe(t.style.format({"WP if we": "{:.0%}", "WP if bot": "{:.0%}", "WP left": "{:+.1%}"}, na_rep="–")
-                 .apply(color, axis=1), width="stretch", hide_index=True)
-    st.caption("Same math as the 4th Down Bot page, using the score at the snap and the estimated clock "
-               "(no game clock in the data), "
-               "3 timeouts each, and no weather. WP left = how much win probability the bot's choice was worth "
-               "over ours; small numbers mean it was close to a toss-up.")
+    st.markdown("**Season ledger**" if df["game_id"].nunique() > 1 else "**Decision ledger**")
+    st.html(ledger_html(t))
+    st.markdown("**Decision map**")
+    st.html(decision_map_html(t, decision_map_grid()))
+    st.markdown("**Decision card**")
+    order = t.assign(_k=t["category"].map({"Costly": 0, "Toss-up": 1, "Agreed": 2, "Not modeled": 3}))
+    order = order.sort_values(["_k", "WP left (pts)"], ascending=[True, False])
+    labels = {i: f'{r["Game"]} · {r["Est. clock"]} · {r["Situation"]} ({r["category"].lower()})'
+              for i, r in order.iterrows()}
+    scope = "all" if df["game_id"].nunique() > 1 else str(df["game_id"].iat[0])
+    pick = st.selectbox("Pick a decision", list(labels), format_func=labels.get, key=f"g_fd_pick_{scope}")
+    st.html(decision_card_html(t.loc[pick]))
+    st.caption("Same math as the 4th Down Bot: score at the snap, estimated clock scaled to the model's 15-minute "
+               "quarters, neutral site, 3 timeouts each, no weather. Under 1 point of win probability is a toss-up.")
 
 
 # ---------------------------------------------------------------------------
@@ -898,6 +1132,9 @@ def render_add_game(existing_path: str) -> None:
                    "committing.")
     st.markdown("**Tagging check for this game**")
     st.dataframe(tagging_coverage(new).style.format("{:.0%}", na_rep="–"), width="stretch")
+    import qol  # local import: qol imports this module
+
+    qol.render_validation(new, "Possible tagging mistakes in this game")
     st.download_button("Download updated curated-pbp.xlsx", to_xlsx_bytes(combined), file_name="curated-pbp.xlsx",
                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", type="primary")
     st.caption("Next: replace curated-pbp.xlsx in the GitHub repo with this file, push, then reboot the app.")

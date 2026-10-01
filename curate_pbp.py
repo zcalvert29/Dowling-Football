@@ -43,9 +43,13 @@ def assign_offense_defense(team, opponent, plays):
     That means the opening kickoff and second-half kickoff no longer need
     to be seeded manually.
 
-    Every other kicking play (punts, fake punts, FGs, PATs, 2-point tries,
-    and blocks/defends of those) belongs to the team that was on offense
-    immediately before it. "Punt Rec" is included there: its DN/DIST always
+    PATs and 2-point tries are also assigned from the PLAY TYPE: "Extra Pt." /
+    "2 Pt." are `team`'s tries, and the Block/Defend versions are the
+    opponent's. (Copying the previous offense credited the PAT after a
+    defensive touchdown to the team that just gave up the touchdown.)
+
+    Every other kicking play (punts, fake punts, FGs, and blocks of those)
+    belongs to the team that was on offense immediately before it. "Punt Rec" is included there: its DN/DIST always
     continues the kicking team's stalled drive (e.g. DN=4, DIST=17
     matching their prior 3rd-and-13), so it stays attributed to the team
     that was actually driving, not the team about to receive.
@@ -62,9 +66,14 @@ def assign_offense_defense(team, opponent, plays):
     df = df[(df["ODK"] != "S") & (df["RESULT"] != "Timeout")].reset_index(drop=True)
 
     SAME_AS_PREV_OFFENSE = {
-        "Punt", "Punt Rec", "Fake Punt", "FG", "FG Block", "Extra Pt.", "Extra Pt. Block",
-        "2 Pt.", "2 Pt. Block", "2 Pt. Defend",
+        "Punt", "Punt Rec", "Fake Punt", "FG", "FG Block",
     }
+    # Tries are named from the filming team's side, like kickoffs: "Extra Pt." /
+    # "2 Pt." = team's try, the Block/Defend versions = opponent's try. Using
+    # the name (not the previous play) matters after a defensive touchdown,
+    # when the team that scored is the team that was just on defense.
+    OUR_TRIES = {"Extra Pt.", "2 Pt."}
+    THEIR_TRIES = {"Extra Pt. Block", "2 Pt. Block", "2 Pt. Defend"}
 
     offense_col, defense_col = [], []
     prev_offense, prev_defense = None, None
@@ -81,6 +90,10 @@ def assign_offense_defense(team, opponent, plays):
                 off, defn = opponent, team
             elif pt == "KO Rec":      # team receives
                 off, defn = team, opponent
+            elif pt in OUR_TRIES:
+                off, defn = team, opponent
+            elif pt in THEIR_TRIES:
+                off, defn = opponent, team
             elif pt in SAME_AS_PREV_OFFENSE:
                 off, defn = prev_offense, prev_defense
             else:
@@ -638,6 +651,12 @@ def add_play_detail_columns(df: pd.DataFrame, team: str, opponent: str, date: st
     df.loc[normal_play_mask, "SERIES"] = series_for_normal_plays.to_numpy()
     df["SERIES"] = df["SERIES"].ffill()  # carries into KO/PAT rows for now
     df.loc[df["PLAY TYPE"].isin(KICKOFF_TYPES), "SERIES"] = np.nan  # then null kickoffs back out
+    # A try after a DEFENSIVE touchdown belongs to the other team, so it isn't
+    # part of the series it would have inherited above (that series ended in
+    # the turnover). Leave it out, the same as kickoffs.
+    last_snap_offense = df["offense"].where(normal_play_mask).ffill()
+    other_teams_try = df["PLAY TYPE"].isin(XP_TYPES | TWO_PT_TYPES) & (df["offense"] != last_snap_offense)
+    df.loc[other_teams_try, "SERIES"] = np.nan
 
     # --- drive_result / SERIES_RESULT: computed on the last NON-kickoff
     # play of each drive/series, then broadcast to every play in it. ---

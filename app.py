@@ -8,6 +8,9 @@ Folder layout (everything sits next to this file):
     app.py              entrypoint: navigation, sidebar filters, page layouts
     visuals.py          scouting data prep, tables, and charts
     insights.py         game recap, self-scout, matchup, report, data tools, WP / 4th-down review
+    profiles.py         team profile radar charts benchmarked against FBS
+    build_cfb_benchmarks.py  builds cfb_benchmarks.csv from cfbfastR play-by-play (run locally)
+    cfb_benchmarks.csv  FBS team-by-team metric table the radar charts compare against
     curate_pbp.py       curation pipeline (used by the "Add a game" page)
     fourth_down_core.py 4th Down Bot decision math (shared with the 4th-down review)
     Fourth_Downs.py     4th Down Bot page
@@ -19,11 +22,18 @@ Folder layout (everything sits next to this file):
 import streamlit as st
 
 import insights as ins
+import profiles
+import qol
+import special_teams
 import visuals as v
 
 DATA_PATH = "curated-pbp.xlsx"
 
 st.set_page_config(page_title="Dowling Scouting Dashboard", layout="wide")
+
+# Optional login: set app_password in the app's secrets to require it.
+if not qol.check_password():
+    st.stop()
 
 # Keep filter selections when you visit a page without the filters and come
 # back. Streamlit drops widget state for widgets that aren't drawn on the
@@ -167,9 +177,18 @@ def matchup():
     ins.render_matchup(df, opponent)
 
 
+def team_profiles():
+    page_header("Team Profiles", show_definitions=False)
+    # Offense/defense axes follow every sidebar filter; special teams and
+    # drives need whole games, so they only follow the Week filter.
+    profiles.render_profiles_page(df, df_all[df_all["WEEK"].isin(sel_weeks)], opponent)
+
+
 def scouting_report():
     page_header("Scouting Report", show_definitions=False)
-    html = ins.build_report_html(df, df_any_down, opponent, " · ".join(active_filter_chips()))
+    qol.notes_box("opponent", opponent, opponent)
+    html = ins.build_report_html(df, df_any_down, opponent, " · ".join(active_filter_chips()),
+                                 notes=qol.latest_note("opponent", opponent))
     st.download_button("Download printable report", html, file_name=f"{opponent}_scouting_report.html",
                        mime="text/html", type="primary")
     st.caption("Opens in any browser; use Print → Save as PDF for the binder.")
@@ -188,9 +207,10 @@ def scouting_report():
 def _game_picker(allow_all: bool) -> str | None:
     options = ins.games(df_all)[::-1]  # newest first
     if allow_all:
-        options = options + [None]
-    return st.selectbox("Game", options, key="g_game_all" if allow_all else "g_game",
-                        format_func=lambda g: "All games" if g is None else ins.game_label(df_all, g))
+        options = options + ["__all__"]
+    pick = st.selectbox("Game", options, key="g_game_all" if allow_all else "g_game",
+                        format_func=lambda g: "All games" if g == "__all__" else ins.game_label(df_all, g))
+    return None if pick == "__all__" else pick
 
 
 def game_recap():
@@ -203,6 +223,8 @@ def game_recap():
     if gid is None:
         st.caption("All games: drive charts and the scoreboard need a single game, so this shows the "
                    "head-to-head numbers and play logs for the whole season.")
+    if gid is not None:
+        qol.notes_box("game", gid, ins.game_label(df_all, gid))
     ins.render_game_recap(df_all, gid, half)
 
 
@@ -214,12 +236,40 @@ def win_prob_fourth_downs():
     ins.render_fourth_down_review(df_all if gid is None else df_all[df_all["game_id"] == gid])
 
 
+# ---- Pages: special teams -------------------------------------------------------
+def special_teams_page():
+    page_header("Special Teams", show_definitions=False)
+    st.caption("Special teams use whole games, so only the Week filter applies here.")
+    special_teams.render_special_teams_page(df_all[df_all["WEEK"].isin(sel_weeks)])
+
+
+# ---- Pages: home and tools -------------------------------------------------------
+def home():
+    qol.render_home(df_all, OPPONENTS, PAGE_LINKS)
+
+
+def play_finder():
+    page_header("Play Finder", show_definitions=False, show_filters=False)
+    qol.render_play_finder(df_all)
+
+
+def sideline_mode():
+    st.title("Sideline Mode")
+    qol.render_sideline(df_all, OPPONENTS, PAGE_LINKS)
+
+
+def glossary():
+    st.title("How to Read This App")
+    qol.render_glossary()
+
+
 # ---- Pages: data ---------------------------------------------------------------
 def tagging_coverage():
     page_header("Tagging Coverage", show_definitions=False, show_filters=False)
     st.caption("Every chart depends on Hudl tags. This shows which ones are missing so they can be filled in "
                "while the film is fresh.")
     ins.render_tagging_coverage(df_all)
+    qol.render_validation(df_all)
 
 
 def add_game():
@@ -227,9 +277,10 @@ def add_game():
     ins.render_add_game(DATA_PATH)
 
 
+HOME_PAGE = st.Page(home, title="Home", icon=":material/home:", url_path="home", default=True)
 FILTERED_PAGES = {
     "DCHS Offense": [
-        st.Page(dchs_offense, title="DCHS Offense", url_path="dchs-offense", default=True),
+        st.Page(dchs_offense, title="DCHS Offense", url_path="dchs-offense"),
         st.Page(dchs_o_run_game, title="DCHS O Run Game", url_path="dchs-o-run-game"),
         st.Page(dchs_o_pass_game, title="DCHS O Pass Game", url_path="dchs-o-pass-game"),
         st.Page(dchs_o_weekly_trends, title="DCHS O Weekly Trends", url_path="dchs-o-weekly-trends"),
@@ -240,6 +291,9 @@ FILTERED_PAGES = {
         st.Page(dchs_d_run_game, title="DCHS D Run Game", url_path="dchs-d-run-game"),
         st.Page(dchs_d_pass_game, title="DCHS D Pass Game", url_path="dchs-d-pass-game"),
     ],
+    "Special Teams": [
+        st.Page(special_teams_page, title="Special Teams", url_path="special-teams"),
+    ],
     "Scouting": [
         st.Page(scout_opposing_offense, title="Scout Opposing Offense", url_path="scout-opposing-offense"),
         st.Page(scout_opposing_o_run_game, title="Scout Opposing O Run Game",
@@ -247,10 +301,16 @@ FILTERED_PAGES = {
         st.Page(scout_opposing_o_pass_game, title="Scout Opposing O Pass Game",
                 url_path="scout-opposing-o-pass-game"),
         st.Page(matchup, title="Matchup", url_path="matchup"),
+        st.Page(team_profiles, title="Team Profiles", url_path="team-profiles"),
         st.Page(scouting_report, title="Scouting Report", url_path="scouting-report"),
     ],
 }
 OTHER_PAGES = {
+    "Tools": [
+        st.Page(play_finder, title="Play Finder", icon=":material/search:", url_path="play-finder"),
+        st.Page(sideline_mode, title="Sideline Mode", icon=":material/smartphone:", url_path="sideline"),
+        st.Page(glossary, title="How to Read This", icon=":material/help:", url_path="how-to-read"),
+    ],
     "Game Review": [
         st.Page(game_recap, title="Game Recap", url_path="game-recap"),
         st.Page(win_prob_fourth_downs, title="Win Probability & 4th Downs", url_path="win-probability"),
@@ -267,7 +327,15 @@ OTHER_PAGES = {
 # Kept under its old name for anything that still refers to it.
 SCOUTING_PAGES = FILTERED_PAGES
 
-pg = st.navigation({**FILTERED_PAGES, **OTHER_PAGES}, expanded=True)
+_all_pages = {p.url_path: p for group in {**FILTERED_PAGES, **OTHER_PAGES}.values() for p in group}
+PAGE_LINKS = {
+    "report": _all_pages["scouting-report"], "matchup": _all_pages["matchup"], "sideline": _all_pages["sideline"],
+    "tagging": _all_pages["tagging-coverage"], "recap": _all_pages["game-recap"],
+    "selfscout": _all_pages["dchs-self-scout"], "st": _all_pages["special-teams"], "finder": _all_pages["play-finder"],
+    "glossary": _all_pages["how-to-read"], "fourth": _all_pages["fourth-down-bot"], "go2": _all_pages["go-for-2-bot"],
+}
+
+pg = st.navigation({"": [HOME_PAGE], **FILTERED_PAGES, **OTHER_PAGES}, expanded=True)
 
 
 # ---- Sidebar filters (only drawn on the DCHS and Scouting pages) --------------
@@ -391,12 +459,15 @@ def _reset_filters():
 
 df_all = v.load_data(DATA_PATH)
 st.sidebar.caption(ins.last_updated_text(df_all))
+OPPONENTS = sorted(o for o in df_all["offense"].dropna().unique() if o != v.TEAM)
+if st.session_state.get("f_opp") not in OPPONENTS:
+    # Default opponent: next_opponent from the app's secrets (set weekly), else SEP, else the first one.
+    _next = qol._secret("next_opponent")
+    st.session_state["f_opp"] = _next if _next in OPPONENTS else "SEP" if "SEP" in OPPONENTS else OPPONENTS[0]
 
 if any(pg is p for group in FILTERED_PAGES.values() for p in group):
     ALL_DOWNS = [1, 2, 3, 4]
     ALL_WEEKS = sorted(df_all["WEEK"].dropna().unique().tolist())
-    OPPONENTS = sorted(o for o in df_all["offense"].dropna().unique() if o != v.TEAM)
-    st.session_state.setdefault("f_opp", "SEP" if "SEP" in OPPONENTS else OPPONENTS[0])
     st.session_state.setdefault("f_sit", "All plays")
     st.session_state.setdefault("f_minplays", 1)
     _apply_query_params()
