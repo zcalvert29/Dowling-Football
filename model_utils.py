@@ -153,6 +153,39 @@ def predict_wp_chained(score_diff, yards_to_goal, down, distance, half_seconds,
 
 
 # ==============================================================================
+# BATCHED PREDICTIONS — same features and models as predict_wp_chained, but
+# for whole arrays of situations in one xgboost call. Building a pandas frame
+# and a DMatrix per situation costs ~1-2 ms each, which is what made the
+# decision maps slow; one call for thousands of rows takes a few ms.
+# ==============================================================================
+def predict_wp_chained_batch(score_diff, yards_to_goal, down, distance, half_seconds,
+                             game_seconds_remaining, off_timeouts=3, def_timeouts=3,
+                             is_home_pos=0):
+    """Vectorized predict_wp_chained. Every argument can be a scalar or an
+    array; they're broadcast together. Returns (wp, ep) as flat float arrays."""
+    sd, ytg, dn, dist, half, game, oto, dto, home = np.broadcast_arrays(
+        *(np.asarray(x, dtype=float).ravel() for x in (
+            score_diff, yards_to_goal, down, distance, half_seconds,
+            game_seconds_remaining, off_timeouts, def_timeouts, is_home_pos)))
+    if len(sd) == 0:
+        return np.array([]), np.array([])
+    dummies = [(dn == k).astype(float) for k in (1, 2, 3, 4)]
+
+    if _ep_booster is not None and _wp_booster is not None:
+        ep_x = np.column_stack([ytg, *dummies, dist, half, sd, oto, dto,
+                                (half <= 120).astype(float), (dist >= ytg).astype(float)])
+        ep = _ep_booster.predict(xgb.DMatrix(ep_x, feature_names=EP_FEATURE_ORDER)).astype(float)
+        ratio = sd / (game / 60 + 1)
+        wp_x = np.column_stack([ep, sd, ytg, *dummies, dist, half, game, oto, dto, home, ratio])
+        wp = _wp_booster.predict(xgb.DMatrix(wp_x, feature_names=WP_FEATURE_ORDER)).astype(float)
+        return wp, ep
+
+    ep = np.array([_heuristic_ep(y) for y in ytg])
+    wp = np.array([_heuristic_wp(s, g, e) for s, g, e in zip(sd, game, ep)])
+    return wp, ep
+
+
+# ==============================================================================
 # SMALL SHARED HELPERS (used by both pages)
 # ==============================================================================
 

@@ -20,6 +20,8 @@ All timing cutoffs live in the TIMING section below so they're easy to tune.
 
 import streamlit as st
 
+import fourth_down_core as fd
+
 # Runs as a page inside the scouting app; st.Page sets the title/icon.
 st.set_page_config(layout="centered")
 
@@ -45,6 +47,36 @@ with st.sidebar:
     quarter = st.selectbox("Quarter", [1, 2, 3, 4], index=3, key="g2_quarter")
     minutes = st.number_input("Minutes remaining in quarter", 0, 12, 8, key="g2_minutes")
     seconds = st.number_input("Seconds", 0, 59, 0, key="g2_seconds")
+
+
+@st.cache_data(show_spinner=False)
+def dowling_pat_record(path: str = "curated-pbp.xlsx") -> tuple[int, int]:
+    """(made, attempted) Dowling extra points this season. Penalties don't count as attempts."""
+    import pandas as pd
+
+    try:
+        df = pd.read_excel(path, usecols=["offense", "PLAY TYPE", "RESULT"])
+    except Exception:
+        return 0, 0
+    xp = df[(df["offense"] == "Dowling Catholic") & df["PLAY TYPE"].isin(["Extra Pt.", "Extra Pt. Block"])
+            & (df["RESULT"] != "Penalty")]
+    return int((xp["RESULT"] == "Good").sum()), len(xp)
+
+
+_made, _att = dowling_pat_record()
+# Default PAT rate: Dowling's season rate, shrunk toward a 90% prior (worth
+# 10 kicks) so a perfect 4-for-4 start doesn't read as a 100% kicker.
+_pat_default = int(round(100 * (_made + 9) / (_att + 10)))
+
+with st.sidebar:
+    st.header("Model check")
+    g2_site = st.selectbox("Site", ["We're home", "We're away", "Neutral"], key="g2_site",
+                           help="The win probability model includes home-field advantage.")
+    pat_pct = st.slider("Extra point make rate", 50, 100, _pat_default, format="%d%%", key="g2_pat",
+                        help=f"Default is Dowling's season rate ({_made}/{_att}) blended with a 90% "
+                             f"prior so a few kicks don't swing it too far.")
+    two_pct = st.slider("Two-point conversion rate", 20, 80, 45, format="%d%%", key="g2_two",
+                        help="Around 40-50% is typical. Raise it if you have a 2-point play you trust.")
 
 if minutes == 12:
     seconds = 0  # quarters are 12:00 max
@@ -172,8 +204,41 @@ st.write(f"Kick the PAT: {describe_margin(margin + 1)}.")
 st.write(f"Go for 2: {describe_margin(margin + 2)}.")
 st.write(reason)
 
+# ---- Model check: the same EP/WP models as the 4th Down Bot ----
 st.divider()
-st.caption("Based on ESPN's cheat sheet for a typical game — not a live win probability calculation.")
+st.write("#### Model check")
+_site = {"We're home": 1.0, "We're away": 0.0, "Neutral": 0.5}[g2_site]
+_try = fd.evaluate_try(margin, fd.model_seconds_remaining(quarter, qtr_left), pat_pct / 100, two_pct / 100,
+                       is_home_pos=_site)
+_diff = (_try["wp_go"] - _try["wp_kick"]) * 100
+if abs(_diff) < 0.5:
+    _model_call = CHOICE
+elif _diff > 0:
+    _model_call = GO
+else:
+    _model_call = KICK
+_be = _try["break_even_two"]
+
+c1, c2, c3 = st.columns(3)
+c1.metric("Win prob. if you kick", f"{_try['wp_kick']:.0%}")
+c2.metric("Win prob. if you go for 2", f"{_try['wp_go']:.0%}", f"{_diff:+.1f} pts vs kicking")
+c3.metric("Break-even 2-pt rate", "—" if _be != _be else f"{_be:.0%}",
+          help="Going for 2 wins out if you convert at least this often.")
+
+_agree = (_model_call == decision) or CHOICE in (_model_call, decision)
+_be_text = "" if _be != _be else f" Going for 2 is the better call if you convert at least {_be:.0%} of the time."
+if _agree:
+    st.success(f"**The model agrees: {_model_call.lower()}.** With a {pat_pct}% kicker and a {two_pct}% "
+               f"2-point play.{_be_text}", icon="✅")
+else:
+    st.warning(f"**The model says {_model_call.lower()}, the cheat sheet says {decision.lower()}.** The cheat sheet "
+               f"assumes NFL rates (about 95% on extra points, 48% on 2-point tries); the model uses your "
+               f"{pat_pct}% / {two_pct}%.{_be_text} The 12-minute clock also matters: the same minutes left "
+               f"are a bigger share of a high school game.", icon="⚠️")
+
+st.divider()
+st.caption("The verdict at the top is ESPN's cheat sheet for a typical NFL game. The model check uses your EP/WP "
+           "models with your make rates; when they disagree, the model is the one that knows about your kicker.")
 with st.expander("Method & limitations"):
     st.markdown(f"""
 - Source: ESPN's game management cheat sheet (Brian Burke's win probability model):
@@ -187,5 +252,7 @@ with st.expander("Method & limitations"):
 - The cheat sheet is built on NFL conversion rates (about 48% on 2-point tries and near-automatic
   extra points). If your kicker is shaky or your 2-point offense is strong, lean toward going for 2
   in the close calls.
-- Doesn't account for timeouts or team strength. The model-driven 4th Down Bot page covers those.
+- Doesn't account for timeouts or team strength.
+- **Model check:** prices each outcome as the other team's ball at their own 25 after the kickoff, with the new
+  margin, using the same EP/WP models and 15/12 clock scaling as the 4th Down Bot. Timeouts are assumed 3 each.
 """)

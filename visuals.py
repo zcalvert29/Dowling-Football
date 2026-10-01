@@ -202,7 +202,8 @@ def crosstab(df: pd.DataFrame, rows, measures, sort_by_count: bool = False) -> p
     out = pd.DataFrame({m: METRICS[m](g) for m in measures})
     if sort_by_count:
         out = out.loc[g.size().sort_values(ascending=False, kind="stable").index]
-    out.attrs["overall"] = {m: METRICS[m](df) for m in measures} if len(df) else {}
+    # Plain floats: Streamlit serializes attrs to JSON and can't handle numpy ints.
+    out.attrs["overall"] = {m: float(METRICS[m](df)) for m in measures} if len(df) else {}
     return out
 
 

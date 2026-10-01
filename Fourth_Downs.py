@@ -8,10 +8,10 @@ export_models_to_json.R), this runs on heuristic fallbacks instead — the
 sidebar shows which mode is active.
 """
 
-import streamlit as st
+import altair as alt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
+import streamlit as st
 
 import model_utils as mu
 
@@ -148,50 +148,77 @@ st.caption(
     f"Estimated FG make rate from here: **{result['p_fg']*100:.0f}%**{weather_note}"
 )
 
-# ---- Decision chart (heatmap across distance x field position) ----
+# Break-even: how often you'd need to convert for going to tie the best kick.
+# This is the number to argue with: if you trust your 4th & short offense
+# more (or less) than the generic conversion curve, compare against this.
+_res = evaluate_many(yards_to_goal, distance, score_diff, seconds_remaining_in_game,
+                     off_timeouts, def_timeouts, site_flag(SITE), wind_speed, wind_direction, rain, snow)
+_be = float(break_even_conversion(_res)[0])
+if not np.isnan(_be):
+    _kick = "field goal" if np.nan_to_num(_res["wp_fg"][0], nan=-1) >= np.nan_to_num(_res["wp_punt"][0], nan=-1) \
+        else "punt"
+    _p = result["p_conv"]
+    _verdict = ("comfortably above it" if _p - _be >= 0.10 else "above it" if _p >= _be
+                else "below it" if _be - _p < 0.10 else "well below it")
+    st.info(
+        f"**Break-even:** going for it beats the {_kick} if you convert at least **{_be:.0%}** of the time. "
+        f"The model's estimate for 4th & {distance} is {_p:.0%}, {_verdict}. If you think your offense "
+        f"converts this more or less often than that, compare your number to {_be:.0%}.",
+        icon="⚖️",
+    )
+
+# ---- Decision chart: every field position x distance, one batched model call ----
 st.divider()
 st.write("#### Decision chart")
-st.caption(f"Go-for-it recommendation across field position and distance, at the current score/time. "
-           f"The dot marks the current situation: 4th & {distance} {spot}.")
+st.caption(f"The model's call for every spot on the field and every distance, at the current score, clock, "
+           f"timeouts, site, and weather. The ringed square is the current situation: 4th & {distance} {spot}. "
+           f"Hover any square for the numbers.")
 
-@st.cache_data(show_spinner="Building decision chart...")
+CALL_COLORS = {"Go for it": "#55A868", "Field goal": "#4C72B0", "Punt": "#C44E52", "Toss-up": "#BDBDBD"}
+
+
+@st.cache_data(show_spinner=False)
 def build_decision_chart(score_diff_, seconds_remaining_, off_timeouts_, def_timeouts_, site_,
-                          wind_speed_, wind_direction_, rain_, snow_):
-    # Coarser grid than a naive 1-yard sweep — cuts model calls from 250+ down to
-    # ~90 while still giving a clear picture of the go/kick/punt boundaries.
-    ytg_grid_ = np.arange(1, 100, 8)
-    dist_grid_ = np.arange(1, 21, 3)
-    Z_ = np.zeros((len(dist_grid_), len(ytg_grid_)))
-    for i, d in enumerate(dist_grid_):
-        for j, y in enumerate(ytg_grid_):
-            r = evaluate_site(site_, y, min(d, y), score_diff_, seconds_remaining_,
-                              off_timeouts=off_timeouts_, def_timeouts=def_timeouts_,
-                              wind_speed=wind_speed_, wind_direction=wind_direction_,
-                              rain=rain_, snow=snow_)
-            ranked_ = sorted(r["wp"].values(), reverse=True)
-            best = max(r["wp"], key=r["wp"].get)
-            toss_up = len(ranked_) > 1 and (ranked_[0] - ranked_[1]) * 100 < 1
-            Z_[i, j] = 2 if toss_up else {"Go for it": 1, "Field goal": 0, "Punt": -1}[best]
-    return ytg_grid_, dist_grid_, Z_
+                         wind_speed_, wind_direction_, rain_, snow_) -> pd.DataFrame:
+    # Full 1-yard resolution: ~1,900 situations priced in a single model call.
+    Y, D = np.meshgrid(np.arange(1, 100), np.arange(1, 21))
+    Y, D = Y.ravel(), D.ravel()
+    keep = D <= Y
+    Y, D = Y[keep], D[keep]
+    res = evaluate_many(Y, D, score_diff_, seconds_remaining_, off_timeouts_, def_timeouts_, site_flag(site_),
+                        wind_speed_, wind_direction_, rain_, snow_)
+    calls = best_calls(res)
+    return pd.DataFrame({
+        "ytg": Y, "dist": D, "x": 100 - Y,
+        "call": np.where(calls["toss_up"], "Toss-up", calls["best"]),
+        "margin": calls["margin"],
+        "go": res["wp_go"], "fg": res["wp_fg"], "punt": res["wp_punt"],
+        "p_conv": res["p_conv"], "break_even": break_even_conversion(res),
+        "spot": [field_spot_label(int(y), "own", "opp").replace("at the ", "") for y in Y],
+    })
 
 
-# Cached on the situation variables that actually change the grid — so dragging
-# the current down/distance, editing team names, or tweaking the score/clock
-# elsewhere on a rerun that doesn't touch these values won't recompute it.
-ytg_grid, dist_grid, Z = build_decision_chart(
-    score_diff, seconds_remaining_in_game, off_timeouts, def_timeouts, SITE,
-    wind_speed, wind_direction, rain, snow
+grid = build_decision_chart(score_diff, seconds_remaining_in_game, off_timeouts, def_timeouts, SITE,
+                            wind_speed, wind_direction, rain, snow)
+grid = grid.assign(label=lambda g: "4th & " + g["dist"].astype(str) + " at " + g["spot"])
+
+pct = lambda f, t: alt.Tooltip(f, format=".0%", title=t)
+heat = alt.Chart(grid).mark_rect().encode(
+    x=alt.X("x:O", title=f"Field position ({off_abbr} goal ← → {def_abbr} goal)",
+            axis=alt.Axis(values=list(range(10, 100, 10)), labelExpr="datum.value == 50 ? '50' : datum.value < 50 "
+                          "? 'Own ' + datum.value : 'Opp ' + (100 - datum.value)", labelAngle=0)),
+    y=alt.Y("dist:O", title="Yards to go", sort="descending"),
+    color=alt.Color("call:N", title=None, scale=alt.Scale(domain=list(CALL_COLORS), range=list(CALL_COLORS.values())),
+                    legend=alt.Legend(orient="top")),
+    tooltip=[alt.Tooltip("label:N", title="Situation"), alt.Tooltip("call:N", title="Call"),
+             alt.Tooltip("margin:Q", format=".1f", title="Margin (WP pts)"),
+             pct("go:Q", "WP go"), pct("fg:Q", "WP field goal"), pct("punt:Q", "WP punt"),
+             pct("p_conv:Q", "Conversion chance"), pct("break_even:Q", "Break-even conversion")],
 )
-
-fig, ax = plt.subplots(figsize=(7, 4))
-cmap = plt.matplotlib.colors.ListedColormap(["#C44E52", "#4C72B0", "#55A868", "#BDBDBD"])
-ax.pcolormesh(ytg_grid, dist_grid, Z, cmap=cmap, vmin=-1.5, vmax=2.5, shading="nearest")
-ax.plot(yards_to_goal, distance, "o", color="white", markeredgecolor="black", markersize=10)
-ax.invert_xaxis()
-ax.set_xlabel("Yards to opponent's goal (own goal ← → opp goal)")
-ax.set_ylabel("Yards to go")
-ax.set_title("Green = Go for it · Blue = Field goal · Red = Punt · Gray = toss-up (under 1 WP pt)", fontsize=10)
-st.pyplot(fig)
+here = alt.Chart(pd.DataFrame({"x": [100 - yards_to_goal], "dist": [min(distance, 20)]})).mark_rect(
+    fill=None, stroke="black", strokeWidth=2.5).encode(x="x:O", y=alt.Y("dist:O", sort="descending"))
+st.altair_chart((heat + here).properties(height=360), width="stretch")
+st.caption("Gray = toss-up: the top two options are within 1 point of win probability.")
 
 st.divider()
 st.caption(
@@ -207,7 +234,11 @@ with st.expander("Model notes & limitations"):
   otherwise this falls back to heuristic curves. Currently:
   **{"real trained models" if mu.USING_REAL_MODELS else "heuristic fallback"}**.
 - Conversion probability, FG probability, and punt distance are still
-  hand-calibrated heuristics — no trained model exists for those yet.
+  hand-calibrated heuristics — no trained model exists for those yet. The
+  break-even conversion rate tells you how much that matters: if your real
+  conversion rate is on the same side of break-even, the call doesn't change.
+- After a change of possession (turnover on downs, punt, score) the timeouts
+  swap sides, and a new first down inside the 10 is 1st & goal.
 - FG probability weather adjustment (hand-calibrated, applied on top of the
   distance-based curve, then clipped to [0, 100]%): rain −5 pts, snow −10 pts.
   Wind has no effect below 10 mph; at/above that, it scales linearly with

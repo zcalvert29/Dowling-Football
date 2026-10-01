@@ -810,40 +810,48 @@ def fourth_down_review(df: pd.DataFrame) -> pd.DataFrame:
     import fourth_down_core as fd
     import model_utils as mu
 
-    rows = []
+    parts = []
     for gid in games(df):
-        g = df[df["game_id"] == gid]
+        d = _estimate_clock(_scrimmage(df[df["game_id"] == gid]))
+        parts.append(d[(d["offense"] == TEAM) & (d["DN"] == 4)])
+    d = pd.concat(parts) if parts else pd.DataFrame()
+    if d.empty:
+        return pd.DataFrame()
+
+    # Every 4th down priced in one batched model call.
+    sd = (d["pre_off_score"] - d["pre_def_score"]).to_numpy(dtype=float)
+    res = fd.evaluate_many(d["YARDLINE_100"].to_numpy(dtype=float), np.maximum(d["DIST"].to_numpy(dtype=float), 1),
+                           sd, d["seconds_remaining"].to_numpy(dtype=float), is_home_pos=0.5)
+    calls = fd.best_calls(res, TOSS_UP_PTS)
+    be = fd.break_even_conversion(res)
+
+    rows = []
+    for i, (_, r) in enumerate(d.iterrows()):
+        gid = r["game_id"]
         opp = opponent_of(gid)
-        d = _estimate_clock(_scrimmage(g))
-        d = d[(d["offense"] == TEAM) & (d["DN"] == 4)]
-        for _, r in d.iterrows():
-            pt = r["PLAY TYPE"]
-            did = "Punt" if pt in PUNT_TYPES else "Field goal" if pt in FG_TYPES else "Go for it"
-            sd = float(r["pre_off_score"] - r["pre_def_score"])
-            res = fd.evaluate_neutral(float(r["YARDLINE_100"]), float(max(r["DIST"], 1)), sd,
-                                      float(r["seconds_remaining"]))
-            wp = res["wp"]
-            ranked = sorted(wp.items(), key=lambda kv: -kv[1])
-            best, best_wp = ranked[0]
-            margin = (best_wp - ranked[1][1]) * 100 if len(ranked) > 1 else 100.0
-            chosen = wp.get(did, np.nan)
-            left = (best_wp - chosen) * 100 if pd.notna(chosen) else np.nan
-            if pd.isna(chosen):
-                category = "Not modeled"
-            elif did == best or left < TOSS_UP_PTS:
-                category = "Agreed" if did == best else "Toss-up"
-            else:
-                category = "Costly"
-            us, them = int(r["pre_off_score"]), int(r["pre_def_score"])
-            score = f"up {us}-{them}" if us > them else f"down {us}-{them}" if us < them else f"tied {us}-{them}"
-            rows.append({
-                "game": gid, "Game": game_label(df, gid), "opp": opp, "Est. clock": r["clock"], "score_text": score,
-                "dist": int(r["DIST"]), "ytg": float(r["YARDLINE_100"]),
-                "Situation": f"4th & {int(r['DIST'])} at {_spot_text(r['YARDLINE_100'], opp)}",
-                "We chose": did, "Model": best, "Strength": mu.strength_tier(margin),
-                "WP if we": chosen, "WP if model": best_wp, "WP left (pts)": left, "category": category,
-                "options": res["options"], "Result": r["RESULT"],
-            })
+        one = fd._to_options(res, i)
+        wp = one["wp"]
+        pt = r["PLAY TYPE"]
+        did = "Punt" if pt in PUNT_TYPES else "Field goal" if pt in FG_TYPES else "Go for it"
+        best, best_wp = str(calls["best"][i]), float(calls["best_wp"][i])
+        chosen = wp.get(did, np.nan)
+        left = (best_wp - chosen) * 100 if pd.notna(chosen) else np.nan
+        if pd.isna(chosen):
+            category = "Not modeled"
+        elif did == best or left < TOSS_UP_PTS:
+            category = "Agreed" if did == best else "Toss-up"
+        else:
+            category = "Costly"
+        us, them = int(r["pre_off_score"]), int(r["pre_def_score"])
+        score = f"up {us}-{them}" if us > them else f"down {us}-{them}" if us < them else f"tied {us}-{them}"
+        rows.append({
+            "game": gid, "Game": game_label(df, gid), "opp": opp, "Est. clock": r["clock"], "score_text": score,
+            "dist": int(r["DIST"]), "ytg": float(r["YARDLINE_100"]),
+            "Situation": f"4th & {int(r['DIST'])} at {_spot_text(r['YARDLINE_100'], opp)}",
+            "We chose": did, "Model": best, "Strength": mu.strength_tier(float(calls["margin"][i])),
+            "WP if we": chosen, "WP if model": best_wp, "WP left (pts)": left, "category": category,
+            "options": one["options"], "Result": r["RESULT"], "break_even": float(be[i]),
+        })
     return pd.DataFrame(rows)
 
 
@@ -905,25 +913,17 @@ MAP_DIST = list(range(1, 16))
 MAP_COLORS = {"G": "#9FE1CB", "F": "#FAC775", "P": "#D3D1C7", "T": "rgba(128,128,128,.10)"}
 
 
-@st.cache_data(show_spinner="Building the decision map (first load only)...", persist="disk")
+@st.cache_data(show_spinner=False)
 def decision_map_grid(score_diff: int = 0) -> list[list[str]]:
     """Model's call for each (yards to goal, distance): tie game, start of Q3, neutral site."""
     import fourth_down_core as fd
 
     secs = fd.model_seconds_remaining(3, HS_QUARTER)
-    grid = []
-    for ytg in MAP_YTG:
-        row = []
-        for dist in MAP_DIST:
-            if dist > ytg:
-                row.append("")
-                continue
-            wp = fd.evaluate_neutral(float(ytg), float(dist), float(score_diff), secs)["wp"]
-            ranked = sorted(wp.items(), key=lambda kv: -kv[1])
-            toss = len(ranked) > 1 and (ranked[0][1] - ranked[1][1]) * 100 < TOSS_UP_PTS
-            row.append("T" if toss else ranked[0][0][0])
-        grid.append(row)
-    return grid
+    Y, D = np.meshgrid(MAP_YTG, MAP_DIST, indexing="ij")
+    calls = fd.best_calls(fd.evaluate_many(Y.ravel(), D.ravel(), score_diff, secs, is_home_pos=0.5), TOSS_UP_PTS)
+    code = np.where(calls["toss_up"], "T", [b[0] for b in calls["best"]])  # G / F / P / T
+    code = np.where(D.ravel() > Y.ravel(), "", code).reshape(Y.shape)
+    return code.tolist()
 
 
 def decision_map_html(t: pd.DataFrame, grid: list[list[str]]) -> str:
