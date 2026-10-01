@@ -8,6 +8,8 @@ render functions you want from each page file.
 """
 from __future__ import annotations
 
+import base64
+
 import altair as alt
 import numpy as np
 import pandas as pd
@@ -428,6 +430,7 @@ def render_pass_zones(df: pd.DataFrame, side: str, team: str, title: str, key: s
 # GAP tag -> lane: A = between C and G, B = between G and T, C = outside
 # the T (D and E are folded into C). PLAY DIR (L/R) picks the side.
 # ---------------------------------------------------------------------------
+# Matched on the first letter, so tags like "E-Alley" still map correctly.
 RUN_GAP_MAP = {"A": "A", "B": "B", "C": "C", "D": "C", "E": "C"}
 
 # (direction, gap) -> (bend x, arrow tip x, bottom label). Bends sit just
@@ -444,10 +447,11 @@ _LINEMEN = [("LT", 200), ("LG", 270), ("C", 340), ("RG", 410), ("RT", 480)]
 _POS, _NEG, _NONE = "#1D9E75", "#E24B4A", "rgba(128,128,128,.45)"
 
 
-def _run_gaps_svg(runs: pd.DataFrame, lanes: dict) -> str:
-    font = 'font-family="inherit"'
-    num = f'{font} font-size="14" font-weight="500"'
-    lab = f'{font} font-size="12" fill="currentColor" opacity=".7"'
+def _run_gaps_svg(runs: pd.DataFrame, lanes: dict, ink: str) -> str:
+    """`ink` = color for neutral text/lines (matches the Streamlit theme)."""
+    font = 'font-family="Source Sans Pro, Segoe UI, Helvetica, Arial, sans-serif"'
+    num = f'{font} font-size="14" font-weight="600"'
+    lab = f'{font} font-size="12" fill="{ink}" fill-opacity=".7"'
 
     td = runs["RESULT"].fillna("").str.contains("TD") & ~runs["RESULT"].fillna("").str.contains("Def TD")
     expl = pd.to_numeric(runs["explosive_play"], errors="coerce").sum()
@@ -463,9 +467,9 @@ def _run_gaps_svg(runs: pd.DataFrame, lanes: dict) -> str:
     parts = []
     for i, (value, label) in enumerate(stats):
         x = 80 + i * 104
-        parts.append(f'<text x="{x}" y="28" text-anchor="middle" fill="currentColor" {num}>{value}</text>'
+        parts.append(f'<text x="{x}" y="28" text-anchor="middle" fill="{ink}" {num}>{value}</text>'
                      f'<text x="{x}" y="46" text-anchor="middle" {lab}>{label}</text>')
-    parts.append('<line x1="40" y1="62" x2="640" y2="62" stroke="currentColor" stroke-opacity=".2"/>')
+    parts.append('<line x1="40" y1="62" x2="640" y2="62" stroke="{ink}" stroke-opacity=".2"/>')
 
     for d, g, bend_x, tip_x, name in _RUN_LANES:
         mean, n = lanes.get((d, g), (np.nan, 0))
@@ -473,8 +477,18 @@ def _run_gaps_svg(runs: pd.DataFrame, lanes: dict) -> str:
         dash = ' stroke-dasharray="6 6"' if n == 0 else ""
         parts.append(
             f'<path d="M340 308 L{bend_x} 275 L{tip_x} 110" fill="none" stroke="{color}" stroke-width="5" '
-            f'stroke-linecap="round" stroke-linejoin="round"{dash} marker-end="url(#rg-arrow)" '
-            f'style="color:{color}"/>'
+            f'stroke-linecap="round" stroke-linejoin="round"{dash}/>'
+        )
+        # Arrowhead drawn as its own shape (pointing along the last segment)
+        # so it doesn't depend on SVG marker support.
+        dx, dy = tip_x - bend_x, 110 - 275
+        length = (dx * dx + dy * dy) ** 0.5
+        ux, uy = dx / length, dy / length
+        bx, by = tip_x - 14 * ux, 110 - 14 * uy
+        px, py = -uy * 8, ux * 8
+        parts.append(
+            f'<polygon points="{tip_x + 2 * ux:.1f},{110 + 2 * uy:.1f} {bx + px:.1f},{by + py:.1f} '
+            f'{bx - px:.1f},{by - py:.1f}" fill="{color}"/>'
         )
         value = "–" if n == 0 or pd.isna(mean) else f"{mean:+.2f}"
         parts.append(f'<text x="{tip_x}" y="92" text-anchor="middle" fill="{color}" {num}>{value}</text>')
@@ -486,13 +500,14 @@ def _run_gaps_svg(runs: pd.DataFrame, lanes: dict) -> str:
                      f'<text x="{x}" y="240" text-anchor="middle" dominant-baseline="central" fill="#E6F1FB" {num}>{name}</text>')
     parts.append('<circle cx="340" cy="330" r="22" fill="#BA7517"/>'
                  f'<text x="340" y="330" text-anchor="middle" dominant-baseline="central" fill="#FAEEDA" {num}>RB</text>')
-    parts.append('<line x1="40" y1="366" x2="640" y2="366" stroke="currentColor" stroke-opacity=".2"/>')
+    parts.append('<line x1="40" y1="366" x2="640" y2="366" stroke="{ink}" stroke-opacity=".2"/>')
 
-    marker = ('<defs><marker id="rg-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4" markerHeight="4" '
-              'orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" '
-              'stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>')
-    return (f'<div style="max-width:760px"><svg width="100%" viewBox="0 0 680 425" role="img" '
-            f'aria-label="Average EPA per rush and carries by run gap">{marker}{"".join(parts)}</svg></div>')
+    svg = (f'<svg xmlns="http://www.w3.org/2000/svg" width="680" height="425" viewBox="0 0 680 425">'
+           f'{"".join(parts)}</svg>')
+    # st.html strips inline <svg>, so the drawing is embedded as an image.
+    b64 = base64.b64encode(svg.encode("utf-8")).decode("ascii")
+    return (f'<img src="data:image/svg+xml;base64,{b64}" alt="Average EPA per rush and carries by run gap" '
+            f'style="width:100%;max-width:760px;height:auto">')
 
 
 def render_run_gaps(df: pd.DataFrame, side: str, team: str, title: str) -> None:
@@ -509,13 +524,15 @@ def render_run_gaps(df: pd.DataFrame, side: str, team: str, title: str) -> None:
         st.info("No runs match the current filters.")
         return
 
-    gap = runs["GAP"].astype("string").str.strip().str.upper().map(RUN_GAP_MAP)
+    gap = runs["GAP"].astype("string").str.strip().str.upper().str[:1].map(RUN_GAP_MAP)
     direction = runs["PLAY DIR"].astype("string").str.strip().str.upper()
     tagged = runs.assign(lane_gap=gap, lane_dir=direction)
     tagged = tagged[tagged["lane_gap"].notna() & tagged["lane_dir"].isin(["L", "R"])]
     lanes = {k: (g["epa"].mean(), len(g)) for k, g in tagged.groupby(["lane_dir", "lane_gap"])}
 
-    st.html(_run_gaps_svg(runs, lanes))
+    theme = getattr(getattr(st.context, "theme", None), "type", None)
+    ink = "#FAFAFA" if theme == "dark" else "#31333F"
+    st.html(_run_gaps_svg(runs, lanes, ink))
     untagged = len(runs) - len(tagged)
     if untagged:
         st.caption(f"{untagged} of {len(runs)} runs are missing a GAP or PLAY DIR tag and aren't shown in the arrows.")
