@@ -1,133 +1,239 @@
 """
 Dowling Catholic Scouting Dashboard (Streamlit port of Dowling_Scouting_Dashboard.twb)
-plus the 4th Down Bot and Go for 2 Bot.
+plus game review, self-scout, data tools, and the 4th Down / Go for 2 bots.
 
 Run with:  streamlit run app.py
 
 Folder layout (everything sits next to this file):
-    app.py              entrypoint: navigation + scouting sidebar filters
-    visuals.py          scouting data prep and render_* functions
+    app.py              entrypoint: navigation, sidebar filters, page layouts
+    visuals.py          scouting data prep, tables, and charts
+    insights.py         game recap, self-scout, matchup, report, data tools, WP / 4th-down review
+    curate_pbp.py       curation pipeline (used by the "Add a game" page)
+    fourth_down_core.py 4th Down Bot decision math (shared with the 4th-down review)
     Fourth_Downs.py     4th Down Bot page
     Go_for_2.py         Go for 2 Bot page
-    model_utils.py      EP/WP model loading used by the 4th Down Bot
+    model_utils.py      EP/WP model loading used by the bots and win probability
     curated-pbp.xlsx    play-by-play data
     *.json              trained model files (optional)
 """
 import streamlit as st
 
+import insights as ins
 import visuals as v
 
 DATA_PATH = "curated-pbp.xlsx"
 
 st.set_page_config(page_title="Dowling Scouting Dashboard", layout="wide")
 
-# Keep scouting filter selections when you visit a Game Day page and come back.
-# Streamlit drops widget state for widgets that aren't drawn on the current page;
-# re-assigning the value here keeps it alive.
+# Keep filter selections when you visit a page without the filters and come
+# back. Streamlit drops widget state for widgets that aren't drawn on the
+# current page; re-assigning the value here keeps it alive.
 for _k in list(st.session_state.keys()):
-    if _k.startswith("f_"):
+    if _k.startswith(("f_", "g_")):
         st.session_state[_k] = st.session_state[_k]
 
 
 # ---- Shared page text -----------------------------------------------------
 DEFINITIONS = """
-**Definitions:**
+**Success:** a 1st down play that gains 40% of the yards needed, a 2nd down play that gains 70%, or a 3rd/4th down play that gains a first down.
 
-**Success:** a 1st down play that gains 40% of yards for the first down, a 2nd down play that gains 70% of yards for the first down, and a 3rd/4th down play that gains a first down are successful plays.
+**EPA (expected points added):** how many points a play was worth, comparing the offense's chances of scoring before and after the snap based on down, distance, and field position. Above 0 is good for the offense.
 
-**EPA:** Expected Points Added, which measures how many points a play was worth by comparing your chances of scoring before and after the snap, based on down, distance, and field position.
+**Explosive rate:** share of plays that are a run of 10+ yards or a pass of 20+ yards.
 
-**Explosive Rate:** % of plays that are a rush of 10+ yards or a pass of 20+ yards.
+**Colors on Dowling offense tables:** green = clearly above the table's average. Red is only for results that are bad on their own: negative EPA or under 4.5 yards per play. Anything else below green is yellow: positive EPA or 4.5+ yards that isn't at the green line yet, and success/explosive/conversion rates that are clearly below average.
+
+**Colors on defense and scouting tables:** green is good for Dowling and red is bad, compared to the table's average, so green = the opponent's offense did worse.
+
+Gray rows have fewer than 10 plays, so treat them as small samples. Hover a column name for its definition.
 """
 
 
-def page_header(title: str, definitions: str | None = None) -> None:
-    """definitions: None (no text), or "team", "offense", or "defense" to show the definitions."""
+def page_header(title: str, show_definitions: bool = True, show_filters: bool = True) -> None:
     st.title(title)
-    if definitions:
-        st.caption(DEFINITIONS.replace("<", "\\<").replace(">", "\\>"))  # keep < and > literal in Markdown
+    if show_filters and "sel_weeks" in globals():
+        chips = active_filter_chips()
+        st.html(
+            '<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12px">'
+            '<span style="opacity:.6;margin-right:2px">Showing</span>'
+            + "".join(f'<span style="padding:3px 10px;border-radius:999px;border:0.5px solid rgba(128,128,128,.4);'
+                      f'background:rgba(128,128,128,.08)">{c}</span>' for c in chips)
+            + "</div>"
+        )
+    if show_definitions:
+        with st.expander("What do these numbers mean?"):
+            st.markdown(DEFINITIONS)
 
 
-# ---- Pages ----------------------------------------------------------------
+# ---- Pages: DCHS offense -----------------------------------------------------
 def dchs_offense():
-    page_header("DCHS Offense", definitions="offense")
+    page_header("DCHS Offense")
+    forms = v.dchs_formations_table(df)
+    v.render_takeaways(forms, "formation")
     v.render_dchs_offense(df)
     v.render_dchs_offense_tendencies(df)
     v.render_dchs_offense_3rd_downs(df_any_down)
     v.render_dchs_offense_4th_downs(df_any_down)
-    v.render_dchs_formations(df)
+    v.render_dchs_formations(df, table=forms)
+    v.render_usage_scatter(forms, "DCHS formations: EPA vs success", noun="Formation")
 
 
 def dchs_o_run_game():
-    page_header("DCHS O Run Game", definitions="offense")
+    page_header("DCHS O Run Game")
     v.render_run_gaps(df, "offense", v.TEAM, "DCHS O Run Gaps")
-    v.render_run_scheme_detail(df)
+    schemes = v.run_scheme_table(df)
+    v.render_takeaways(schemes, "run scheme")
+    v.render_run_scheme_detail(df, table=schemes)
+    v.render_usage_scatter(schemes, "DCHS run schemes: EPA vs success", noun="Run scheme")
     v.render_rush_vs_box(df)
 
 
 def dchs_o_pass_game():
     page_header("DCHS O Pass Game")
     v.render_pass_zones(df, "offense", v.TEAM, "DCHS O Pass Zones", key="pz_dchs_o")
-    v.render_o_pass_game_detail(df)
+    calls = v.o_pass_detail_table(df)
+    v.render_takeaways(calls, "pass play")
+    v.render_o_pass_game_detail(df, table=calls)
+    v.render_usage_scatter(calls, "DCHS pass plays: EPA vs success", noun="Pass play")
     v.render_dchs_intended_pass_distance(df)
     v.render_pass_vs_box(df)
 
 
 def dchs_o_weekly_trends():
     page_header("DCHS O Weekly Trends")
-    c1, c2 = st.columns(2)
-    with c1:
-        v.render_weekly_pass_epa(df_all_weeks)
-        v.render_weekly_rush_epa(df_all_weeks)
-    with c2:
-        v.render_weekly_pass_success(df_all_weeks)
-        v.render_weekly_rush_success(df_all_weeks)
+    v.render_weekly_trend(df_all_weeks, "epa", "EPA per play by week", "+.2f")
+    v.render_weekly_trend(df_all_weeks, "success", "Success rate by week", ".0%")
 
 
+def dchs_self_scout():
+    page_header("DCHS Self-Scout")
+    st.caption("What an opponent scouting Dowling's film would see. Strong tendencies are worth breaking "
+               "before someone builds a game plan around them.")
+    ins.render_self_scout(df, df_any_down)
+
+
+# ---- Pages: DCHS defense -----------------------------------------------------
 def dchs_d_overview():
-    page_header("DCHS D Overview", definitions="defense")
+    page_header("DCHS D Overview")
+    forms = v.d_vs_formation_table(df)
+    v.render_takeaways(forms, "opponent formation", good_high=False)
     v.render_dchs_defense(df)
     v.render_d_3rd_downs(df_any_down)
-    v.render_d_vs_formation(df)
+    v.render_d_vs_formation(df, table=forms)
+    v.render_usage_scatter(forms, "Opponent formations vs DCHS D: EPA vs success", good_high=False,
+                           noun="Formation")
 
 
 def dchs_d_run_game():
-    page_header("DCHS D Run Game", definitions="defense")
-    v.render_run_gaps(df, "defense", v.TEAM, "DCHS D Run Gaps")
+    page_header("DCHS D Run Game")
+    v.render_run_gaps(df, "defense", v.TEAM, "DCHS D Run Gaps", good_high=False)
     v.render_d_rush_vs_box(df)
     v.render_d_run_game_detail(df)
 
 
 def dchs_d_pass_game():
     page_header("DCHS D Pass Game")
-    v.render_pass_zones(df, "defense", v.TEAM, "DCHS D Pass Zones", key="pz_dchs_d")
-    v.render_d_pass_coverage(df)
+    v.render_pass_zones(df, "defense", v.TEAM, "DCHS D Pass Zones", key="pz_dchs_d", good_high=False)
+    cov = v.d_coverage_table(df)
+    v.render_takeaways(cov, "coverage", good_high=False)
+    v.render_d_pass_coverage(df, table=cov)
+    v.render_usage_scatter(cov, "DCHS coverages: EPA vs success allowed", good_high=False, noun="Coverage")
+    ins.render_coverage_by_formation(df)
     v.render_d_pass_game_detail(df)
 
 
+# ---- Pages: scouting -----------------------------------------------------------
 def scout_opposing_offense():
-    page_header("Scout Opposing Offense", definitions="team")
+    page_header("Scout Opposing Offense")
+    v.render_dd_tendencies(df_any_down, opponent, f"{opponent} down & distance tendencies")
     v.render_opp_tendencies(df, opponent)
     v.render_opp_3rd_downs(df_any_down, opponent)
     v.render_opp_4th_downs(df_any_down, opponent)
+    ins.render_best_plays(df, opponent)
 
 
 def scout_opposing_o_run_game():
     page_header("Scout Opposing O Run Game")
-    v.render_run_gaps(df, "offense", opponent, f"{opponent} O Run Gaps")
+    v.render_run_gaps(df, "offense", opponent, f"{opponent} O Run Gaps", good_high=False)
 
 
 def scout_opposing_o_pass_game():
     page_header("Scout Opposing O Pass Game")
-    v.render_pass_zones(df, "offense", opponent, f"{opponent} O Pass Zones", key="pz_opp_o")
+    v.render_pass_zones(df, "offense", opponent, f"{opponent} O Pass Zones", key="pz_opp_o", good_high=False)
 
 
-SCOUTING_PAGES = {
+def matchup():
+    page_header("Matchup")
+    ins.render_matchup(df, opponent)
+
+
+def scouting_report():
+    page_header("Scouting Report", show_definitions=False)
+    html = ins.build_report_html(df, df_any_down, opponent, " · ".join(active_filter_chips()))
+    st.download_button("Download printable report", html, file_name=f"{opponent}_scouting_report.html",
+                       mime="text/html", type="primary")
+    st.caption("Opens in any browser; use Print → Save as PDF for the binder.")
+    v.render_dd_tendencies(df_any_down, opponent, "Down & distance tendencies")
+    c1, c2 = st.columns(2)
+    with c1:
+        v.render_run_gaps(df, "offense", opponent, "Run game by gap", good_high=False)
+    with c2:
+        v.render_pass_zones(df, "offense", opponent, "Where they throw", key="pz_report", good_high=False)
+    forms = v.opp_formations_table(df, opponent)
+    v.show_table("Formations", forms, good_high=False)
+    ins.render_best_plays(df, opponent)
+
+
+# ---- Pages: game review --------------------------------------------------------
+def _game_picker(allow_all: bool) -> str | None:
+    options = ins.games(df_all)[::-1]  # newest first
+    if allow_all:
+        options = options + [None]
+    return st.selectbox("Game", options, key="g_game_all" if allow_all else "g_game",
+                        format_func=lambda g: "All games" if g is None else ins.game_label(df_all, g))
+
+
+def game_recap():
+    page_header("Game Recap", show_filters=False)
+    c1, c2 = st.columns([2, 3])
+    with c1:
+        gid = _game_picker(allow_all=True)
+    with c2:
+        half = st.radio("Show", ["Full game", "First half", "Second half"], horizontal=True, key="g_half")
+    if gid is None:
+        st.caption("All games: drive charts and the scoreboard need a single game, so this shows the "
+                   "head-to-head numbers and play logs for the whole season.")
+    ins.render_game_recap(df_all, gid, half)
+
+
+def win_prob_fourth_downs():
+    page_header("Win Probability & 4th Downs", show_definitions=False, show_filters=False)
+    gid = _game_picker(allow_all=True)
+    if gid is not None:
+        ins.render_win_probability(df_all[df_all["game_id"] == gid], ins.opponent_of(gid))
+    ins.render_fourth_down_review(df_all if gid is None else df_all[df_all["game_id"] == gid])
+
+
+# ---- Pages: data ---------------------------------------------------------------
+def tagging_coverage():
+    page_header("Tagging Coverage", show_definitions=False, show_filters=False)
+    st.caption("Every chart depends on Hudl tags. This shows which ones are missing so they can be filled in "
+               "while the film is fresh.")
+    ins.render_tagging_coverage(df_all)
+
+
+def add_game():
+    page_header("Add a Game", show_definitions=False, show_filters=False)
+    ins.render_add_game(DATA_PATH)
+
+
+FILTERED_PAGES = {
     "DCHS Offense": [
         st.Page(dchs_offense, title="DCHS Offense", url_path="dchs-offense", default=True),
         st.Page(dchs_o_run_game, title="DCHS O Run Game", url_path="dchs-o-run-game"),
         st.Page(dchs_o_pass_game, title="DCHS O Pass Game", url_path="dchs-o-pass-game"),
         st.Page(dchs_o_weekly_trends, title="DCHS O Weekly Trends", url_path="dchs-o-weekly-trends"),
+        st.Page(dchs_self_scout, title="DCHS Self-Scout", url_path="dchs-self-scout"),
     ],
     "DCHS Defense": [
         st.Page(dchs_d_overview, title="DCHS D Overview", url_path="dchs-d-overview"),
@@ -140,19 +246,31 @@ SCOUTING_PAGES = {
                 url_path="scout-opposing-o-run-game"),
         st.Page(scout_opposing_o_pass_game, title="Scout Opposing O Pass Game",
                 url_path="scout-opposing-o-pass-game"),
+        st.Page(matchup, title="Matchup", url_path="matchup"),
+        st.Page(scouting_report, title="Scouting Report", url_path="scouting-report"),
     ],
 }
-GAME_DAY_PAGES = {
+OTHER_PAGES = {
+    "Game Review": [
+        st.Page(game_recap, title="Game Recap", url_path="game-recap"),
+        st.Page(win_prob_fourth_downs, title="Win Probability & 4th Downs", url_path="win-probability"),
+    ],
     "Game Day": [
         st.Page("Fourth_Downs.py", title="4th Down Bot", icon="🏈", url_path="fourth-down-bot"),
         st.Page("Go_for_2.py", title="Go for 2 Bot", icon="🎯", url_path="go-for-2-bot"),
     ],
+    "Data": [
+        st.Page(tagging_coverage, title="Tagging Coverage", url_path="tagging-coverage"),
+        st.Page(add_game, title="Add a Game", url_path="add-a-game"),
+    ],
 }
+# Kept under its old name for anything that still refers to it.
+SCOUTING_PAGES = FILTERED_PAGES
 
-pg = st.navigation({**SCOUTING_PAGES, **GAME_DAY_PAGES})
+pg = st.navigation({**FILTERED_PAGES, **OTHER_PAGES}, expanded=True)
 
 
-# ---- Scouting sidebar filters (only drawn on scouting pages) ---------------
+# ---- Sidebar filters (only drawn on the DCHS and Scouting pages) --------------
 def dropdown_multiselect(label, options, key, fmt=str):
     """Compact dropdown: a button that opens a checklist, with a one-line summary.
     Everything is checked by default."""
@@ -179,6 +297,30 @@ def dropdown_multiselect(label, options, key, fmt=str):
     return selected
 
 
+def _summary(selected, options, fmt=str, all_text="All"):
+    if set(selected) == set(options):
+        return all_text
+    if not selected:
+        return "None"
+    return ", ".join(fmt(o) for o in selected)
+
+
+def active_filter_chips() -> list[str]:
+    week_labels = v.week_labels(df_all)
+    chips = [
+        _summary(sel_weeks, ALL_WEEKS, lambda w: week_labels.get(w, f"W{w}").split(" ")[0], "All weeks"),
+        _summary(sel_downs, ALL_DOWNS, lambda d: {1: "1st", 2: "2nd", 3: "3rd", 4: "4th"}[d], "All downs"),
+        _summary(sel_dist, v.DISTANCE_ORDER, lambda s: s.split(" (")[0], "All distances"),
+    ]
+    if situation != "All plays":
+        chips.append(situation)
+    if min_plays > 1:
+        chips.append(f"Rows with {min_plays}+ plays")
+    if any(pg is p for p in FILTERED_PAGES["Scouting"]):
+        chips.append(f"Opponent: {opponent}")
+    return chips
+
+
 def filtered(use_week: bool = True, use_down: bool = True):
     """Apply the sidebar filters. A filter with everything selected is skipped,
     so plays with a blank Down or Distance aren't dropped unless you narrow it."""
@@ -189,25 +331,90 @@ def filtered(use_week: bool = True, use_down: bool = True):
         d = d[d["DN"].isin(sel_downs)]
     if set(sel_dist) != set(v.DISTANCE_ORDER):
         d = d[d["Distance"].isin(sel_dist)]
-    return d
+    return ins.apply_situation(d, situation)
 
 
-if any(pg is p for group in SCOUTING_PAGES.values() for p in group):
-    df_all = v.load_data(DATA_PATH)
+SITUATION_NAMES = list(ins.SITUATIONS)
+
+
+def _apply_query_params():
+    """On first load, set the filters from the URL (so a shared link opens to the same view)."""
+    if st.session_state.get("_qp_applied"):
+        return
+    st.session_state["_qp_applied"] = True
+    qp = st.query_params
+
+    def set_multi(param, key, options, to_value):
+        if param not in qp:
+            return
+        chosen = set()
+        for raw in qp[param].split(","):
+            try:
+                chosen.add(to_value(raw))
+            except (ValueError, IndexError):
+                pass
+        for o in options:
+            st.session_state[f"{key}_{o}"] = o in chosen
+
+    set_multi("down", "f_down", ALL_DOWNS, int)
+    set_multi("dist", "f_dist", v.DISTANCE_ORDER, lambda i: v.DISTANCE_ORDER[int(i)])
+    set_multi("week", "f_week", ALL_WEEKS, lambda w: type(ALL_WEEKS[0])(float(w)) if ALL_WEEKS else w)
+    if qp.get("opp") in OPPONENTS:
+        st.session_state["f_opp"] = qp["opp"]
+    if qp.get("sit", "").isdigit() and int(qp["sit"]) < len(SITUATION_NAMES):
+        st.session_state["f_sit"] = SITUATION_NAMES[int(qp["sit"])]
+
+
+def _write_query_params():
+    params = {}
+    if set(sel_downs) != set(ALL_DOWNS):
+        params["down"] = ",".join(str(d) for d in sel_downs)
+    if set(sel_dist) != set(v.DISTANCE_ORDER):
+        params["dist"] = ",".join(str(v.DISTANCE_ORDER.index(s)) for s in sel_dist)
+    if set(sel_weeks) != set(ALL_WEEKS):
+        params["week"] = ",".join(str(int(w)) for w in sel_weeks)
+    if situation != "All plays":
+        params["sit"] = str(SITUATION_NAMES.index(situation))
+    if any(pg is p for p in FILTERED_PAGES["Scouting"]):
+        params["opp"] = opponent
+    if dict(st.query_params) != params:
+        st.query_params.from_dict(params)
+
+
+def _reset_filters():
+    for k in list(st.session_state.keys()):
+        if k.startswith(("f_down_", "f_dist_", "f_week_")):
+            st.session_state[k] = True
+    st.session_state["f_sit"] = "All plays"
+    st.session_state["f_minplays"] = 1
+
+
+df_all = v.load_data(DATA_PATH)
+st.sidebar.caption(ins.last_updated_text(df_all))
+
+if any(pg is p for group in FILTERED_PAGES.values() for p in group):
     ALL_DOWNS = [1, 2, 3, 4]
     ALL_WEEKS = sorted(df_all["WEEK"].dropna().unique().tolist())
     OPPONENTS = sorted(o for o in df_all["offense"].dropna().unique() if o != v.TEAM)
     st.session_state.setdefault("f_opp", "SEP" if "SEP" in OPPONENTS else OPPONENTS[0])
+    st.session_state.setdefault("f_sit", "All plays")
+    st.session_state.setdefault("f_minplays", 1)
+    _apply_query_params()
 
     with st.sidebar:
         st.header("Filters")
         sel_downs = dropdown_multiselect("Down", ALL_DOWNS, key="f_down")
         sel_dist = dropdown_multiselect("Distance", v.DISTANCE_ORDER, key="f_dist")
         sel_weeks = dropdown_multiselect("Week", ALL_WEEKS, key="f_week", fmt=lambda w: f"Week {w}")
+        situation = st.selectbox("Situation", SITUATION_NAMES, key="f_sit")
+        min_plays = st.slider("Hide table rows with fewer than … plays", 1, 15, key="f_minplays")
         # Opponent only matters on the Scouting section's pages
-        if any(pg is p for p in SCOUTING_PAGES["Scouting"]):
+        if any(pg is p for p in FILTERED_PAGES["Scouting"]):
             opponent = st.selectbox("Opponent", OPPONENTS, key="f_opp")
+        st.button("Reset filters", on_click=_reset_filters, width="stretch")
 
+    v.MIN_PLAYS = min_plays
+    _write_query_params()
     df = filtered()                          # most visuals
     df_any_down = filtered(use_down=False)   # 3rd/4th down tables set their own down
     df_all_weeks = filtered(use_week=False)  # weekly trend charts show every week
