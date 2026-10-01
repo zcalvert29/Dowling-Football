@@ -88,6 +88,14 @@ def load_data(path: str) -> pd.DataFrame:
     df["COVERAGE"] = df["COVERAGE"].map(lambda v: str(v) if pd.notna(v) else None)
     df["MEN IN BOX"] = df["MEN IN BOX"].astype("Int64")
     df["DN"] = df["DN"].astype("Int64")
+
+    # Older curated files won't have 'completion' yet; derive it the same
+    # way curate_pbp.py does so the pass-zone visuals still work.
+    if "completion" not in df.columns:
+        res = df["RESULT"].fillna("")
+        df["completion"] = np.select(
+            [res.str.contains("Incomplete|Interception"), res.str.contains("Complete")], [0, 1], default=np.nan
+        )
     return df
 
 
@@ -249,6 +257,169 @@ def render_rush_vs_box(df):
 
 def render_pass_vs_box(df):
     _men_in_box(df, "Pass", "offense", "DCHS O Pass Metrics vs Men in the Box")
+
+
+# ---------------------------------------------------------------------------
+# Pass zones heatmap (used on DCHS O / DCHS D / Scout Opposing O pass pages)
+#
+# PASS ZONE numbering, from the quarterback's view:
+#   7 8 9   20+ yards
+#   4 5 6   10-19 yards
+#   1 2 3   0-9 yards
+#   L M R
+# ---------------------------------------------------------------------------
+ZONE_ROWS = [("20+ yds", [7, 8, 9]), ("10–19 yds", [4, 5, 6]), ("0–9 yds", [1, 2, 3])]
+ZONE_COLS = [("Left", [1, 4, 7]), ("Middle", [2, 5, 8]), ("Right", [3, 6, 9])]
+LOW_N = 10  # zones with fewer attempts than this get a "low n" flag
+
+# key -> (button label, short label, column in the zone stats frame, formatter)
+_pct = lambda v: f"{v:.0%}"
+_epa = lambda v: f"{v:+.2f}"
+PASS_ZONE_METRICS = {
+    "Share of throws": ("Share", "share", lambda v: f"{v:.1%}"),
+    "Completion %": ("Comp", "comp", _pct),
+    "EPA per play": ("EPA", "epa", _epa),
+    "Success rate": ("Succ", "success", _pct),
+    "Explosive rate": ("Expl", "explosive", _pct),
+}
+
+# Blue (below reference) -> gray (at reference) -> red (above reference).
+# (background, text color) pairs, index 0..6 = -3..+3.
+_ZONE_STOPS = [
+    ("#185FA5", "#E6F1FB"), ("#378ADD", "#042C53"), ("#B5D4F4", "#042C53"),
+    ("#F1EFE8", "#2C2C2A"),
+    ("#F7C1C1", "#501313"), ("#E24B4A", "#501313"), ("#A32D2D", "#FCEBEB"),
+]
+_EMPTY_ZONE = ("rgba(128,128,128,0.12)", "inherit")
+
+
+def _zone_stats(d: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
+    """Per-zone attempts/share/comp/epa/success/explosive, plus overall averages."""
+    d = d.assign(explosive_play=pd.to_numeric(d["explosive_play"], errors="coerce"))
+    g = d.groupby("zone")
+    stats = pd.DataFrame({
+        "att": g.size(),
+        "comp": g["completion"].sum() / g["completion"].count(),
+        "epa": g["epa"].mean(),
+        "success": g["success"].mean(),
+        "explosive": g["explosive_play"].mean(),
+    }).reindex(range(1, 10))
+    stats["att"] = stats["att"].fillna(0).astype(int)
+    stats["share"] = stats["att"] / stats["att"].sum()
+    overall = {
+        "att": len(d),
+        "share": 1 / 9,  # reference for share = an even split across 9 zones
+        "comp": d["completion"].sum() / d["completion"].count() if d["completion"].count() else np.nan,
+        "epa": d["epa"].mean(),
+        "success": d["success"].mean(),
+        "explosive": d["explosive_play"].mean(),
+    }
+    return stats, overall
+
+
+def _zone_color(stats: pd.DataFrame, col: str, ref: float, value: float) -> tuple[str, str]:
+    if pd.isna(value) or pd.isna(ref):
+        return _EMPTY_ZONE
+    # Scale the color range by zones with a real sample, so one 1-for-1
+    # deep shot can't wash every other zone out to gray. Low-n zones still
+    # get colored, just clipped to the ends of the scale.
+    has_att = stats["att"] > 0
+    sized = stats.loc[stats["att"] >= LOW_N, col]
+    dev = (sized if sized.notna().any() else stats.loc[has_att, col]).sub(ref).abs().max()
+    t = (value - ref) / dev if dev and not pd.isna(dev) else 0.0
+    t = float(np.clip(t, -1, 1))
+    a = abs(t)
+    step = 0 if a < 0.2 else 1 if a < 0.5 else 2 if a < 0.8 else 3
+    return _ZONE_STOPS[3 + int(np.sign(t)) * step]
+
+
+def _fmt(fn, v) -> str:
+    return "–" if pd.isna(v) else fn(v)
+
+
+def _pass_zone_html(stats: pd.DataFrame, overall: dict, metric: str) -> str:
+    short, col, fn = PASS_ZONE_METRICS[metric]
+    ref = overall[col]
+    ref_label = "even split" if col == "share" else "avg"
+    muted = "opacity:.65"
+
+    kpis = [("Attempts", str(overall["att"])), ("Comp %", _fmt(_pct, overall["comp"])),
+            ("EPA / play", _fmt(_epa, overall["epa"])), ("Success", _fmt(_pct, overall["success"])),
+            ("Explosive", _fmt(_pct, overall["explosive"]))]
+    kpi_html = "".join(
+        f'<div style="background:rgba(128,128,128,.08);border-radius:8px;padding:6px 10px">'
+        f'<div style="font-size:12px;{muted}">{l}</div>'
+        f'<div style="font-size:20px;font-weight:500;font-variant-numeric:tabular-nums">{v}</div></div>'
+        for l, v in kpis
+    )
+
+    def share_of(zones):
+        return f'{stats.loc[zones, "share"].sum():.0%}'
+
+    cells = ['<div></div>'] + [
+        f'<div style="text-align:center;font-size:13px">{name}<br>'
+        f'<span style="font-size:12px;{muted}">{share_of(zs)} of throws</span></div>'
+        for name, zs in ZONE_COLS
+    ]
+    for label, zones in ZONE_ROWS:
+        cells.append(
+            f'<div style="display:flex;flex-direction:column;justify-content:center;align-items:flex-end;'
+            f'text-align:right;font-size:12px;padding-right:6px;{muted}">{label}<span>{share_of(zones)}</span></div>'
+        )
+        for z in zones:
+            row = stats.loc[z]
+            att = int(row["att"])
+            bg, fg = _zone_color(stats, col, ref, row[col]) if att else _EMPTY_ZONE
+            flag = " · low n" if 0 < att < LOW_N else ""
+            others = "".join(
+                f"<span>{s} {_fmt(f, row[c])}</span>"
+                for m, (s, c, f) in PASS_ZONE_METRICS.items() if m != metric
+            )
+            cells.append(
+                f'<div style="background:{bg};color:{fg};border-radius:8px;padding:9px 11px;min-height:116px;'
+                f'display:flex;flex-direction:column;justify-content:space-between">'
+                f'<div style="display:flex;justify-content:space-between;font-size:12px;opacity:.85">'
+                f'<span>Zone {z}</span><span>{att} att{flag}</span></div>'
+                f'<div style="font-size:24px;font-weight:500;font-variant-numeric:tabular-nums">{_fmt(fn, row[col])}</div>'
+                f'<div style="display:grid;grid-template-columns:1fr 1fr;gap:1px 8px;font-size:12px;'
+                f'font-variant-numeric:tabular-nums">{others}</div></div>'
+            )
+
+    swatches = "".join(
+        f'<span style="width:22px;height:12px;border-radius:2px;background:{bg};'
+        f'border:0.5px solid rgba(128,128,128,.4)"></span>'
+        for bg, _ in _ZONE_STOPS
+    )
+    return (
+        '<div style="max-width:820px;font-family:inherit">'
+        f'<div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:12px">{kpi_html}</div>'
+        f'<div style="display:grid;grid-template-columns:62px repeat(3,minmax(0,1fr));gap:4px">{"".join(cells)}</div>'
+        '<div style="display:grid;grid-template-columns:62px 1fr;gap:4px;margin-top:4px">'
+        f'<div style="font-size:12px;text-align:right;padding-right:6px;{muted}">LOS</div>'
+        '<div style="border-top:2px solid rgba(128,128,128,.6);text-align:center;font-size:12px;padding-top:4px">QB</div></div>'
+        f'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;margin-top:8px">'
+        f'<span style="{muted}">Below {ref_label}</span>{swatches}<span style="{muted}">Above {ref_label}</span>'
+        f'<span style="{muted};margin-left:6px">{"Even split" if col == "share" else "Avg"}: {_fmt(fn, ref)}</span></div>'
+        '</div>'
+    )
+
+
+def render_pass_zones(df: pd.DataFrame, side: str, team: str, title: str, key: str) -> None:
+    """
+    Pass-zone heatmap for passes where `side` ("offense" or "defense") == team.
+    Only Pass plays with a PASS ZONE of 1-9 are included.
+    """
+    st.markdown(f"**{title}**")
+    d = run_pass(df[df[side] == team], ["Pass"]).copy()
+    d["zone"] = pd.to_numeric(d["PASS ZONE"], errors="coerce")
+    d = d[d["zone"].between(1, 9)]
+    d["zone"] = d["zone"].astype(int)
+    if d.empty:
+        st.info("No pass plays with a PASS ZONE tag match the current filters.")
+        return
+    metric = st.radio("Shade by", list(PASS_ZONE_METRICS), horizontal=True, key=key)
+    stats, overall = _zone_stats(d)
+    st.html(_pass_zone_html(stats, overall, metric))
 
 
 # ---------------------------------------------------------------------------

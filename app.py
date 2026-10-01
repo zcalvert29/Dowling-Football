@@ -16,7 +16,6 @@ Folder layout (everything sits next to this file):
 import streamlit as st
 
 import visuals as v
-st.sidebar.caption(f"visuals: {v.__file__} | has new tables: {hasattr(v, 'render_o_pass_game_detail')}")
 
 DATA_PATH = "curated-pbp.xlsx"
 
@@ -67,6 +66,7 @@ def dchs_o_run_game():
 
 def dchs_o_pass_game():
     page_header("DCHS O Pass Game")
+    v.render_pass_zones(df, "offense", v.TEAM, "DCHS O Pass Zones", key="pz_dchs_o")
     v.render_o_pass_game_detail(df)
     v.render_dchs_intended_pass_distance(df)
     v.render_pass_vs_box(df)
@@ -98,6 +98,7 @@ def dchs_d_run_game():
 
 def dchs_d_pass_game():
     page_header("DCHS D Pass Game")
+    v.render_pass_zones(df, "defense", v.TEAM, "DCHS D Pass Zones", key="pz_dchs_d")
     v.render_d_pass_coverage(df)
     v.render_d_pass_game_detail(df)
 
@@ -107,6 +108,11 @@ def scout_opposing_offense():
     v.render_opp_tendencies(df, opponent)
     v.render_opp_3rd_downs(df_any_down, opponent)
     v.render_opp_4th_downs(df_any_down, opponent)
+
+
+def scout_opposing_o_pass_game():
+    page_header("Scout Opposing O Pass Game")
+    v.render_pass_zones(df, "offense", opponent, f"{opponent} O Pass Zones", key="pz_opp_o")
 
 
 SCOUTING_PAGES = {
@@ -123,6 +129,8 @@ SCOUTING_PAGES = {
     ],
     "Scouting": [
         st.Page(scout_opposing_offense, title="Scout Opposing Offense", url_path="scout-opposing-offense"),
+        st.Page(scout_opposing_o_pass_game, title="Scout Opposing O Pass Game",
+                url_path="scout-opposing-o-pass-game"),
     ],
 }
 GAME_DAY_PAGES = {
