@@ -423,6 +423,105 @@ def render_pass_zones(df: pd.DataFrame, side: str, team: str, title: str, key: s
 
 
 # ---------------------------------------------------------------------------
+# Run gaps diagram (used on DCHS O / DCHS D / Scout Opposing O run pages)
+#
+# GAP tag -> lane: A = between C and G, B = between G and T, C = outside
+# the T (D and E are folded into C). PLAY DIR (L/R) picks the side.
+# ---------------------------------------------------------------------------
+RUN_GAP_MAP = {"A": "A", "B": "B", "C": "C", "D": "C", "E": "C"}
+
+# (direction, gap) -> (bend x, arrow tip x, bottom label). Bends sit just
+# behind the line at y=275; arrows finish at y=110.
+_RUN_LANES = [
+    ("L", "C", 165, 85, "Left C"),
+    ("L", "B", 235, 235, "Left B"),
+    ("L", "A", 305, 305, "Left A"),
+    ("R", "A", 375, 375, "Right A"),
+    ("R", "B", 445, 445, "Right B"),
+    ("R", "C", 515, 595, "Right C"),
+]
+_LINEMEN = [("LT", 200), ("LG", 270), ("C", 340), ("RG", 410), ("RT", 480)]
+_POS, _NEG, _NONE = "#1D9E75", "#E24B4A", "rgba(128,128,128,.45)"
+
+
+def _run_gaps_svg(runs: pd.DataFrame, lanes: dict) -> str:
+    font = 'font-family="inherit"'
+    num = f'{font} font-size="14" font-weight="500"'
+    lab = f'{font} font-size="12" fill="currentColor" opacity=".7"'
+
+    td = runs["RESULT"].fillna("").str.contains("TD") & ~runs["RESULT"].fillna("").str.contains("Def TD")
+    expl = pd.to_numeric(runs["explosive_play"], errors="coerce").sum()
+    epa = runs["epa"].mean()
+    stats = [
+        (f"{len(runs)}", "carries"),
+        (f"{runs['GN/LS'].sum():.0f}", "yards"),
+        (f"{runs['GN/LS'].mean():.1f}", "yds / carry"),
+        (f"{int(td.sum())}", "rush TD"),
+        (f"{int(expl)}", "explosive"),
+        ("–" if pd.isna(epa) else f"{epa:+.2f}", "EPA / rush"),
+    ]
+    parts = []
+    for i, (value, label) in enumerate(stats):
+        x = 80 + i * 104
+        parts.append(f'<text x="{x}" y="28" text-anchor="middle" fill="currentColor" {num}>{value}</text>'
+                     f'<text x="{x}" y="46" text-anchor="middle" {lab}>{label}</text>')
+    parts.append('<line x1="40" y1="62" x2="640" y2="62" stroke="currentColor" stroke-opacity=".2"/>')
+
+    for d, g, bend_x, tip_x, name in _RUN_LANES:
+        mean, n = lanes.get((d, g), (np.nan, 0))
+        color = _NONE if n == 0 or pd.isna(mean) else (_POS if mean >= 0 else _NEG)
+        dash = ' stroke-dasharray="6 6"' if n == 0 else ""
+        parts.append(
+            f'<path d="M340 308 L{bend_x} 275 L{tip_x} 110" fill="none" stroke="{color}" stroke-width="5" '
+            f'stroke-linecap="round" stroke-linejoin="round"{dash} marker-end="url(#rg-arrow)" '
+            f'style="color:{color}"/>'
+        )
+        value = "–" if n == 0 or pd.isna(mean) else f"{mean:+.2f}"
+        parts.append(f'<text x="{tip_x}" y="92" text-anchor="middle" fill="{color}" {num}>{value}</text>')
+        parts.append(f'<text x="{tip_x}" y="390" text-anchor="middle" fill="{color}" {num}>{n}</text>'
+                     f'<text x="{tip_x}" y="408" text-anchor="middle" {lab}>{name}</text>')
+
+    for name, x in _LINEMEN:
+        parts.append(f'<circle cx="{x}" cy="240" r="22" fill="#185FA5"/>'
+                     f'<text x="{x}" y="240" text-anchor="middle" dominant-baseline="central" fill="#E6F1FB" {num}>{name}</text>')
+    parts.append('<circle cx="340" cy="330" r="22" fill="#BA7517"/>'
+                 f'<text x="340" y="330" text-anchor="middle" dominant-baseline="central" fill="#FAEEDA" {num}>RB</text>')
+    parts.append('<line x1="40" y1="366" x2="640" y2="366" stroke="currentColor" stroke-opacity=".2"/>')
+
+    marker = ('<defs><marker id="rg-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4" markerHeight="4" '
+              'orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" '
+              'stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>')
+    return (f'<div style="max-width:760px"><svg width="100%" viewBox="0 0 680 425" role="img" '
+            f'aria-label="Average EPA per rush and carries by run gap">{marker}{"".join(parts)}</svg></div>')
+
+
+def render_run_gaps(df: pd.DataFrame, side: str, team: str, title: str) -> None:
+    """
+    Run-gap diagram for runs where `side` ("offense" or "defense") == team.
+    Top strip uses every Run play (penalties excluded); arrows use runs with
+    both a GAP and a PLAY DIR tag. Arrow color/number = average EPA,
+    bottom number = carries.
+    """
+    st.markdown(f"**{title}**")
+    runs = run_pass(df[df[side] == team], ["Run"])
+    runs = runs[runs["RESULT"] != "Penalty"]
+    if runs.empty:
+        st.info("No runs match the current filters.")
+        return
+
+    gap = runs["GAP"].astype("string").str.strip().str.upper().map(RUN_GAP_MAP)
+    direction = runs["PLAY DIR"].astype("string").str.strip().str.upper()
+    tagged = runs.assign(lane_gap=gap, lane_dir=direction)
+    tagged = tagged[tagged["lane_gap"].notna() & tagged["lane_dir"].isin(["L", "R"])]
+    lanes = {k: (g["epa"].mean(), len(g)) for k, g in tagged.groupby(["lane_dir", "lane_gap"])}
+
+    st.html(_run_gaps_svg(runs, lanes))
+    untagged = len(runs) - len(tagged)
+    if untagged:
+        st.caption(f"{untagged} of {len(runs)} runs are missing a GAP or PLAY DIR tag and aren't shown in the arrows.")
+
+
+# ---------------------------------------------------------------------------
 # Weekly trends (Dowling Catholic offense, all weeks)
 # ---------------------------------------------------------------------------
 def _weekly(df, play_type, col, title, fmt):

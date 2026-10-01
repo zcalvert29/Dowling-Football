@@ -60,6 +60,7 @@ def dchs_offense():
 
 def dchs_o_run_game():
     page_header("DCHS O Run Game", definitions="offense")
+    v.render_run_gaps(df, "offense", v.TEAM, "DCHS O Run Gaps")
     v.render_run_scheme_detail(df)
     v.render_rush_vs_box(df)
 
@@ -92,6 +93,7 @@ def dchs_d_overview():
 
 def dchs_d_run_game():
     page_header("DCHS D Run Game", definitions="defense")
+    v.render_run_gaps(df, "defense", v.TEAM, "DCHS D Run Gaps")
     v.render_d_rush_vs_box(df)
     v.render_d_run_game_detail(df)
 
@@ -108,6 +110,11 @@ def scout_opposing_offense():
     v.render_opp_tendencies(df, opponent)
     v.render_opp_3rd_downs(df_any_down, opponent)
     v.render_opp_4th_downs(df_any_down, opponent)
+
+
+def scout_opposing_o_run_game():
+    page_header("Scout Opposing O Run Game")
+    v.render_run_gaps(df, "offense", opponent, f"{opponent} O Run Gaps")
 
 
 def scout_opposing_o_pass_game():
@@ -129,6 +136,8 @@ SCOUTING_PAGES = {
     ],
     "Scouting": [
         st.Page(scout_opposing_offense, title="Scout Opposing Offense", url_path="scout-opposing-offense"),
+        st.Page(scout_opposing_o_run_game, title="Scout Opposing O Run Game",
+                url_path="scout-opposing-o-run-game"),
         st.Page(scout_opposing_o_pass_game, title="Scout Opposing O Pass Game",
                 url_path="scout-opposing-o-pass-game"),
     ],
