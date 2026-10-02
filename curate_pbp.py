@@ -503,6 +503,85 @@ def calculate_ep_epa(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+DEF_TD_MARK = "Def TD"  # RESULT text when the defense scores on the play ("Interception, Def TD")
+
+
+def _try_after_defensive_td(df: pd.DataFrame) -> pd.Series:
+    """The extra point / 2-point try that follows a defensive touchdown (the scoring team's try, even though
+    Hudl often tags it with the same offense as the play before)."""
+    res = df["RESULT"].astype("string").fillna("")
+    is_try = df["PLAY TYPE"].isin(XP_TYPES | TWO_PT_TYPES)
+    last_non_try = res.where(~is_try).ffill().fillna("")
+    return is_try & last_non_try.str.contains(DEF_TD_MARK, regex=False)
+
+
+def _drive_numbers(df: pd.DataFrame) -> pd.Series:
+    """
+    Running drive count for ONE game, rows in play order. A new drive starts when:
+      * 'offense' changes from the previous play,
+      * the half turns over (Q2 -> Q3), even if the same team has the ball on both sides of it, or
+      * the play after a defensive touchdown and its try. After a pick-six or scoop-and-score the team that
+        lost the ball gets it right back on the kickoff, so 'offense' never changes; without this, their next
+        possession merged into the drive that ended in the score (one "drive" holding two or three).
+    """
+    halftime_boundary = (df["QTR"] == 3) & (df["QTR"].shift() == 2)
+    res = df["RESULT"].astype("string").fillna("")
+    is_try = df["PLAY TYPE"].isin(XP_TYPES | TWO_PT_TYPES).to_numpy()
+    def_td = res.str.contains(DEF_TD_MARK, regex=False).to_numpy()
+    after = np.zeros(len(df), dtype=bool)
+    pending = False
+    for i in range(len(df)):
+        if pending and not is_try[i]:
+            after[i], pending = True, False
+        if def_td[i]:
+            pending = True
+    return ((df["offense"] != df["offense"].shift()) | halftime_boundary
+            | pd.Series(after, index=df.index)).cumsum()
+
+
+def assign_drives(game: pd.DataFrame) -> pd.DataFrame:
+    """
+    Recompute drive, YDS_NET, and drive_result for ONE already-curated game, in play order. The app runs this
+    when it loads curated-pbp.xlsx, so games curated before the defensive-touchdown fix are corrected without
+    re-curating them. Needs the columns curation produces (offense, QTR, PLAY TYPE, RESULT, DN, success,
+    turnover, GN/LS).
+    """
+    df = game.reset_index(drop=True).copy()
+    df["drive"] = _drive_numbers(df)
+    df["YDS_NET"] = df.groupby("drive")["GN/LS"].transform(lambda s: s.fillna(0).cumsum())
+    is_kickoff = df["PLAY TYPE"].isin(KICKOFF_TYPES)
+    n = len(df)
+
+    def last_play_result(i):
+        pt = str(df.at[i, "PLAY TYPE"])
+        res = df.at[i, "RESULT"] if pd.notna(df.at[i, "RESULT"]) else ""
+        if DEF_TD_MARK in res:
+            return "Turnover, Def TD"
+        if pt in XP_TYPES or pt in TWO_PT_TYPES or ("TD" in res and DEF_TD_MARK not in res):
+            return "Touchdown"
+        if pt in FG_TYPES:
+            return "FG Attempt"
+        if pt in PUNT_TYPES:
+            return "Punt"
+        if df.at[i, "turnover"] == 1:
+            return "Turnover"
+        if "Safety" in res:
+            return "Safety"
+        if df.at[i, "DN"] == 4 and df.at[i, "success"] == 0:
+            return "Turnover on Downs"
+        if df.at[i, "QTR"] == 2 and i + 1 < n and df.at[i + 1, "QTR"] == 3:
+            return "End of Half"
+        if df.at[i, "QTR"] == 4 and i == n - 1:
+            return "End of Game"
+        return "Error"
+
+    plays = df[~is_kickoff & ~_try_after_defensive_td(df) & df["drive"].notna()]
+    last_idx = plays.groupby("drive").tail(1).index
+    df["drive_result"] = df["drive"].map({df.at[i, "drive"]: last_play_result(i) for i in last_idx})
+    df.index = game.index
+    return df
+
+
 def add_play_detail_columns(df: pd.DataFrame, team: str, opponent: str, date: str, week) -> pd.DataFrame:
     """
     Add play-type flags, game_id, drive, and drive_result columns to a
@@ -617,8 +696,8 @@ def add_play_detail_columns(df: pd.DataFrame, team: str, opponent: str, date: st
     # same team on both sides of the gap (e.g. a deferred-receive team
     # also gets the ball right before half and right after it) — without
     # this, that gap wouldn't register as a new drive at all. ---
-    halftime_boundary = (df["QTR"] == 3) & (df["QTR"].shift() == 2)
-    df["drive"] = ((df["offense"] != df["offense"].shift()) | halftime_boundary).cumsum()
+    # (also starts a new drive after a defensive touchdown — see assign_drives)
+    df["drive"] = _drive_numbers(df)
 
     # --- YDS_NET: running total of GN/LS within each drive, restarting at
     # the start of every new drive. Missing GN/LS values are treated as 0
@@ -655,7 +734,8 @@ def add_play_detail_columns(df: pd.DataFrame, team: str, opponent: str, date: st
     # part of the series it would have inherited above (that series ended in
     # the turnover). Leave it out, the same as kickoffs.
     last_snap_offense = df["offense"].where(normal_play_mask).ffill()
-    other_teams_try = df["PLAY TYPE"].isin(XP_TYPES | TWO_PT_TYPES) & (df["offense"] != last_snap_offense)
+    other_teams_try = (df["PLAY TYPE"].isin(XP_TYPES | TWO_PT_TYPES) & (df["offense"] != last_snap_offense)) \
+        | _try_after_defensive_td(df)
     df.loc[other_teams_try, "SERIES"] = np.nan
 
     # --- drive_result / SERIES_RESULT: computed on the last NON-kickoff
@@ -674,24 +754,6 @@ def add_play_detail_columns(df: pd.DataFrame, team: str, opponent: str, date: st
         if df.at[i, "QTR"] == 4 and i == n - 1:
             return "End of Game"
         return "Error"
-
-    def last_play_result(i):
-        pt = str(df.at[i, "PLAY TYPE"])
-        res = df.at[i, "RESULT"] if pd.notna(df.at[i, "RESULT"]) else ""
-
-        if _scored_td(i):
-            return "Touchdown"
-        if pt in FG_TYPES:
-            return "FG Attempt"
-        if pt in PUNT_TYPES:
-            return "Punt"
-        if df.at[i, "turnover"] == 1:
-            return "Turnover"
-        if "Safety" in res:
-            return "Safety"
-        if df.at[i, "DN"] == 4 and df.at[i, "success"] == 0:
-            return "Turnover on Downs"
-        return _end_of_period(i)
 
     def last_play_series_result(i):
         pt = str(df.at[i, "PLAY TYPE"])
@@ -719,11 +781,14 @@ def add_play_detail_columns(df: pd.DataFrame, team: str, opponent: str, date: st
         return _end_of_period(i)
 
     def _broadcast(key, fn):
-        plays = df[~is_kickoff & df[key].notna()]
+        # The try after a defensive TD is the scoring team's, so it can't be the last play of the drive that
+        # ended in the turnover (it would read as that offense's "Touchdown").
+        plays = df[~is_kickoff & ~_try_after_defensive_td(df) & df[key].notna()]
         last_idx = plays.groupby(key).tail(1).index
         return df[key].map({df.at[i, key]: fn(i) for i in last_idx})
 
-    df["drive_result"] = _broadcast("drive", last_play_result)
+    # Same rules as assign_drives (one copy, so curation and the app's load-time fix can't drift apart).
+    df["drive_result"] = assign_drives(df)["drive_result"]
     df["SERIES_RESULT"] = _broadcast("SERIES", last_play_series_result)
     df["SERIES_SUCCESS"] = np.where(
         df["SERIES_RESULT"].isna(),

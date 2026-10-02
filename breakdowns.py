@@ -440,7 +440,7 @@ def _drive_kpis(d: pd.DataFrame) -> dict:
     return {"Drives": n, "Points / drive": d["points"].mean(), "TD rate": (d["result"] == "Touchdown").mean(),
             "Scoring rate": (d["points"] > 0).mean(), "3-and-outs": d["three_and_out"].mean(),
             "Avg start": d["start"].mean(), "Yards / drive": d["yards"].mean(),
-            "Turnovers": int(d["result"].isin(["Turnover", "Turnover on Downs"]).sum())}
+            "Turnovers": int(d["result"].isin(["Turnover", "Turnover, Def TD", "Turnover on Downs"]).sum())}
 
 
 # ==============================================================================
@@ -448,7 +448,8 @@ def _drive_kpis(d: pd.DataFrame) -> dict:
 # ==============================================================================
 RZ_BANDS = [("Red zone (11–20)", 11, 20), ("Inside the 10 (6–10)", 6, 10), ("Goal line (1–5)", 1, 5)]
 RZ_RESULTS = [("Touchdown", "#1D9E75"), ("FG Made", "#E8B923"), ("FG Missed", "#E24B4A"),
-              ("Turnover on Downs", "#E24B4A"), ("Turnover", "#A32D2D"), ("End of Half", "#888780"),
+              ("Turnover on Downs", "#E24B4A"), ("Turnover", "#A32D2D"), ("Turnover, Def TD", "#501313"),
+              ("End of Half", "#888780"),
               ("End of Game", "#888780")]
 
 
@@ -622,7 +623,8 @@ def render_season_drives(df_all: pd.DataFrame) -> None:
     with c2:
         st.markdown("**How drives ended**")
         res_order = [("Touchdown", "#1D9E75"), ("FG Made", "#E8B923"), ("FG Missed", "#EF9F27"), ("Punt", "#B4B2A9"),
-                     ("Downs", "#E24B4A"), ("Turnover", "#A32D2D"), ("End of half", "#D3D1C7")]
+                     ("Downs", "#E24B4A"), ("Turnover", "#A32D2D"), ("Turnover, Def TD", "#501313"),
+                     ("End of half", "#D3D1C7")]
         r = allx["result"].replace({"Turnover on Downs": "Downs", "End of Half": "End of half",
                                     "End of Game": "End of half"})
         html = []
@@ -733,3 +735,252 @@ def render_aggressiveness(t: pd.DataFrame, order: list[str]) -> None:
             width="stretch")
     st.caption("\"Clearly\" = the model's pick beat the next option by at least 1 point of win probability "
                "(not a toss-up). Decisions with the game already decided aren't counted.")
+
+
+# ==============================================================================
+# 7. FIELD POSITION (Scout Opposing Offense)
+# ==============================================================================
+# (name, where, low yards-to-goal, high yards-to-goal, strip width). Every yard line is in exactly one zone:
+# own goal line through own 20 | own 21 through opp 41 | opp 40 through opp 21 | opp 20 to the goal.
+FP_ZONES = [("Backed up", "Goal to own 20", 80, 99, 20), ("Neutral", "Own 20 to opp 40", 41, 79, 40),
+            ("FG range", "Opp 40 to 20", 21, 40, 20), ("Red zone", "Opp 20 to goal", 1, 20, 20)]
+FP_SMALL = 10  # zones with fewer plays than this get a "small sample" flag
+
+
+def _call_name(s: str) -> str:
+    """'TE DELAY' -> 'TE Delay', 'GIVE @ 1' -> 'Give @ 1': title case that keeps short tags like TE/RB upper."""
+    words = str(s).strip().split()
+    return " ".join(w if (len(w) <= 2 and w.isalpha()) else w.title() for w in words)
+
+
+def _zone_of(ytg: pd.Series) -> pd.Series:
+    out = pd.Series(pd.NA, index=ytg.index, dtype="object")
+    for name, _, lo, hi, _ in FP_ZONES:
+        out[ytg.between(lo, hi)] = name
+    return out
+
+
+def _k_of(mask: pd.Series) -> tuple[int, int]:
+    m = mask.dropna()
+    return int(m.sum()), len(m)
+
+
+def field_position_summary(d: pd.DataFrame, drives: pd.DataFrame) -> dict:
+    """
+    Everything the tab shows, per zone. d = the team's run/pass snaps (filtered); drives = season_drives()
+    for the same team and games (drive starts per zone use whole drives, not the down/distance filters).
+    """
+    d = d.assign(zone=_zone_of(d["YARDLINE_100"]))
+    total = len(d)
+    starts = drives.assign(zone=_zone_of(100 - drives["start"])) if not drives.empty else drives
+    out = {"total": total, "drives": len(drives), "zones": {}}
+    for name, where, lo, hi, width in FP_ZONES:
+        z = d[d["zone"] == name]
+        info = {"where": where, "width": width, "n": len(z), "share": len(z) / total if total else 0.0}
+        dz = starts[starts["zone"] == name] if not drives.empty else drives
+        info["drive_starts"] = len(dz)
+        info["drive_scores"] = int((dz["points"] > 0).sum()) if len(dz) else 0
+        if len(z):
+            info["run_share"] = 1 - z["PASS"].mean()
+            info["epa"] = z["epa"].mean()
+            info["success"] = z["success"].mean()
+            info["by_type"] = {}
+            for t in ("Run", "Pass"):
+                s = z[z["PLAY TYPE"] == t]
+                info["by_type"][t] = {"n": len(s), "success": s["success"].mean() if len(s) else np.nan,
+                                      "epa": s["epa"].mean() if len(s) else np.nan,
+                                      "yds": s["GN/LS"].mean() if len(s) else np.nan}
+            f = z["OFF FORM"].dropna().astype(str).str.strip().str.title()
+            info["formations"] = [(k, c / len(z)) for k, c in f.value_counts().head(3).items()]
+            calls_tagged = z["OFF PLAY"].notna().mean() >= 0.5
+            info["calls_tagged"] = calls_tagged
+            for t in ("Run", "Pass"):
+                s = z[z["PLAY TYPE"] == t]
+                if calls_tagged:
+                    info[f"calls_{t}"] = [(_call_name(k), c) for k, c in s["OFF PLAY"].dropna().value_counts().head(3).items()]
+                elif t == "Run":
+                    info["calls_Run"] = [({"L": "Left", "R": "Right"}.get(k, k), c)
+                                         for k, c in s["PLAY DIR"].dropna().value_counts().items()]
+                else:
+                    pz = s["PASS ZONE"].dropna()
+                    info["calls_Pass"] = [(f"Zone {int(k)}", c) for k, c in pz.value_counts().head(3).items()]
+            first, third = z[z["DN"] == 1], z[z["DN"] == 3]
+            info["first_run"] = _k_of(first["PLAY TYPE"].eq("Run")) if len(first) else (0, 0)
+            info["third_pass"] = _k_of(third["PLAY TYPE"].eq("Pass")) if len(third) else (0, 0)
+            info["third_conv"] = int(third["THIRD_DOWN_CONVERTED"].sum()) if len(third) else 0
+            info["fourth"] = int((z["DN"] == 4).sum())
+            info["avg_dist"] = z["DIST"].mean()
+            runs = z[(z["PLAY TYPE"] == "Run") & z["PLAY DIR"].isin(["L", "R"])]
+            if len(runs):
+                side = runs["PLAY DIR"].value_counts()
+                info["run_dir"] = ({"L": "left", "R": "right"}[side.index[0]], int(side.iat[0]), len(runs))
+            box = pd.to_numeric(z["MEN IN BOX"], errors="coerce").dropna()
+            info["box"] = box.mean() if len(box) else np.nan
+        out["zones"][name] = info
+    return out
+
+
+def field_position_reads(s: dict) -> list[str]:
+    """Up to 4 plain-language reads, strongest first."""
+    zones = s["zones"]
+    total = s["total"]
+    reads = []
+    live = max(zones, key=lambda k: zones[k]["n"])
+    z = zones[live]
+    if z["n"]:
+        line = f"{live} is where they live: {z['share']:.0%} of snaps"
+        tp, tn = z["third_pass"]
+        if tn >= 3 and tp / tn >= 0.75:
+            line += f", and they throw {tp / tn:.0%} on 3rd down ({tp} of {tn})"
+        elif z["run_share"] >= 0.65 or z["run_share"] <= 0.35:
+            line += f", {'running' if z['run_share'] >= 0.5 else 'throwing'} " \
+                    f"{max(z['run_share'], 1 - z['run_share']):.0%} of the time"
+        reads.append(line + ".")
+    overall_pass = np.average([1 - zones[k]["run_share"] for k in zones if zones[k]["n"]],
+                              weights=[zones[k]["n"] for k in zones if zones[k]["n"]]) if total else 0
+    for name, *_ in FP_ZONES:
+        z = zones[name]
+        if name == live or z["n"] < 5:
+            continue
+        parts = []  # one sentence per zone, so a busy zone can't crowd out the others
+        pass_share = 1 - z["run_share"]
+        n_pass = round(pass_share * z["n"])
+        if z["success"] <= 0.2:
+            parts.append(f"little worked: {round(z['success'] * z['n'])} of {z['n']} plays successful")
+        elif pass_share - overall_pass >= 0.2:
+            bp = z["by_type"]["Pass"]
+            ok = round(bp["success"] * bp["n"]) if bp["n"] else 0
+            parts.append(f"they turn to the pass: {n_pass} of {z['n']} plays were passes, and {ok} of {bp['n']} "
+                         f"succeeded")
+        elif overall_pass - pass_share >= 0.2:
+            parts.append(f"they lean on the run: {z['n'] - n_pass} of {z['n']} plays were runs")
+        fr, fn = z["first_run"]
+        if fn >= 3 and fr == fn:
+            parts.append(f"they ran on every 1st down ({fr} of {fn})")
+        if parts:
+            reads.append(f"{name}, " + ", and ".join(parts) + ".")
+    if zones["Red zone"]["n"] == 0:
+        reads.append("They never ran a play inside the 20 in these games.")
+    return reads[:4]
+
+
+def _strip_html(s: dict) -> str:
+    cells = []
+    last = len(FP_ZONES) - 1
+    for i, (name, where, *_rest) in enumerate(FP_ZONES):
+        z = s["zones"][name]
+        radius = "8px 0 0 8px" if i == 0 else "0 8px 8px 0" if i == last else "0"
+        faded = "opacity:.5;" if z["n"] == 0 else ""
+        body = ""
+        if z["n"]:
+            epa_c = "#1D9E75" if z["epa"] >= 0 else "#E24B4A"
+            body = (f'{_split_bar(z["run_share"], 7)}<div style="font-size:11px;color:{epa_c}">EPA {z["epa"]:+.2f}</div>')
+        cells.append(
+            f'<div style="{CARD};border-radius:{radius};min-width:0;{faded}">'
+            f'<div style="font-size:13px;font-weight:600">{name}</div>'
+            f'<div style="font-size:11px;opacity:.65">{where}</div>'
+            f'<div style="font-size:19px;font-weight:600;margin-top:4px">{z["share"]:.0%}</div>'
+            f'<div style="font-size:11px;opacity:.65">{z["n"]} plays · {z["drive_starts"]} drive'
+            f'{"" if z["drive_starts"] == 1 else "s"} started</div>{body}</div>')
+    widths = " ".join(f"{w}fr" for *_x, w in FP_ZONES)
+    return (f'<div style="display:grid;grid-template-columns:{widths};gap:3px;margin-bottom:4px;overflow-x:auto;'
+            f'min-width:0">{"".join(cells)}</div>')
+
+
+def _chip(text: str) -> str:
+    return (f'<span style="display:inline-block;font-size:12px;background:rgba(128,128,128,.12);border-radius:6px;'
+            f'padding:2px 8px;margin:0 4px 4px 0">{text}</span>')
+
+
+def _zone_card_html(name: str, z: dict, team: str, n_games: int) -> str:
+    if z["n"] == 0:
+        drives = (f'<div style="margin-top:8px">{_chip(f"Drives started here: {z["drive_starts"]}")}</div>'
+                  if z["drive_starts"] else "")
+        return (f'<div style="{CARD};padding:14px 16px;display:flex;flex-direction:column;justify-content:center;'
+                f'align-items:center;text-align:center;min-height:180px">'
+                f'<div style="font-weight:600">{name}</div><div style="font-size:12px;opacity:.65">{z["where"]}</div>'
+                f'<div style="font-size:13px;opacity:.75;max-width:260px;margin-top:6px">{team} didn\'t run a play here '
+                f'in {n_games} game{"" if n_games == 1 else "s"} of film. This card fills in once they do.</div>{drives}</div>')
+    pill = ('<span style="font-size:11px;padding:1px 8px;border-radius:999px;background:#FAEEDA;color:#854F0B;'
+            'white-space:nowrap">small sample</span>' if z["n"] < FP_SMALL else "")
+    def cell(v, color="", left=False):
+        align = "left" if left else "right"
+        return f'<td style="padding:3px 0;text-align:{align};{f"color:{color}" if color else ""}">{v}</td>'
+    head = "".join(cell(h, left=(i == 0)) for i, h in enumerate(["", "Plays", "Success", "EPA", "Yds"]))
+    rows = f'<tr style="font-size:11px;opacity:.65">{head}</tr>'
+    for t in ("Run", "Pass"):
+        b = z["by_type"][t]
+        if b["n"] == 0:
+            rows += "<tr>" + cell(t, left=True) + cell(0) + cell("–") + cell("–") + cell("–") + "</tr>"
+            continue
+        rows += ("<tr>" + cell(t, left=True) + cell(b["n"]) + cell(f'{b["success"]:.0%}')
+                 + cell(f'{b["epa"]:+.2f}', "#1D9E75" if b["epa"] >= 0 else "#E24B4A") + cell(f'{b["yds"]:.1f}') + "</tr>")
+    table = f'<table style="width:100%;font-size:13px;border-collapse:collapse;margin-top:8px">{rows}</table>'
+    lbl = lambda t: f'<div style="font-size:12px;opacity:.65;margin:12px 0 4px">{t}</div>'
+    forms = "".join(
+        f'<div style="display:grid;grid-template-columns:minmax(0,120px) minmax(0,1fr) 36px;align-items:center;'
+        f'gap:8px;font-size:13px;margin:3px 0"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'
+        f'{f}</span><div style="height:6px;background:rgba(128,128,128,.15);border-radius:3px"><div style="width:'
+        f'{share * 100:.0f}%;height:6px;background:rgba(128,128,128,.55);border-radius:3px"></div></div>'
+        f'<span style="text-align:right">{share:.0%}</span></div>' for f, share in z["formations"])
+    def calls(t, color):
+        items = z.get(f"calls_{t}") or []
+        if not items:
+            return f'<div style="font-size:13px"><span style="color:{color}">{t}</span> <span style="opacity:.5">none</span></div>'
+        if len(items) > 1 and all(c == 1 for _, c in items):
+            txt = ", ".join(k for k, _ in items) + ' <span style="opacity:.6">(1 each)</span>'
+        else:
+            txt = ", ".join(f"{k} ({c})" for k, c in items)
+        return f'<div style="font-size:13px"><span style="color:{color}">{t}</span> {txt}</div>'
+    calls_title = "Top calls" if z["calls_tagged"] else "Top calls (calls not tagged: run direction, pass zone)"
+    chips = []
+    fr, fn = z["first_run"]
+    if fn:
+        chips.append(f"1st down: run {fr} of {fn}" if fr >= fn - fr else f"1st down: pass {fn - fr} of {fn}")
+    tp, tn = z["third_pass"]
+    if tn:
+        chips.append(f"3rd down: pass {tp} of {tn}, converted {z['third_conv']}")
+    if z["fourth"]:
+        chips.append(f"4th downs: {z['fourth']}")
+    if pd.notna(z["avg_dist"]):
+        chips.append(f"Avg to go {z['avg_dist']:.1f}")
+    if "run_dir" in z and z["run_dir"][2] >= 3:  # "1 of 1" isn't a direction tendency
+        side, k, n = z["run_dir"]
+        chips.append(f"Runs go {side} {k} of {n}")
+    if pd.notna(z.get("box", np.nan)):
+        chips.append(f"Box {z['box']:.1f}")
+    ds = z["drive_starts"]
+    chips.append(f"Drives started here: {ds}" + (f", scored on {z['drive_scores']}" if ds else ""))
+    return (f'<div style="{CARD};padding:14px 16px;min-width:0">'
+            f'<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><div>'
+            f'<span style="font-weight:600">{name}</span> <span style="font-size:12px;opacity:.65">{z["where"].lower()}'
+            f'</span></div>{pill}</div>{_split_bar(z["run_share"], 7)}'
+            f'<div style="font-size:12px;opacity:.7">Run {z["run_share"]:.0%} · Pass {1 - z["run_share"]:.0%} · '
+            f'{z["n"]} plays</div>{table}{lbl("Formations (% of zone plays)")}{forms}{lbl(calls_title)}'
+            f'{calls("Run", RUN_C)}{calls("Pass", PASS_C)}{lbl("Situation")}{"".join(_chip(c) for c in chips)}</div>')
+
+
+def render_field_position(df: pd.DataFrame, df_games: pd.DataFrame, team: str, title: str,
+                          side: str = "offense") -> None:
+    """df = filtered plays; df_games = whole games from the selected weeks (for drive starts)."""
+    st.markdown(f"**{title}**")
+    d = _team_plays(df, team, side)
+    if d.empty:
+        st.info("No plays match the current filters.")
+        return
+    drives = season_drives(df_games, team, side)
+    n_games = d["game_id"].nunique()
+    s = field_position_summary(d, drives)
+    st.html(f'<div style="font-size:13px;opacity:.7;margin-bottom:6px">{len(d)} snaps · {s["drives"]} drives · '
+            f'{n_games} game{"" if n_games == 1 else "s"}</div>' + _strip_html(s) + LEGEND.replace(
+                "tell / lean / small sample = how much to trust a 70%+ split", "Strip widths match each zone's yardage"))
+    reads = field_position_reads(s)
+    if reads:
+        st.html('<div style="background:rgba(128,128,128,.08);border-radius:8px;padding:10px 14px;font-size:14px;'
+                'line-height:1.8;margin:6px 0 12px"><div style="font-size:12px;opacity:.65">Key reads</div>'
+                + "".join(f"<div>{r}</div>" for r in reads) + "</div>")
+    cards = [_zone_card_html(name, s["zones"][name], team, n_games) for name, *_ in FP_ZONES]
+    st.html('<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:12px">'
+            + "".join(cards) + "</div>")
+    st.caption(f"Zones by the ball's spot at the snap. Small sample = under {FP_SMALL} plays in the zone. Plays follow "
+               "the sidebar filters; drive starts use whole drives from the selected weeks.")

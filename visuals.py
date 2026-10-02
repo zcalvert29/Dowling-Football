@@ -66,6 +66,13 @@ AIR_YARDS_ORDER = ["Short", "Medium", "Long"]
 def load_data(path: str) -> pd.DataFrame:
     df = pd.read_excel(path)
 
+    # Re-derive drives with the current rules, so games curated before a fix pick it up without re-curating
+    # (e.g. a possession after a defensive touchdown used to merge into the drive that ended in the score).
+    import curate_pbp
+    if {"game_id", "PLAY #", "drive", "turnover", "success"} <= set(df.columns):
+        df = pd.concat([curate_pbp.assign_drives(g.sort_values("PLAY #", kind="stable"))
+                        for _, g in df.groupby("game_id", sort=False)]).sort_index()
+
     # Tableau calc: Distance
     dist = df["DIST"]
     df["Distance"] = pd.Categorical(

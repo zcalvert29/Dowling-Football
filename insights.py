@@ -94,7 +94,7 @@ def last_updated_text(df: pd.DataFrame) -> str:
 # ---------------------------------------------------------------------------
 YELLOW = "#E8B923"
 DRIVE_COLORS = {
-    "Touchdown": GREEN, "FG Made": YELLOW, "FG Missed": RED, "Punt": GRAY, "Turnover": RED,
+    "Touchdown": GREEN, "FG Made": YELLOW, "FG Missed": RED, "Punt": GRAY, "Turnover": RED, "Turnover, Def TD": RED,
     "Turnover on Downs": RED, "Safety": RED, "End of Half": GRAY, "End of Game": GRAY, "Error": GRAY,
 }
 DRIVE_LEGEND = [("Touchdown", GREEN), ("FG made", YELLOW), ("Turnover / downs / missed FG / safety", RED),
@@ -188,7 +188,7 @@ def render_drive_chart(g: pd.DataFrame, team: str, title: str) -> pd.DataFrame:
         ("Touchdowns", int((drives["result"] == "Touchdown").sum())),
         ("Avg start", _yard_label(drives["start"].mean())),
         ("3-and-outs", int(drives["three_and_out"].sum())),
-        ("Turnovers", int(drives["result"].isin(["Turnover", "Turnover on Downs"]).sum())),
+        ("Turnovers", int(drives["result"].isin(["Turnover", "Turnover, Def TD", "Turnover on Downs"]).sum())),
     ]
     stats_html = (
         '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">'

@@ -179,8 +179,9 @@ def dchs_d_pass_game():
 # ---- Pages: scouting -----------------------------------------------------------
 def scout_opposing_offense():
     page_header("Scout Opposing Offense")
-    tendencies, tree, field, seq, run_game, pass_game, red_zone = st.tabs(
-        ["Tendencies", "Tendency tree", "Field & strength", "Sequencing", "Run game", "Pass game", "Red zone"])
+    tendencies, tree, field, seq, field_pos, run_game, pass_game, red_zone = st.tabs(
+        ["Tendencies", "Tendency tree", "Field & strength", "Sequencing", "Field position", "Run game", "Pass game",
+         "Red zone"])
     with tendencies:
         v.render_dd_tendencies(df_any_down, opponent, f"{opponent} down & distance tendencies")
         v.render_opp_tendencies(df, opponent)
@@ -193,6 +194,8 @@ def scout_opposing_offense():
         bd.render_field_strength(df, opponent, f"{opponent} by hash and formation strength")
     with seq:
         bd.render_sequencing(df, _week_games(), opponent, f"What {opponent} calls after...")
+    with field_pos:
+        bd.render_field_position(df, _week_games(), opponent, f"{opponent} offense by field position")
     with run_game:
         v.render_run_gaps(df, "offense", opponent, f"{opponent} O Run Gaps", good_high=False)
     with pass_game:

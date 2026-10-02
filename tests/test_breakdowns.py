@@ -68,3 +68,45 @@ def test_aggressiveness_matches_ledger(df):
     ledger = t.loc[t["category"] == "Costly", "WP left (pts)"].sum()
     assert a["wp_left"].sum() == pytest.approx(ledger)
     assert (a["went_on_go"] <= a["model_go"]).all()
+
+
+# --- Defensive touchdowns split drives (curate_pbp.assign_drives, applied at load) ---
+
+def test_defensive_td_ends_the_drive(df):
+    g = df[df["game_id"].str.contains("Waterloo")]
+    drives = ins.drive_summary(g, "Waterloo West")
+    assert (drives["result"] == "Turnover, Def TD").sum() == 3
+    # every play that scored for the defense is the last snap of its drive
+    for _, p in g[g["RESULT"].astype(str).str.contains("Def TD")].iterrows():
+        snaps = g[(g["drive"] == p["drive"]) & g["PLAY TYPE"].isin(["Run", "Pass"])]
+        assert snaps["PLAY #"].max() == p["PLAY #"]
+
+
+def test_drive_fix_leaves_other_games_alone():
+    raw = pd.read_excel("curated-pbp.xlsx")
+    import curate_pbp
+    for gid, g in raw.groupby("game_id"):
+        if g["RESULT"].astype(str).str.contains("Def TD").any():
+            continue
+        new = curate_pbp.assign_drives(g.sort_values("PLAY #"))
+        assert (new["drive"].to_numpy() == g.sort_values("PLAY #")["drive"].to_numpy()).all()
+        assert (new["drive_result"].fillna("").to_numpy() == g.sort_values("PLAY #")["drive_result"].fillna("").to_numpy()).all()
+
+
+# --- Field position tab ---
+
+def test_field_position_zones_cover_every_snap_once(df):
+    d = bd._team_plays(df, "SEP")
+    s = bd.field_position_summary(d, bd.season_drives(df, "SEP"))
+    assert sum(z["n"] for z in s["zones"].values()) == len(d)
+    zone_of = bd._zone_of(pd.Series(range(1, 100)))
+    assert zone_of.notna().all()                                      # every yard line has a zone
+    assert zone_of[19] == "Red zone" and zone_of[20] == "FG range"    # ytg 20 / 21
+    assert zone_of[39] == "FG range" and zone_of[40] == "Neutral"     # ytg 40 / 41
+    assert zone_of[78] == "Neutral" and zone_of[79] == "Backed up"    # ytg 79 / 80
+
+
+def test_field_position_drive_starts_add_up(df):
+    dr = bd.season_drives(df, "Valley")
+    s = bd.field_position_summary(bd._team_plays(df, "Valley"), dr)
+    assert sum(z["drive_starts"] for z in s["zones"].values()) == len(dr) == 10
