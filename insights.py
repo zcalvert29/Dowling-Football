@@ -239,12 +239,41 @@ HEAD_TO_HEAD_BETTER = {"EPA / play": True, "Success": True, "Explosive plays": T
 PLAY_COLS = ["WEEK", "QTR", "DN", "DIST", "YARD LN", "PLAY TYPE", "OFF FORM", "OFF PLAY", "RESULT", "GN/LS", "epa"]
 
 
+def _ordinal(n) -> str:
+    return {1: "1st", 2: "2nd", 3: "3rd", 4: "4th"}.get(int(n), f"{int(n)}th") if pd.notna(n) else ""
+
+
+def _field_spot(ytg) -> str:
+    """Yards to goal -> 'Own 33' / 'Opp 29' / '50', from the offense's view."""
+    if pd.isna(ytg):
+        return ""
+    y = int(round(ytg))
+    return "50" if y == 50 else f"Own {100 - y}" if y > 50 else f"Opp {y}"
+
+
 def plays_table(d: pd.DataFrame) -> pd.DataFrame:
-    cols = [c for c in PLAY_COLS if c in d.columns]
-    out = d[cols].rename(columns={"epa": "EPA", "GN/LS": "Yards", "YARD LN": "Yard ln"}).copy()
-    for c in ("DN", "DIST", "QTR", "WEEK", "Yard ln", "Yards"):
-        if c in out:
-            out[c] = out[c].astype("Int64")
+    """
+    One row per play, outcome first: EPA, yards, and result lead so they stay
+    visible when tables sit side by side, followed by a readable situation
+    ("Q1 · 3rd & 5 · Own 33") instead of separate numeric columns.
+    """
+    out = pd.DataFrame(index=d.index)
+    if "epa" in d:
+        out["EPA"] = d["epa"]
+    if "GN/LS" in d:
+        # Text so a missing value shows blank instead of Streamlit's "None".
+        out["Yards"] = [str(int(x)) if pd.notna(x) else "" for x in d["GN/LS"]]
+    if "RESULT" in d:
+        out["Result"] = d["RESULT"].fillna("")
+    spot = d["YARDLINE_100"].map(_field_spot) if "YARDLINE_100" in d else ""
+    down = [f"{_ordinal(n)} & {int(x)}" if pd.notna(n) and pd.notna(x) else "" for n, x in zip(d["DN"], d["DIST"])]
+    out["Situation"] = [" · ".join(p for p in (f"Q{int(q)}" if pd.notna(q) else "", dd, sp) if p)
+                        for q, dd, sp in zip(d["QTR"], down, spot if len(spot) else [""] * len(d))]
+    for src, name in (("PLAY TYPE", "Type"), ("OFF FORM", "Formation"), ("OFF PLAY", "Play")):
+        if src in d:
+            out[name] = d[src].astype("string").fillna("")
+    if "WEEK" in d and d["WEEK"].nunique() > 1:
+        out["Week"] = d["WEEK"].astype("Int64")
     return out
 
 
@@ -416,12 +445,29 @@ def _side_metrics(d: pd.DataFrame) -> dict:
         "Success rate": rp["success"].mean(),
         "Explosive rate": pd.to_numeric(rp["explosive_play"], errors="coerce").mean(),
         "3rd down conversion": third["THIRD_DOWN_CONVERTED"].mean() if len(third) else np.nan,
+        # Sample size behind each number, used to shrink small samples in the projection.
+        "_n": {"Rush EPA / play": int((rp["PLAY TYPE"] == "Run").sum()),
+               "Pass EPA / play": int((rp["PLAY TYPE"] == "Pass").sum()),
+               "Success rate": len(rp), "Explosive rate": len(rp), "3rd down conversion": len(third)},
     }
 
 
 # How far the projected matchup has to be from the baseline to call an edge.
 EDGE_THRESHOLDS = {"Rush EPA / play": 0.10, "Pass EPA / play": 0.10, "Success rate": 0.04,
                    "Explosive rate": 0.03, "3rd down conversion": 0.06}
+
+
+# Shrinkage: before projecting, each number is pulled toward average as if it
+# came with this many extra plays of exactly-average football. One game of
+# film (~30 passes) is mostly noise for EPA, so it gets pulled about halfway;
+# a full season of Dowling plays barely moves. Rough stabilization points;
+# tune them as the data grows.
+SHRINK_PLAYS = {"Rush EPA / play": 40, "Pass EPA / play": 40, "Success rate": 40,
+                "Explosive rate": 80, "3rd down conversion": 15}
+
+
+def _shrink(x: float, n: int, base: float, k: int) -> float:
+    return base + (x - base) * n / (n + k) if pd.notna(x) else x
 
 
 def _baselines(df: pd.DataFrame) -> dict:
@@ -441,12 +487,17 @@ def _matchup_table(off: dict, deff: dict, base: dict, off_name: str, def_name: s
     """
     rows = []
     for k in off:
+        if k.startswith("_"):
+            continue
         a, b, b0 = off[k], deff[k], base.get(k, np.nan)
         proj, edge = np.nan, ""
         thr = EDGE_THRESHOLDS.get(k)
         if thr and pd.notna(a) and pd.notna(b) and pd.notna(b0):
-            proj = a + b - b0
-            edge = off_name if proj - b0 >= thr else def_name if b0 - proj >= thr else "Even"
+            a_s = _shrink(a, off["_n"][k], b0, SHRINK_PLAYS[k])
+            b_s = _shrink(b, deff["_n"][k], b0, SHRINK_PLAYS[k])
+            proj = a_s + b_s - b0
+            edge = (off_name if proj - b0 >= thr else def_name.replace(" allows", "") if b0 - proj >= thr
+                    else "Even")
         rows.append((k, a, b, b0, proj, edge))
     return pd.DataFrame(rows, columns=["Metric", off_name, def_name, "Average offense", "Projected", "Edge"]
                         ).set_index("Metric")
@@ -497,9 +548,23 @@ def _show_matchup(title: str, t: pd.DataFrame, dowling_on_offense: bool) -> None
 
 def render_matchup(df: pd.DataFrame, opponent: str) -> None:
     base = _baselines(df)
+    # Dowling's side leaves out the head-to-head games, so a game already
+    # played against this opponent isn't counted on both sides of the table.
+    h2h = set(df.loc[((df["offense"] == opponent) | (df["defense"] == opponent)) & ((df["offense"] == TEAM)
+                     | (df["defense"] == TEAM)), "game_id"])
+    others = df[~df["game_id"].isin(h2h)]
+    dchs = others if not others.empty else df
+    opp_games = df.loc[(df["offense"] == opponent) | (df["defense"] == opponent), "game_id"].unique()
+    only_h2h = len(opp_games) > 0 and set(opp_games) <= h2h
+
+    if only_h2h:
+        st.warning(f"All of {opponent}'s film is from their game against Dowling, so their numbers below are really "
+                   f"\"how they did against us.\" Add film of {opponent} against someone else for an independent read.",
+                   icon="⚠️")
+
     opp_o = _side_metrics(df[df["offense"] == opponent])
-    dchs_d = _side_metrics(df[df["defense"] == TEAM])
-    dchs_o = _side_metrics(df[df["offense"] == TEAM])
+    dchs_d = _side_metrics(dchs[dchs["defense"] == TEAM])
+    dchs_o = _side_metrics(dchs[dchs["offense"] == TEAM])
     opp_d = _side_metrics(df[df["defense"] == opponent])
     _show_matchup(f"{opponent} offense vs DCHS defense",
                   _matchup_table(opp_o, dchs_d, base, f"{opponent} offense", "DCHS defense allows"),
@@ -507,14 +572,16 @@ def render_matchup(df: pd.DataFrame, opponent: str) -> None:
     _show_matchup(f"DCHS offense vs {opponent} defense",
                   _matchup_table(dchs_o, opp_d, base, "DCHS offense", f"{opponent} defense allows"),
                   dowling_on_offense=True)
-    n_games = df.loc[(df["offense"] == opponent) | (df["defense"] == opponent), "game_id"].nunique()
+    h2h_note = (f" Dowling's columns leave out the {len(h2h)} game(s) against {opponent} so that game isn't counted "
+                f"twice." if h2h and not others.empty else "")
     st.caption(
         "Every number is from the offense's point of view: what the offense gets, and what the defense gives up. "
         "Both are compared to an average offense (EPA 0; rates = every offense in the data combined), so a "
-        "defense that allows positive EPA is a weakness. Projected = offense + defense − average: where this "
-        "offense should land against this defense. The edge goes to the offense if the projection is clearly "
-        "above average, to the defense if clearly below, otherwise Even. Green = good for Dowling, red = bad. "
-        f"{opponent}'s numbers come from the {n_games} game(s) in the data that include them."
+        "defense that allows positive EPA is a weakness. Projected = offense + defense − average, after pulling "
+        "small samples toward average (one game of film counts for about half; a season of plays for nearly all "
+        "of it). The edge goes to the offense if the projection is clearly above average, to the defense if "
+        "clearly below, otherwise Even. Green = good for Dowling, red = bad. "
+        f"{opponent}'s numbers come from the {len(opp_games)} game(s) in the data that include them.{h2h_note}"
     )
 
 
@@ -778,8 +845,7 @@ def render_win_probability(g: pd.DataFrame, opponent: str) -> None:
     top = d.reindex(d["swing"].abs().sort_values(ascending=False).index).head(5)
     t = plays_table(top).assign(**{"Est. clock": top["clock"].to_numpy(), "Offense": top["offense"].to_numpy(),
                                    "WP swing": top["swing"].to_numpy()})
-    t = t[["Est. clock", "Offense"] + [c for c in t.columns if c not in ("Est. clock", "Offense", "WP swing")]
-          + ["WP swing"]]
+    t = t[["WP swing", "Offense", "Est. clock"] + [c for c in t.columns if c not in ("Est. clock", "Offense", "WP swing")]]
     st.markdown("**Biggest swing plays**")
 
     def color(col):
@@ -794,6 +860,10 @@ def render_win_probability(g: pd.DataFrame, opponent: str) -> None:
 # 4th-down decision review: ledger, map, and one card per decision
 # ---------------------------------------------------------------------------
 TOSS_UP_PTS = 1.0   # under 1 point of win probability = either call is fine (nfl4th's cutoff)
+# Outside this win-probability band the game is effectively decided, so the
+# call barely matters and shouldn't count for or against the staff (the same
+# kind of filter rbsdm.com uses).
+DECIDED_WP = (0.05, 0.95)
 OPTION_SHORT = {"Go for it": "Go", "Field goal": "FG", "Punt": "Punt"}
 
 
@@ -836,7 +906,9 @@ def fourth_down_review(df: pd.DataFrame) -> pd.DataFrame:
         best, best_wp = str(calls["best"][i]), float(calls["best_wp"][i])
         chosen = wp.get(did, np.nan)
         left = (best_wp - chosen) * 100 if pd.notna(chosen) else np.nan
-        if pd.isna(chosen):
+        if not DECIDED_WP[0] < best_wp < DECIDED_WP[1]:
+            category = "Decided"
+        elif pd.isna(chosen):
             category = "Not modeled"
         elif did == best or left < TOSS_UP_PTS:
             category = "Agreed" if did == best else "Toss-up"
@@ -857,6 +929,8 @@ def fourth_down_review(df: pd.DataFrame) -> pd.DataFrame:
 
 # --- Ledger ------------------------------------------------------------------
 def ledger_html(t: pd.DataFrame) -> str:
+    decided = int((t["category"] == "Decided").sum())
+    t = t[t["category"] != "Decided"]
     n = len(t)
     agreed = int((t["category"] == "Agreed").sum())
     costly = t[t["category"] == "Costly"]
@@ -865,7 +939,7 @@ def ledger_html(t: pd.DataFrame) -> str:
     kpi = "".join(
         f'<div style="background:rgba(128,128,128,.08);border-radius:8px;padding:8px 12px">'
         f'<div style="font-size:12px;opacity:.65">{k}</div><div style="font-size:20px;font-weight:600">{v}</div></div>'
-        for k, v in [("4th downs", n), ("Agreed with the model", agreed), ("Costly disagreements", len(costly)),
+        for k, v in [("4th downs" + (f" (+{decided} decided)" if decided else ""), n), ("Agreed with the model", agreed), ("Costly disagreements", len(costly)),
                      ("Win prob. left on the table", f"{left:.1f} pts")])
     seg = lambda c, k: f'<span style="width:{k / n * 100:.1f}%;background:{c}"></span>' if n and k else ""
     bar = (f'<div style="display:flex;height:14px;border-radius:4px;overflow:hidden;margin:12px 0 6px">'
@@ -873,7 +947,10 @@ def ledger_html(t: pd.DataFrame) -> str:
     legend = (f'<div style="display:flex;flex-wrap:wrap;gap:14px;font-size:12px;opacity:.75;margin-bottom:14px">'
               f'<span>■ <span style="color:{GREEN}">Agreed ({agreed})</span></span>'
               f'<span>■ <span style="color:{RED}">Disagreed, cost 1+ point ({len(costly)})</span></span>'
-              f'<span>■ <span style="opacity:.8">Disagreed, toss-up under 1 point ({toss})</span></span></div>')
+              f'<span>■ <span style="opacity:.8">Disagreed, toss-up under 1 point ({toss})</span></span>'
+              + (f'<span style="opacity:.8">Not counted: {decided} with the game already decided '
+                 f'(win probability under {DECIDED_WP[0]:.0%} or over {DECIDED_WP[1]:.0%})</span>' if decided else "")
+              + '</div>')
     dis = t[t["category"].isin(["Costly", "Toss-up"])].sort_values("WP left (pts)", ascending=False)
     rows = []
     for _, r in dis.iterrows():
@@ -908,7 +985,8 @@ def ledger_html(t: pd.DataFrame) -> str:
 
 
 # --- Map ---------------------------------------------------------------------
-MAP_YTG = list(range(5, 100, 5))
+MAP_YTG = list(range(1, 100))  # 1-yard resolution; the batched engine prices it in one call
+MAP_STEP = MAP_YTG[1] - MAP_YTG[0]
 MAP_DIST = list(range(1, 16))
 MAP_COLORS = {"G": "#9FE1CB", "F": "#FAC775", "P": "#D3D1C7", "T": "rgba(128,128,128,.10)"}
 
@@ -933,7 +1011,7 @@ def decision_map_html(t: pd.DataFrame, grid: list[list[str]]) -> str:
         for j, c in enumerate(grid[i]):
             if not c:
                 continue
-            cells.append(f'<span style="position:absolute;left:{100 - ytg - 2.5}%;width:5%;bottom:{j / max_d * 100}%;'
+            cells.append(f'<span style="position:absolute;left:{100 - ytg - MAP_STEP / 2}%;width:{MAP_STEP + 0.05}%;bottom:{j / max_d * 100}%;'
                          f'height:{100 / max_d}%;background:{MAP_COLORS[c]}"></span>')
     lines = "".join(f'<span style="position:absolute;top:0;bottom:0;left:{x}%;border-left:{"1.5px" if x == 50 else "0.5px"} '
                     f'solid rgba(255,255,255,.7)"></span>' for x in range(10, 100, 10))
@@ -993,7 +1071,11 @@ def decision_card_html(r: pd.Series) -> str:
              f'<span style="position:absolute;top:0;bottom:0;left:{line}%;border-left:2px solid #EF9F27"></span></div>')
     did, best, cat = r["We chose"], r["Model"], r["category"]
     verb = {"Go for it": "went for it", "Field goal": "kicked the field goal", "Punt": "punted"}[did]
-    if cat == "Agreed":
+    if cat == "Decided":
+        box, text = ("rgba(128,128,128,.12)", "inherit"), (
+            f'We {verb}. The game was already decided here (win probability {r["WP if model"]:.0%} for the best '
+            f'option), so this one doesn\'t count in the ledger.')
+    elif cat == "Agreed":
         box, text = ("#E1F5EE", "#085041"), f'We {verb}, and the model agrees ({r["Strength"].lower()}).'
     elif cat == "Toss-up":
         box, text = ("rgba(128,128,128,.12)", "inherit"), (f'We {verb}; the model slightly prefers '
@@ -1052,10 +1134,13 @@ def render_fourth_down_review(df: pd.DataFrame) -> None:
         return
     st.markdown("**Season ledger**" if df["game_id"].nunique() > 1 else "**Decision ledger**")
     st.html(ledger_html(t))
+    if df["game_id"].nunique() > 1:
+        import breakdowns as bd  # imported here: breakdowns imports this module
+        bd.render_aggressiveness(t, games(df))
     st.markdown("**Decision map**")
     st.html(decision_map_html(t, decision_map_grid()))
     st.markdown("**Decision card**")
-    order = t.assign(_k=t["category"].map({"Costly": 0, "Toss-up": 1, "Agreed": 2, "Not modeled": 3}))
+    order = t.assign(_k=t["category"].map({"Costly": 0, "Toss-up": 1, "Agreed": 2, "Not modeled": 3, "Decided": 4}))
     order = order.sort_values(["_k", "WP left (pts)"], ascending=[True, False])
     labels = {i: f'{r["Game"]} · {r["Est. clock"]} · {r["Situation"]} ({r["category"].lower()})'
               for i, r in order.iterrows()}

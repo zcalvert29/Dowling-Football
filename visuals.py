@@ -750,6 +750,8 @@ _RUN_LANES = [
 ]
 _LINEMEN = [("LT", 200), ("LG", 270), ("C", 340), ("RG", 410), ("RT", 480)]
 _POS, _NEG, _NONE = "#1D9E75", "#E24B4A", "rgba(128,128,128,.45)"
+_LOW_N = "#9A9890"     # lanes with only a few carries: shown, but not colored good/bad
+GAP_MIN_CARRIES = 5
 
 
 def _run_gaps_svg(runs: pd.DataFrame, lanes: dict, ink: str, good_high: bool = True) -> str:
@@ -776,12 +778,19 @@ def _run_gaps_svg(runs: pd.DataFrame, lanes: dict, ink: str, good_high: bool = T
                      f'<text x="{x}" y="46" text-anchor="middle" {lab}>{label}</text>')
     parts.append(f'<line x1="40" y1="62" x2="640" y2="62" stroke="{ink}" stroke-opacity=".2"/>')
 
+    max_n = max([n for _, n in lanes.values()] or [1])
     for d, g, bend_x, tip_x, name in _RUN_LANES:
         mean, n = lanes.get((d, g), (np.nan, 0))
-        color = _NONE if n == 0 or pd.isna(mean) else (_POS if (mean >= 0) == good_high else _NEG)
+        if n == 0 or pd.isna(mean):
+            color = _NONE
+        elif n < GAP_MIN_CARRIES:
+            color = _LOW_N
+        else:
+            color = _POS if (mean >= 0) == good_high else _NEG
         dash = ' stroke-dasharray="6 6"' if n == 0 else ""
+        width = 3 + 6 * n / max_n  # thicker arrow = run there more often
         parts.append(
-            f'<path d="M340 308 L{bend_x} 275 L{tip_x} 110" fill="none" stroke="{color}" stroke-width="5" '
+            f'<path d="M340 308 L{bend_x} 275 L{tip_x} 110" fill="none" stroke="{color}" stroke-width="{width:.1f}" '
             f'stroke-linecap="round" stroke-linejoin="round"{dash}/>'
         )
         # Arrowhead drawn as its own shape (pointing along the last segment)
@@ -847,8 +856,18 @@ def render_run_gaps(df: pd.DataFrame, side: str, team: str, title: str, good_hig
         return
     st.html(_run_gaps_svg(runs, lanes, theme_ink(), good_high))
     untagged = len(runs) - len(tagged)
+    note = (f"Thicker arrows = more carries. Gray arrows have fewer than {GAP_MIN_CARRIES} carries, so they aren't "
+            f"colored good or bad.")
     if untagged:
-        st.caption(f"{untagged} of {len(runs)} runs are missing a GAP or PLAY DIR tag and aren't shown in the arrows.")
+        missing_gap = int(runs["GAP"].isna().sum())
+        missing_dir = int(runs["PLAY DIR"].isna().sum())
+        which = ("GAP" if missing_gap >= missing_dir else "PLAY DIR")
+        note = (f"{untagged} of {len(runs)} runs aren't shown in the arrows (missing GAP on {missing_gap}, PLAY DIR on "
+                f"{missing_dir}; tagging {which} would fill in the most). " + note)
+    if len(tagged) < 0.25 * len(runs):
+        st.warning(f"Only {len(tagged)} of {len(runs)} runs have both a GAP and PLAY DIR tag, so the arrows don't "
+                   f"represent this run game yet.", icon="🏷️")
+    st.caption(note)
 
 
 # ---------------------------------------------------------------------------
@@ -1019,6 +1038,33 @@ def opp_formations_table(df, team):
 DD_DOWNS = [1, 2, 3, 4]
 TELL_SHARE = 0.75   # 75%+ one way...
 TELL_MIN_N = 5      # ...on at least this many plays = a "tell"
+
+
+# How sure a tendency is. "Runs 100% on 6 plays" and "runs 83% on 35 plays"
+# look alike as percentages, but the second is far more trustworthy. The
+# grade uses the Wilson lower bound: the lowest one-way share consistent with
+# what we've seen (90% confidence). A 29-of-35 tendency is at least ~71% one
+# way; a 6-of-6 tendency could plausibly be only ~69%; 5-of-6 only ~49%.
+TENDENCY_GRADES = [(0.70, "Solid"), (0.55, "Likely")]  # else "Small sample"
+
+
+def wilson_lower(k: float, n: float, z: float = 1.645) -> float:
+    if n <= 0:
+        return 0.0
+    p = k / n
+    denom = 1 + z * z / n
+    center = p + z * z / (2 * n)
+    margin = z * np.sqrt(p * (1 - p) / n + z * z / (4 * n * n))
+    return float((center - margin) / denom)
+
+
+def tendency_grade(k: float, n: float) -> tuple[str, float]:
+    """(grade, lower bound) for k of n plays going the majority way."""
+    lb = wilson_lower(k, n)
+    for cut, name in TENDENCY_GRADES:
+        if lb >= cut:
+            return name, lb
+    return "Small sample", lb
 
 
 def dd_tendency_html(df: pd.DataFrame, team: str, ink: str = "inherit") -> str:

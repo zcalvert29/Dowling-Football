@@ -21,6 +21,7 @@ Folder layout (everything sits next to this file):
 """
 import streamlit as st
 
+import breakdowns as bd
 import insights as ins
 import profiles
 import qol
@@ -119,7 +120,30 @@ def dchs_self_scout():
     page_header("DCHS Self-Scout")
     st.caption("What an opponent scouting Dowling's film would see. Strong tendencies are worth breaking "
                "before someone builds a game plan around them.")
-    ins.render_self_scout(df, df_any_down)
+    tabs = st.tabs(["Tendencies", "Tendency tree", "Field & strength", "Sequencing"])
+    with tabs[0]:
+        ins.render_self_scout(df, df_any_down)
+    with tabs[1]:
+        bd.render_tendency_tree(df, v.TEAM, "DCHS formation tree", key="tree_dchs")
+    with tabs[2]:
+        bd.render_field_strength(df, v.TEAM, "DCHS by hash and formation strength")
+    with tabs[3]:
+        bd.render_sequencing(df, _week_games(), v.TEAM, "What DCHS calls after...")
+
+
+def dchs_red_zone():
+    page_header("DCHS Red Zone")
+    off, deff = st.tabs(["DCHS offense", "DCHS defense"])
+    with off:
+        bd.render_red_zone(df, _week_games(), v.TEAM, "offense", "DCHS offense", good_high=True, key="rz_o")
+    with deff:
+        bd.render_red_zone(df, _week_games(), v.TEAM, "defense", "Opponents vs DCHS defense", good_high=False,
+                           key="rz_d")
+
+
+def _week_games():
+    """Whole games from the selected weeks: for anything that needs full drives or the previous snap."""
+    return df_all[df_all["WEEK"].isin(sel_weeks)]
 
 
 # ---- Pages: DCHS defense -----------------------------------------------------
@@ -155,21 +179,27 @@ def dchs_d_pass_game():
 # ---- Pages: scouting -----------------------------------------------------------
 def scout_opposing_offense():
     page_header("Scout Opposing Offense")
-    v.render_dd_tendencies(df_any_down, opponent, f"{opponent} down & distance tendencies")
-    v.render_opp_tendencies(df, opponent)
-    v.render_opp_3rd_downs(df_any_down, opponent)
-    v.render_opp_4th_downs(df_any_down, opponent)
-    ins.render_best_plays(df, opponent)
-
-
-def scout_opposing_o_run_game():
-    page_header("Scout Opposing O Run Game")
-    v.render_run_gaps(df, "offense", opponent, f"{opponent} O Run Gaps", good_high=False)
-
-
-def scout_opposing_o_pass_game():
-    page_header("Scout Opposing O Pass Game")
-    v.render_pass_zones(df, "offense", opponent, f"{opponent} O Pass Zones", key="pz_opp_o", good_high=False)
+    tendencies, tree, field, seq, run_game, pass_game, red_zone = st.tabs(
+        ["Tendencies", "Tendency tree", "Field & strength", "Sequencing", "Run game", "Pass game", "Red zone"])
+    with tendencies:
+        v.render_dd_tendencies(df_any_down, opponent, f"{opponent} down & distance tendencies")
+        v.render_opp_tendencies(df, opponent)
+        v.render_opp_3rd_downs(df_any_down, opponent)
+        v.render_opp_4th_downs(df_any_down, opponent)
+        ins.render_best_plays(df, opponent)
+    with tree:
+        bd.render_tendency_tree(df, opponent, f"{opponent} formation tree", key="tree_opp")
+    with field:
+        bd.render_field_strength(df, opponent, f"{opponent} by hash and formation strength")
+    with seq:
+        bd.render_sequencing(df, _week_games(), opponent, f"What {opponent} calls after...")
+    with run_game:
+        v.render_run_gaps(df, "offense", opponent, f"{opponent} O Run Gaps", good_high=False)
+    with pass_game:
+        v.render_pass_zones(df, "offense", opponent, f"{opponent} O Pass Zones", key="pz_opp_o", good_high=False)
+    with red_zone:
+        bd.render_red_zone(df, _week_games(), opponent, "offense", f"{opponent} offense", good_high=False,
+                           key="rz_opp")
 
 
 def matchup():
@@ -226,6 +256,12 @@ def game_recap():
     if gid is not None:
         qol.notes_box("game", gid, ins.game_label(df_all, gid))
     ins.render_game_recap(df_all, gid, half)
+
+
+def season_drives_page():
+    page_header("Season Drives", show_filters=False)
+    st.caption("Every possession this season: where drives start, how far they get, and how they end.")
+    bd.render_season_drives(df_all)
 
 
 def win_prob_fourth_downs():
@@ -285,6 +321,7 @@ FILTERED_PAGES = {
         st.Page(dchs_o_pass_game, title="DCHS O Pass Game", url_path="dchs-o-pass-game"),
         st.Page(dchs_o_weekly_trends, title="DCHS O Weekly Trends", url_path="dchs-o-weekly-trends"),
         st.Page(dchs_self_scout, title="DCHS Self-Scout", url_path="dchs-self-scout"),
+        st.Page(dchs_red_zone, title="DCHS Red Zone", url_path="dchs-red-zone"),
     ],
     "DCHS Defense": [
         st.Page(dchs_d_overview, title="DCHS D Overview", url_path="dchs-d-overview"),
@@ -296,10 +333,6 @@ FILTERED_PAGES = {
     ],
     "Scouting": [
         st.Page(scout_opposing_offense, title="Scout Opposing Offense", url_path="scout-opposing-offense"),
-        st.Page(scout_opposing_o_run_game, title="Scout Opposing O Run Game",
-                url_path="scout-opposing-o-run-game"),
-        st.Page(scout_opposing_o_pass_game, title="Scout Opposing O Pass Game",
-                url_path="scout-opposing-o-pass-game"),
         st.Page(matchup, title="Matchup", url_path="matchup"),
         st.Page(team_profiles, title="Team Profiles", url_path="team-profiles"),
         st.Page(scouting_report, title="Scouting Report", url_path="scouting-report"),
@@ -313,6 +346,7 @@ OTHER_PAGES = {
     ],
     "Game Review": [
         st.Page(game_recap, title="Game Recap", url_path="game-recap"),
+        st.Page(season_drives_page, title="Season Drives", url_path="season-drives"),
         st.Page(win_prob_fourth_downs, title="Win Probability & 4th Downs", url_path="win-probability"),
     ],
     "Game Day": [
@@ -333,9 +367,29 @@ PAGE_LINKS = {
     "tagging": _all_pages["tagging-coverage"], "recap": _all_pages["game-recap"],
     "selfscout": _all_pages["dchs-self-scout"], "st": _all_pages["special-teams"], "finder": _all_pages["play-finder"],
     "glossary": _all_pages["how-to-read"], "fourth": _all_pages["fourth-down-bot"], "go2": _all_pages["go-for-2-bot"],
+    "home": HOME_PAGE,
 }
 
 pg = st.navigation({"": [HOME_PAGE], **FILTERED_PAGES, **OTHER_PAGES}, expanded=True)
+
+
+def _is_phone() -> bool:
+    """Best guess from the browser's user agent (tablets count as phones' bigger cousins: no)."""
+    try:
+        ua = (st.context.headers.get("User-Agent") or "").lower()
+    except Exception:
+        return False
+    return any(t in ua for t in ("iphone", "android", "mobile")) and "ipad" not in ua
+
+
+# On a phone, the first page of a visit is Sideline Mode: that's what a coach
+# on the field needs. Only the first load is redirected, so tapping Home in the
+# menu afterwards still goes Home. A link with anything after the "?" (a shared
+# filtered view, or just ?full=1) skips it.
+if not st.session_state.get("_landed"):
+    st.session_state["_landed"] = True
+    if pg is HOME_PAGE and _is_phone() and not st.query_params:
+        st.switch_page(_all_pages["sideline"])
 
 
 # ---- Sidebar filters (only drawn on the DCHS and Scouting pages) --------------

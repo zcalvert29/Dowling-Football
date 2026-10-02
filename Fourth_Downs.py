@@ -14,6 +14,7 @@ import pandas as pd
 import streamlit as st
 
 import model_utils as mu
+import qol
 
 # This page is built for a narrow layout; the scouting pages use "wide".
 st.set_page_config(layout="centered")
@@ -48,29 +49,60 @@ else:
         icon="⚠️"
     )
 
-with st.sidebar:
-    st.header("Game Situation")
-    off_abbr = st.text_input("Offense (team with the ball)", "DCHS", key="fd_off_abbr").upper()[:4]
-    def_abbr = st.text_input("Defense", "VHS", key="fd_def_abbr").upper()[:4]
-    off_score = st.number_input(f"{off_abbr} score", 0, 99, 0, key="fd_off_score")
-    def_score = st.number_input(f"{def_abbr} score", 0, 99, 0, key="fd_def_score")
-    quarter = st.selectbox("Quarter", [1, 2, 3, 4], index=0, key="fd_quarter")
-    minutes = st.number_input("Minutes remaining in quarter", 0, 12, 11, key="fd_minutes")
-    seconds = st.number_input("Seconds", 0, 59, 30, key="fd_seconds")
-    yards_to_goal = st.number_input("Yards to opponent's goal line", 1, 99, 65,
-                                     help="1 = at the goal line, 99 = pinned at own 1", key="fd_ytg")
-    distance = st.number_input("Yards to go for 1st down", 1, 30, 2, key="fd_distance")
-    off_timeouts = st.selectbox("Offense timeouts remaining", [0, 1, 2, 3], index=3, key="fd_off_to")
-    def_timeouts = st.selectbox("Defense timeouts remaining", [0, 1, 2, 3], index=3, key="fd_def_to")
-    site_label = st.selectbox("Site", ["Offense is home", "Offense is away", "Neutral"], index=0, key="fd_site",
-                              help="The win probability model includes home-field advantage.")
+# Every input, its URL name, default, and allowed values. The URL keeps the
+# non-default ones, so a shared link opens to the same situation.
+SITES = ["Offense is home", "Offense is away", "Neutral"]
+LINK_SPEC = [
+    ("us", "fd_off_score", int, 0, (0, 99)), ("them", "fd_def_score", int, 0, (0, 99)),
+    ("q", "fd_quarter", int, 1, [1, 2, 3, 4]), ("min", "fd_minutes", int, 11, (0, 12)),
+    ("sec", "fd_seconds", int, 30, (0, 59)), ("side", "fd_side", str, "Own", ["Own", "Opp"]),
+    ("yl", "fd_yard_line", int, 35, (1, 50)), ("togo", "fd_distance", int, 2, (1, 30)),
+    ("our_to", "fd_off_to", int, 3, [0, 1, 2, 3]), ("their_to", "fd_def_to", int, 3, [0, 1, 2, 3]),
+    ("site", "fd_site", str, SITES[0], SITES), ("off", "fd_off_abbr", str, "DCHS", None),
+    ("def", "fd_def_abbr", str, "OPP", None), ("wind", "fd_wind_speed", int, 0, (0, 40)),
+    ("wdir", "fd_wind_dir", str, "Into", ["Into", "With", "Crosswind"]),
+    ("rain", "fd_rain", bool, False, None), ("snow", "fd_snow", bool, False, None),
+]
+qol.apply_link_params(LINK_SPEC, "_fd_link_applied")
 
-    st.header("Weather")
-    wind_speed = st.number_input("Wind speed (mph)", 0, 40, 0,
-                                  help="No modeled effect at or below 10 mph.", key="fd_wind_speed")
-    wind_direction = st.selectbox("Wind direction", ["Into", "With", "Crosswind"], index=0, key="fd_wind_dir")
-    rain = st.checkbox("Rain", key="fd_rain")
-    snow = st.checkbox("Snow", key="fd_snow")
+# Inputs live on the page, not the sidebar: on a phone the sidebar is
+# collapsed, so a coach would otherwise see a recommendation for a situation
+# they never entered.
+with st.container(border=True):
+    c1, c2 = st.columns(2)
+    off_score = c1.number_input("Our score", 0, 99, key="fd_off_score")
+    def_score = c2.number_input("Their score", 0, 99, key="fd_def_score")
+    c1, c2, c3 = st.columns([2, 1, 1])
+    quarter = c1.segmented_control("Quarter", [1, 2, 3, 4], key="fd_quarter",
+                                   format_func=lambda q: f"Q{q}", width="stretch") or 1
+    minutes = c2.number_input("Min left", 0, 12, key="fd_minutes")
+    seconds = c3.number_input("Sec", 0, 59, key="fd_seconds")
+    c1, c2, c3 = st.columns([2, 1, 1])
+    side = c1.segmented_control("Ball on", ["Own", "Opp"], key="fd_side", width="stretch") or "Own"
+    yard_line = c2.number_input("Yard line", 1, 50, key="fd_yard_line",
+                                help="Own 35 = your 35. Opp 10 = their 10. The 50 is either.")
+    distance = c3.number_input("To go", 1, 30, key="fd_distance")
+    yards_to_goal = 100 - yard_line if side == "Own" else yard_line
+
+    with st.expander("Timeouts, site, teams & weather"):
+        c1, c2 = st.columns(2)
+        off_timeouts = c1.segmented_control("Our timeouts", [0, 1, 2, 3], key="fd_off_to")
+        def_timeouts = c2.segmented_control("Their timeouts", [0, 1, 2, 3], key="fd_def_to")
+        off_timeouts = 3 if off_timeouts is None else off_timeouts
+        def_timeouts = 3 if def_timeouts is None else def_timeouts
+        site_label = st.segmented_control("Site", SITES, key="fd_site", width="stretch",
+                                          help="The win probability model includes home-field advantage.") \
+            or "Offense is home"
+        c1, c2 = st.columns(2)
+        off_abbr = c1.text_input("Offense", key="fd_off_abbr").upper()[:4]
+        def_abbr = c2.text_input("Defense", key="fd_def_abbr").upper()[:4]
+        c1, c2 = st.columns(2)
+        wind_speed = c1.number_input("Wind (mph)", 0, 40, help="No modeled effect below 10 mph.",
+                                     key="fd_wind_speed")
+        wind_direction = c2.selectbox("Wind direction", ["Into", "With", "Crosswind"], key="fd_wind_dir")
+        c1, c2 = st.columns(2)
+        rain = c1.checkbox("Rain", key="fd_rain")
+        snow = c2.checkbox("Snow", key="fd_snow")
 
 # "home" / "away" / "neutral" from the offense's point of view. After a change
 # of possession, evaluate_options() flips home/away for the other team.
@@ -97,20 +129,27 @@ tier = mu.strength_tier(margin_pts)
 
 emoji = {"Go for it": "👉", "Field goal": "🦵", "Punt": "🏈"}[best_option]
 
-# ---- "Tweet" style card ----
-st.divider()
+# ---- Verdict (big and wrapping, so it reads on a phone) ----
 spot = field_spot_label(yards_to_goal, off_abbr, def_abbr)
 clock_str = f"{minutes}:{seconds:02d}"
-tweet_lines = f"""
-```
----> {def_abbr} ({def_score}) @ {off_abbr} ({off_score}) <---
-{off_abbr} has 4th & {distance} {spot}
-Q{quarter} {clock_str} remaining
-
-Recommendation ({tier}): {emoji} {best_option} (+{margin_pts:.1f} WP)
-```
-"""
-st.markdown(tweet_lines)
+tier_color = {"VERY STRONG": "#0F6E56", "STRONG": "#1D9E75", "LEAN": "#BA7517", "TOSS-UP": "#888780"}[tier]
+verdict = "TOSS-UP" if tier == "TOSS-UP" else best_option.upper()
+sub = (f"{best_option} by a hair over {second_option.lower()} (+{margin_pts:.1f} WP pts). Either call is fine."
+       if tier == "TOSS-UP" else f"{tier.title()} · +{margin_pts:.1f} win probability points over {second_option.lower()}")
+st.html(
+    f'<div style="text-align:center;padding:6px 0 2px">'
+    f'<div style="font-size:14px;opacity:.7">4th &amp; {distance} {spot} · Q{quarter} {clock_str} · '
+    f'{off_abbr} {off_score}, {def_abbr} {def_score}</div>'
+    f'<div style="font-size:clamp(34px,9vw,52px);font-weight:700;line-height:1.15;margin:6px 0">{emoji} {verdict}</div>'
+    f'<div style="display:inline-block;padding:3px 12px;border-radius:999px;background:{tier_color};color:#fff;'
+    f'font-size:14px">{sub}</div></div>'
+)
+_link = qol.write_link_params(LINK_SPEC, {k: st.session_state.get(k) for _, k, *_ in LINK_SPEC})
+qol.share_link_box(_link)
+with st.expander("Copy as text"):
+    st.code(f"---> {def_abbr} ({def_score}) @ {off_abbr} ({off_score}) <---\n"
+            f"{off_abbr} has 4th & {distance} {spot}\nQ{quarter} {clock_str} remaining\n\n"
+            f"Recommendation ({tier}): {emoji} {best_option} (+{margin_pts:.1f} WP)", language=None)
 
 # ---- gt-style results table (rbsdm/nfl4th style: success prob + WP on each branch) ----
 st.write("#### Win probability by option")

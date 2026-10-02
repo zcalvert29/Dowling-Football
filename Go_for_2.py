@@ -21,6 +21,7 @@ All timing cutoffs live in the TIMING section below so they're easy to tune.
 import streamlit as st
 
 import fourth_down_core as fd
+import qol
 
 # Runs as a page inside the scouting app; st.Page sets the title/icon.
 st.set_page_config(layout="centered")
@@ -35,19 +36,6 @@ FINAL_SECONDS_GAME = 20       # "down to 15-20 seconds" (seconds left in the gam
 
 st.title("🎯 Go for 2 Bot")
 st.caption("Extra point vs. two-point try, based on ESPN's score-and-time cheat sheet.")
-
-with st.sidebar:
-    st.header("Game Situation")
-    your_abbr = st.text_input("Your team", "DCHS", key="g2_your_abbr").upper()[:4]
-    opp_abbr = st.text_input("Opponent", "VHS", key="g2_opp_abbr").upper()[:4]
-    your_score = st.number_input(
-        f"{your_abbr} score (BEFORE the try — after the TD's 6 points)", 0, 99, 20, key="g2_your_score"
-    )
-    opp_score = st.number_input(f"{opp_abbr} score", 0, 99, 25, key="g2_opp_score")
-    quarter = st.selectbox("Quarter", [1, 2, 3, 4], index=3, key="g2_quarter")
-    minutes = st.number_input("Minutes remaining in quarter", 0, 12, 8, key="g2_minutes")
-    seconds = st.number_input("Seconds", 0, 59, 0, key="g2_seconds")
-
 
 @st.cache_data(show_spinner=False)
 def dowling_pat_record(path: str = "curated-pbp.xlsx") -> tuple[int, int]:
@@ -68,15 +56,36 @@ _made, _att = dowling_pat_record()
 # 10 kicks) so a perfect 4-for-4 start doesn't read as a 100% kicker.
 _pat_default = int(round(100 * (_made + 9) / (_att + 10)))
 
-with st.sidebar:
-    st.header("Model check")
-    g2_site = st.selectbox("Site", ["We're home", "We're away", "Neutral"], key="g2_site",
-                           help="The win probability model includes home-field advantage.")
-    pat_pct = st.slider("Extra point make rate", 50, 100, _pat_default, format="%d%%", key="g2_pat",
+SITES = ["We're home", "We're away", "Neutral"]
+# Every input, its URL name, default, and allowed values; the URL keeps the
+# non-default ones so a shared link opens to the same situation.
+LINK_SPEC = [
+    ("us", "g2_your_score", int, 0, (0, 99)), ("them", "g2_opp_score", int, 0, (0, 99)),
+    ("q", "g2_quarter", int, 4, [1, 2, 3, 4]), ("min", "g2_minutes", int, 8, (0, 12)),
+    ("sec", "g2_seconds", int, 0, (0, 59)), ("pat", "g2_pat", int, _pat_default, (50, 100)),
+    ("two", "g2_two", int, 45, (20, 80)), ("site", "g2_site", str, SITES[0], SITES),
+]
+qol.apply_link_params(LINK_SPEC, "_g2_link_applied")
+
+# Inputs live on the page, not the sidebar, so they're visible on a phone.
+with st.container(border=True):
+    c1, c2 = st.columns(2)
+    your_score = c1.number_input("Our score (after the TD, before the try)", 0, 99, key="g2_your_score")
+    opp_score = c2.number_input("Their score", 0, 99, key="g2_opp_score")
+    c1, c2, c3 = st.columns([2, 1, 1])
+    quarter = c1.segmented_control("Quarter", [1, 2, 3, 4], key="g2_quarter",
+                                   format_func=lambda q: f"Q{q}", width="stretch") or 4
+    minutes = c2.number_input("Min left", 0, 12, key="g2_minutes")
+    seconds = c3.number_input("Sec", 0, 59, key="g2_seconds")
+your_abbr, opp_abbr = "DCHS", "OPP"
+
+with st.expander("Kicker, 2-point offense & site"):
+    pat_pct = st.slider("Extra point make rate", 50, 100, format="%d%%", key="g2_pat",
                         help=f"Default is Dowling's season rate ({_made}/{_att}) blended with a 90% "
                              f"prior so a few kicks don't swing it too far.")
-    two_pct = st.slider("Two-point conversion rate", 20, 80, 45, format="%d%%", key="g2_two",
+    two_pct = st.slider("Two-point conversion rate", 20, 80, format="%d%%", key="g2_two",
                         help="Around 40-50% is typical. Raise it if you have a 2-point play you trust.")
+    g2_site = st.segmented_control("Site", SITES, key="g2_site", width="stretch") or "We're home"
 
 if minutes == 12:
     seconds = 0  # quarters are 12:00 max
@@ -235,6 +244,8 @@ else:
                f"assumes NFL rates (about 95% on extra points, 48% on 2-point tries); the model uses your "
                f"{pat_pct}% / {two_pct}%.{_be_text} The 12-minute clock also matters: the same minutes left "
                f"are a bigger share of a high school game.", icon="⚠️")
+
+qol.share_link_box(qol.write_link_params(LINK_SPEC, {k: st.session_state.get(k) for _, k, *_ in LINK_SPEC}))
 
 st.divider()
 st.caption("The verdict at the top is ESPN's cheat sheet for a typical NFL game. The model check uses your EP/WP "

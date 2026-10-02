@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hmac
 from datetime import datetime
+from urllib.parse import quote
 
 import numpy as np
 import pandas as pd
@@ -195,7 +196,16 @@ def notes_box(scope: str, key: str, label: str) -> None:
 # ---------------------------------------------------------------------------
 # Home page
 # ---------------------------------------------------------------------------
-def _opponent_tells(df: pd.DataFrame, team: str, n: int = 3) -> list[tuple[str, str]]:
+# Badge for each confidence grade: (label, color).
+GRADE_BADGE = {"Solid": ("Tell", "red"), "Likely": ("Lean", "orange"), "Small sample": ("Small sample", "gray")}
+
+
+def _opponent_tells(df: pd.DataFrame, team: str, n: int = 3) -> list[tuple[str, str, str]]:
+    """
+    Up to n run/pass tendencies (75%+ one way on 5+ plays), most trustworthy
+    first, plus the opponent's best formation. Each is (badge, color, text);
+    the badge says how much to trust it (see visuals.tendency_grade).
+    """
     d = v.downs(v.run_pass(df[df["offense"] == team]))
     d = d[d["Distance"].notna()]
     tells = []
@@ -206,18 +216,23 @@ def _opponent_tells(df: pd.DataFrame, team: str, n: int = 3) -> list[tuple[str, 
         share = max(pr, 1 - pr)
         if share >= v.TELL_SHARE:
             kind = "Throws" if pr >= 0.5 else "Runs"
+            k = int(round(share * len(g)))
+            grade, lb = v.tendency_grade(k, len(g))
             form = g["OFF FORM"].mode()
             form_txt = f", mostly out of {str(form.iat[0]).title()}" if len(form) else ""
             dist_txt = str(dist).split(" (")[0].lower()
-            tells.append((len(g), f"{kind} {share:.0%} on {['', '1st', '2nd', '3rd', '4th'][int(dn)]} & "
-                                   f"{dist_txt}{form_txt} ({len(g)} plays)"))
-    out = [("Tell", t) for _, t in sorted(tells, reverse=True)[:n]]
+            badge, color = GRADE_BADGE[grade]
+            tells.append((lb, badge, color, f"{kind} {share:.0%} on {['', '1st', '2nd', '3rd', '4th'][int(dn)]} & "
+                                            f"{dist_txt}{form_txt} ({k} of {len(g)} plays)"))
+    out = [(b_, c_, t) for _, b_, c_, t in sorted(tells, key=lambda x: -x[0])[:n]]
     f = v.opp_formations_table(df, team)
     f = f[f["Plays"] >= 5]
     if not f.empty:
         best = f["EPA per Play"].idxmax()
-        out.append(("Threat", f"Best formation: {str(best).title()}, {f.loc[best, 'EPA per Play']:+.2f} EPA on "
-                              f"{int(f.loc[best, 'Plays'])} plays"))
+        plays = int(f.loc[best, "Plays"])
+        small = plays < v.LOW_N_ROWS
+        out.append(("Threat" + (" · small sample" if small else ""), "gray" if small else "orange",
+                    f"Best formation: {str(best).title()}, {f.loc[best, 'EPA per Play']:+.2f} EPA on {plays} plays"))
     return out
 
 
@@ -261,9 +276,12 @@ def render_home(df: pd.DataFrame, opponents: list[str], pages: dict) -> None:
                                     "with next_opponent in the app's secrets.")
             n_games = df.loc[(df["offense"] == opp) | (df["defense"] == opp), "game_id"].nunique()
             st.caption(f"{n_games} game(s) of film on {opp}")
-            for kind, text in _opponent_tells(df, opp):
-                color = "red" if kind == "Tell" else "orange"
-                st.markdown(f":{color}-badge[{kind}] {text}")
+            tells = _opponent_tells(df, opp)
+            for badge, color, text in tells:
+                st.markdown(f":{color}-badge[{badge}] {text}")
+            if tells:
+                st.caption("**Tell** = solid sample. **Lean** = probably real, worth a check on film. "
+                           "**Small sample** = could easily be noise.")
             note = latest_note("opponent", opp)
             if note:
                 st.info(f"Staff note: {note}")
@@ -408,16 +426,22 @@ def render_sideline(df: pd.DataFrame, opponents: list[str], pages: dict) -> None
             dirs = dirs[dirs.isin(["L", "R"])]
             if len(dirs):
                 st.caption(f"Direction: left {(dirs == 'L').mean():.0%} · right {(dirs == 'R').mean():.0%}")
-            if len(m) < v.TELL_MIN_N:
-                st.warning("Small sample: treat it as a lean, not a tell.")
-            elif max(pr, 1 - pr) >= v.TELL_SHARE:
-                st.success("Strong tendency: 75%+ one way.")
+            share = max(pr, 1 - pr)
+            grade, lb = v.tendency_grade(round(share * len(m)), len(m))
+            if len(m) < v.TELL_MIN_N or grade == "Small sample":
+                st.warning(f"Small sample: could easily be noise (only sure it's at least {lb:.0%} one way).")
+            elif grade == "Solid" and share >= v.TELL_SHARE:
+                st.success(f"Tell: {share:.0%} one way, and the sample backs it up (at least {lb:.0%}).")
+            elif share >= v.TELL_SHARE:
+                st.info(f"Lean: {share:.0%} one way, but only sure it's at least {lb:.0%}. Check the film.")
             top = m["OFF FORM"].value_counts().head(3)
             if form == "Any" and len(top):
                 st.caption("Most common looks here: " + ", ".join(f"{str(f).title()} ({n})" for f, n in top.items()))
-    c = st.columns(2)
+    c = st.columns(3)
     c[0].page_link(pages["fourth"], label="4th Down Bot", icon="🏈")
     c[1].page_link(pages["go2"], label="Go for 2 Bot", icon="🎯")
+    if "home" in pages:
+        c[2].page_link(pages["home"], label="Full dashboard", icon=":material/dashboard:")
     with st.expander("Full down & distance card"):
         v.render_dd_tendencies(df, opp, f"{opp} down & distance tendencies")
 
@@ -448,7 +472,7 @@ Each axis is how far a number sits from the FBS median, in FBS standard deviatio
 - **Neutral site:** home/away isn't in the data, so reviews average the two.
 
 ### Tendencies
-- **Tell:** 75%+ one way (run or pass) on 5+ plays in a situation.
+- **Tell / Lean / Small sample:** a tendency is 75%+ one way (run or pass) on 5+ plays. The badge says how much to trust it, based on the lowest one-way share the plays are consistent with (90% confidence): **Tell** if that's 70%+ (e.g. 29 of 35), **Lean** if 55%+ (e.g. 6 of 6), otherwise **Small sample** (e.g. 5 of 6).
 - **Strong / Lean / Mixed** (self-scout): 80%+, 70–79%, under 70% one way.
 
 ### Data notes
@@ -459,3 +483,73 @@ Each axis is how far a number sits from the FBS median, in FBS standard deviatio
 
 def render_glossary() -> None:
     st.markdown(GLOSSARY)
+
+
+# ---------------------------------------------------------------------------
+# Shareable links for the game-day bots: the inputs live in the URL, so a
+# link texted from the press box opens to the exact same situation.
+# ---------------------------------------------------------------------------
+def _parse_param(raw: str, kind, allowed):
+    """Convert a URL value; None if it's malformed or out of range."""
+    try:
+        if kind is bool:
+            val = raw in ("1", "true", "yes")
+        elif kind is int:
+            val = int(float(raw))
+        else:
+            val = str(raw)
+    except (TypeError, ValueError):
+        return None
+    if isinstance(allowed, tuple) and kind is int and not allowed[0] <= val <= allowed[1]:
+        return None
+    if isinstance(allowed, list) and val not in allowed:
+        return None
+    return val
+
+
+def apply_link_params(spec: list[tuple], flag: str) -> None:
+    """
+    Before the widgets are drawn: load a shared link's values into session
+    state, once per visit. spec rows are (param, state_key, type, default,
+    allowed), where allowed is a (min, max) range, a list of options, or None.
+    Bad or out-of-range values are ignored rather than crashing the page.
+    """
+    # Defaults live here instead of on the widgets, so a widget never gets a
+    # value from both its default and session state (Streamlit warns on that).
+    for _param, key, _kind, default, _allowed in spec:
+        st.session_state.setdefault(key, default)
+    if st.session_state.get(flag):
+        return
+    st.session_state[flag] = True
+    qp = st.query_params
+    for param, key, kind, _default, allowed in spec:
+        if param in qp:
+            val = _parse_param(qp[param], kind, allowed)
+            if val is not None:
+                st.session_state[key] = val
+
+
+def write_link_params(spec: list[tuple], values: dict) -> str:
+    """After the widgets: put every non-default value in the URL. Returns the full link."""
+    params = {}
+    for param, key, kind, default, _allowed in spec:
+        val = values.get(key, default)
+        if val is None or val == default:
+            continue
+        params[param] = ("1" if val else "0") if kind is bool else str(val)
+    if dict(st.query_params) != params:
+        st.query_params.from_dict(params)
+    try:
+        base = (st.context.url or "").split("?")[0]
+    except Exception:
+        base = ""
+    return base + ("?" + "&".join(f"{k}={quote(str(v))}" for k, v in params.items()) if params else "")
+
+
+def share_link_box(link: str, what: str = "this situation") -> None:
+    if not link:
+        return
+    with st.expander(f"Share {what}"):
+        st.code(link, language=None, wrap_lines=True)
+        st.caption("Copy with the button on the right. The link opens straight to these inputs. Your browser's "
+                   "address bar always has the same link.")

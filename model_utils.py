@@ -35,9 +35,13 @@ try:
 except ImportError:
     _XGB_AVAILABLE = False
 
-EP_MODEL_PATH = "cfb_ep_model.json"
-WP_TRUTH_MODEL_PATH = "cfb_wp_model_truth.json"
-WP_CFB_MODEL_PATH = "cfb_wp_model_cfb.json"   # loaded for reference/comparison, not used in recommendations
+# Paths are relative to this file, not the working directory, so the models
+# load no matter where streamlit is launched from. (Before, launching from
+# another folder silently switched every page to the heuristic fallback.)
+_HERE = os.path.dirname(os.path.abspath(__file__))
+EP_MODEL_PATH = os.path.join(_HERE, "cfb_ep_model.json")
+WP_TRUTH_MODEL_PATH = os.path.join(_HERE, "cfb_wp_model_truth.json")
+WP_CFB_MODEL_PATH = os.path.join(_HERE, "cfb_wp_model_cfb.json")   # reference/comparison only
 
 
 def _load_booster(path):

@@ -119,6 +119,12 @@ pbp <- pbp_raw %>%
       "End of Game", "Extra Point Good", "Extra Point Missed",
       "Two Point Rush", "Two Point Pass", "Penalty"
     ),
+    # Every kickoff variant, not just "Kickoff": rows like "Kickoff Return
+    # (Offense)" carry down = 1, but their scores are from the KICKING team's
+    # view while pos_team is the receiver, so score_diff and the win label
+    # come out flipped. (~1% of rows; in 2024, all 57 kickoff rows with a late
+    # 9+ point "lead" were labeled losses.)
+    !str_detect(play_type, "Kickoff"),
     !is.na(yards_to_goal),
     !is.na(TimeSecsRem),
     !is.na(ep_before)
@@ -214,6 +220,15 @@ FEATURE_FORMULA <- ~ ep + score_diff + yards_to_goal + down + distance +
 build_matrix <- function(df) model.matrix(FEATURE_FORMULA, data = df)
 
 x_fit  <- build_matrix(fit_data)
+
+# Monotone constraints, in model.matrix column order: +1 = higher is better for
+# the offense, -1 = worse, 0 = free. Without these, sparse corners of the data
+# (goal-line snaps, two-score games) let the trees learn impossible shapes, e.g.
+# an opponent with 1st & goal at the 1 "less likely to win" than at the 10.
+MONOTONE <- c(ep = 1, score_diff = 1, yards_to_goal = -1, down1 = 0, down2 = 0, down3 = 0, down4 = 0,
+              distance = -1, half_seconds = 0, game_seconds_remaining = 0, off_timeouts = 1,
+              def_timeouts = -1, is_home_pos = 1, score_diff_time_ratio = 1)
+stopifnot(identical(colnames(x_fit), names(MONOTONE)))
 x_val  <- build_matrix(val_data)
 x_test <- build_matrix(test_data)
 
@@ -232,6 +247,7 @@ fit_one_model <- function(label_fit, label_val, model_name) {
     nrounds = 800,
     subsample = 0.8,
     colsample_bytree = 0.7,
+    monotone_constraints = unname(MONOTONE),
     watchlist = list(fit = dfit, val = dval),
     early_stopping_rounds = 30,
     print_every_n = 50
