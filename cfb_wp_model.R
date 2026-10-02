@@ -221,13 +221,22 @@ build_matrix <- function(df) model.matrix(FEATURE_FORMULA, data = df)
 
 x_fit  <- build_matrix(fit_data)
 
-# Monotone constraints, in model.matrix column order: +1 = higher is better for
-# the offense, -1 = worse, 0 = free. Without these, sparse corners of the data
-# (goal-line snaps, two-score games) let the trees learn impossible shapes, e.g.
-# an opponent with 1st & goal at the 1 "less likely to win" than at the 10.
-MONOTONE <- c(ep = 1, score_diff = 1, yards_to_goal = -1, down1 = 0, down2 = 0, down3 = 0, down4 = 0,
-              distance = -1, half_seconds = 0, game_seconds_remaining = 0, off_timeouts = 1,
-              def_timeouts = -1, is_home_pos = 1, score_diff_time_ratio = 1)
+# Monotone constraints on the three field-position features only, in
+# model.matrix column order: +1 = higher is better for the offense, -1 = worse,
+# 0 = free. EP can only help, more yards to the goal or to go can only hurt.
+# Without them, sparse goal-line data lets the trees learn impossible shapes:
+# 2% of 4th downs priced "converting" as worse than "failing", and win
+# probability could jump 40+ points moving AWAY from the goal inside the 10.
+#
+# Score and clock are deliberately left free. Constraining every directional
+# feature was tried and rejected: only ~0.2% worse overall, but clearly worse
+# in the last minutes of one-score games (2025 late-game log loss 0.4655 vs
+# ~0.458), which is exactly where 4th-down calls are decided. It turned a
+# strong go into a toss-up. When comparing models, check the late-game slice,
+# not just overall log loss (model_training/evaluate.py does both).
+MONOTONE <- c(ep = 1, score_diff = 0, yards_to_goal = -1, down1 = 0, down2 = 0, down3 = 0, down4 = 0,
+              distance = -1, half_seconds = 0, game_seconds_remaining = 0, off_timeouts = 0,
+              def_timeouts = 0, is_home_pos = 0, score_diff_time_ratio = 0)
 stopifnot(identical(colnames(x_fit), names(MONOTONE)))
 x_val  <- build_matrix(val_data)
 x_test <- build_matrix(test_data)
@@ -242,9 +251,9 @@ fit_one_model <- function(label_fit, label_val, model_name) {
                                       # (cross-entropy against a soft label),
                                       # not just 0/1 — used for both models here
     eval_metric = "logloss",
-    max_depth = 4,
+    max_depth = 6,      # was 4; deeper trees fit late-game interactions better
     eta = 0.03,
-    nrounds = 800,
+    nrounds = 1500,     # early stopping ends it well before this (~345 rounds at depth 6)
     subsample = 0.8,
     colsample_bytree = 0.7,
     monotone_constraints = unname(MONOTONE),

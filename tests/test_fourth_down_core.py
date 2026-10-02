@@ -9,6 +9,7 @@ are retrained). They check that the batched code agrees with the one-at-a-time
 code, and that the decision logic behaves the way football says it should.
 """
 import numpy as np
+import pandas as pd
 import pytest
 
 import fourth_down_core as fd
@@ -85,3 +86,54 @@ def test_two_point_logic():
     worse_kicker = fd.evaluate_try(-1, late, p_xp=0.70, p_two=0.45, is_home_pos=0.5)
     better_kicker = fd.evaluate_try(-1, late, p_xp=0.95, p_two=0.45, is_home_pos=0.5)
     assert worse_kicker["break_even_two"] < better_kicker["break_even_two"]
+
+
+# --- Checks on the shipped WP model itself. If a retrain breaks these, look at
+# model_training/evaluate.py (including the late-game and goal-line columns) before shipping it.
+
+def _direct_wp(rows):
+    import xgboost as xgb
+    return mu._wp_booster.predict(xgb.DMatrix(rows.to_numpy(np.float32), feature_names=mu.WP_FEATURE_ORDER))
+
+
+@pytest.mark.parametrize("feature, direction", [("yards_to_goal", -1), ("distance", -1), ("ep", 1)])
+def test_field_position_constraints_hold(feature, direction):
+    """The model's guarantees: holding everything else fixed, more yards to the goal or to go never helps,
+    and more expected points never hurts."""
+    rng = np.random.default_rng(1)
+    values = {"yards_to_goal": np.arange(1, 100), "distance": np.arange(1, 31), "ep": np.linspace(-3, 7, 60)}[feature]
+    for _ in range(100):
+        sd = int(rng.integers(-21, 22)); game = int(rng.integers(30, 3600)); down = int(rng.integers(1, 5))
+        base = {"ep": float(rng.uniform(-2, 6)), "score_diff": sd, "yards_to_goal": int(rng.integers(1, 100)),
+                **{f"down{k}": float(k == down) for k in (1, 2, 3, 4)}, "distance": int(rng.integers(1, 20)),
+                "half_seconds": min(game, 1800), "game_seconds_remaining": game, "off_timeouts": int(rng.integers(0, 4)),
+                "def_timeouts": int(rng.integers(0, 4)), "is_home_pos": int(rng.integers(0, 2)),
+                "score_diff_time_ratio": sd / (game / 60 + 1)}
+        rows = pd.DataFrame([base] * len(values))[mu.WP_FEATURE_ORDER]
+        rows[feature] = values
+        assert (np.diff(_direct_wp(rows)) * direction >= -1e-6).all()
+
+
+def test_converting_never_worse_than_failing():
+    """A successful 4th-down try should never leave the offense worse off than a failed one."""
+    Y, D, S, T = np.meshgrid(np.arange(15, 100, 2), np.arange(1, 11), np.arange(-21, 22, 7),
+                             [3000, 2000, 1200, 600], indexing="ij")
+    keep = D <= Y - 10
+    r = fd.evaluate_many(Y[keep], D[keep], S[keep], T[keep], is_home_pos=0.5)
+    assert (r["wp_go_success"] >= r["wp_go_fail"] - 1e-9).all()
+
+
+def test_goal_line_no_big_reversals():
+    """Through the full chain (EP model -> WP model), win probability shouldn't jump as the offense moves away
+    from the goal. The original model jumped as much as 42 points inside the 10; the shipped one stays under 3."""
+    rng = np.random.default_rng(0)
+    for _ in range(300):
+        ytg = np.arange(1, 100)
+        wp, _ = mu.predict_wp_chained_batch(int(rng.integers(-21, 22)), ytg, int(rng.integers(1, 5)), np.minimum(10, ytg),
+                                            int(rng.integers(30, 1800)), int(rng.integers(30, 3600)),
+                                            is_home_pos=int(rng.integers(0, 2)))
+        assert np.diff(wp).max() < 0.03
+
+
+def test_own_goal_line_punts_on_long_yardage():
+    assert fd.best_calls(fd.evaluate_many(99, 15, 0, Q3_START, is_home_pos=1))["best"][0] == "Punt"
