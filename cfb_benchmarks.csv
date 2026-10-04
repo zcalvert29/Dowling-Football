@@ -10,6 +10,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Air Force,0.02857142857142857,70
 2022,offense,turnover,Air Force,0.023008849557522124,565
 2022,offense,stuffed,Air Force,0.07597535934291581,487
+2022,offense,scoring,Air Force,0.46153846153846156,91
 2022,defense,success,Air Force,0.44567627494456763,451
 2022,defense,explosive,Air Force,0.12638580931263857,451
 2022,defense,epa_rush,Air Force,-0.0880472852385171,255
@@ -38,6 +39,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Akron,0.01818181818181818,330
 2022,offense,turnover,Akron,0.02909090909090909,550
 2022,offense,stuffed,Akron,0.164021164021164,189
+2022,offense,scoring,Akron,0.25510204081632654,98
 2022,defense,success,Akron,0.5101214574898786,494
 2022,defense,explosive,Akron,0.15587044534412955,494
 2022,defense,epa_rush,Akron,0.02590833165825906,277
@@ -66,6 +68,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Alabama,0.023195876288659795,388
 2022,offense,turnover,Alabama,0.02564102564102564,780
 2022,offense,stuffed,Alabama,0.1935483870967742,372
+2022,offense,scoring,Alabama,0.5255474452554745,137
 2022,defense,success,Alabama,0.41160949868073876,758
 2022,defense,explosive,Alabama,0.0870712401055409,758
 2022,defense,epa_rush,Alabama,-0.09300644057877137,350
@@ -94,6 +97,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Appalachian State,0.01834862385321101,327
 2022,offense,turnover,Appalachian State,0.012345679012345678,729
 2022,offense,stuffed,Appalachian State,0.13178294573643412,387
+2022,offense,scoring,Appalachian State,0.4132231404958678,121
 2022,defense,success,Appalachian State,0.426179604261796,657
 2022,defense,explosive,Appalachian State,0.1248097412480974,657
 2022,defense,epa_rush,Appalachian State,0.03792217550981757,342
@@ -122,6 +126,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Arizona,0.021108179419525065,379
 2022,offense,turnover,Arizona,0.025222551928783383,674
 2022,offense,stuffed,Arizona,0.16058394160583941,274
+2022,offense,scoring,Arizona,0.46153846153846156,117
 2022,defense,success,Arizona,0.5690936106983655,673
 2022,defense,explosive,Arizona,0.1485884101040119,673
 2022,defense,epa_rush,Arizona,0.24007823889058882,348
@@ -150,6 +155,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Arizona State,0.025735294117647058,272
 2022,offense,turnover,Arizona State,0.017241379310344827,522
 2022,offense,stuffed,Arizona State,0.23008849557522124,226
+2022,offense,scoring,Arizona State,0.3473684210526316,95
 2022,defense,success,Arizona State,0.4983164983164983,594
 2022,defense,explosive,Arizona State,0.12121212121212122,594
 2022,defense,epa_rush,Arizona State,0.16206405834476617,277
@@ -178,6 +184,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Arkansas,0.01824817518248175,274
 2022,offense,turnover,Arkansas,0.024128686327077747,746
 2022,offense,stuffed,Arkansas,0.19068736141906872,451
+2022,offense,scoring,Arkansas,0.35772357723577236,123
 2022,defense,success,Arkansas,0.46253602305475505,694
 2022,defense,explosive,Arkansas,0.11671469740634005,694
 2022,defense,epa_rush,Arkansas,0.07773502808979514,329
@@ -206,6 +213,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Arkansas State,0.006289308176100629,318
 2022,offense,turnover,Arkansas State,0.01078582434514638,649
 2022,offense,stuffed,Arkansas State,0.29333333333333333,300
+2022,offense,scoring,Arkansas State,0.3560606060606061,132
 2022,defense,success,Arkansas State,0.4577259475218659,686
 2022,defense,explosive,Arkansas State,0.13119533527696792,686
 2022,defense,epa_rush,Arkansas State,0.01693993903098458,375
@@ -234,6 +242,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Army,0.0449438202247191,89
 2022,offense,turnover,Army,0.019261637239165328,623
 2022,offense,stuffed,Army,0.06095238095238095,525
+2022,offense,scoring,Army,0.39603960396039606,101
 2022,defense,success,Army,0.5253968253968254,630
 2022,defense,explosive,Army,0.15714285714285714,630
 2022,defense,epa_rush,Army,0.16205997982009357,367
@@ -262,6 +271,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Auburn,0.04905660377358491,265
 2022,offense,turnover,Auburn,0.04524886877828054,663
 2022,offense,stuffed,Auburn,0.21657754010695188,374
+2022,offense,scoring,Auburn,0.3203125,128
 2022,defense,success,Auburn,0.4328571428571429,700
 2022,defense,explosive,Auburn,0.12,700
 2022,defense,epa_rush,Auburn,0.05160200437432174,360
@@ -290,6 +300,7 @@ season,unit,metric,team,value,n
 2022,offense,int,BYU,0.010273972602739725,292
 2022,offense,turnover,BYU,0.01936619718309859,568
 2022,offense,stuffed,BYU,0.20599250936329588,267
+2022,offense,scoring,BYU,0.41,100
 2022,defense,success,BYU,0.5126582278481012,632
 2022,defense,explosive,BYU,0.14082278481012658,632
 2022,defense,epa_rush,BYU,0.07356389264051538,365
@@ -318,6 +329,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Ball State,0.027210884353741496,441
 2022,offense,turnover,Ball State,0.02342786683107275,811
 2022,offense,stuffed,Ball State,0.13687150837988826,358
+2022,offense,scoring,Ball State,0.3082191780821918,146
 2022,defense,success,Ball State,0.4604651162790698,860
 2022,defense,explosive,Ball State,0.1058139534883721,860
 2022,defense,epa_rush,Ball State,-0.008217134468941475,472
@@ -346,6 +358,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Baylor,0.040880503144654086,318
 2022,offense,turnover,Baylor,0.023715415019762844,759
 2022,offense,stuffed,Baylor,0.14084507042253522,426
+2022,offense,scoring,Baylor,0.43410852713178294,129
 2022,defense,success,Baylor,0.4474431818181818,704
 2022,defense,explosive,Baylor,0.09943181818181818,704
 2022,defense,epa_rush,Baylor,-0.001291172412807514,327
@@ -374,6 +387,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Boise State,0.027149321266968326,221
 2022,offense,turnover,Boise State,0.03339517625231911,539
 2022,offense,stuffed,Boise State,0.12012987012987013,308
+2022,offense,scoring,Boise State,0.43157894736842106,95
 2022,defense,success,Boise State,0.34279475982532753,458
 2022,defense,explosive,Boise State,0.0851528384279476,458
 2022,defense,epa_rush,Boise State,-0.11604556574327744,254
@@ -402,6 +416,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Boston College,0.023952095808383235,334
 2022,offense,turnover,Boston College,0.029310344827586206,580
 2022,offense,stuffed,Boston College,0.3037383177570093,214
+2022,offense,scoring,Boston College,0.24793388429752067,121
 2022,defense,success,Boston College,0.4336134453781513,595
 2022,defense,explosive,Boston College,0.12773109243697478,595
 2022,defense,epa_rush,Boston College,0.01802174177056392,309
@@ -430,6 +445,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Bowling Green,0.022435897435897436,312
 2022,offense,turnover,Bowling Green,0.028662420382165606,628
 2022,offense,stuffed,Bowling Green,0.14982578397212543,287
+2022,offense,scoring,Bowling Green,0.2661290322580645,124
 2022,defense,success,Bowling Green,0.4469357249626308,669
 2022,defense,explosive,Bowling Green,0.11958146487294469,669
 2022,defense,epa_rush,Bowling Green,-0.021661019508824528,314
@@ -458,6 +474,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Buffalo,0.030303030303030304,297
 2022,offense,turnover,Buffalo,0.027820710973724884,647
 2022,offense,stuffed,Buffalo,0.1337386018237082,329
+2022,offense,scoring,Buffalo,0.4095238095238095,105
 2022,defense,success,Buffalo,0.44861660079051385,506
 2022,defense,explosive,Buffalo,0.17786561264822134,506
 2022,defense,epa_rush,Buffalo,-0.13043334463414855,270
@@ -486,6 +503,7 @@ season,unit,metric,team,value,n
 2022,offense,int,California,0.017994858611825194,389
 2022,offense,turnover,California,0.018018018018018018,666
 2022,offense,stuffed,California,0.2073170731707317,246
+2022,offense,scoring,California,0.30833333333333335,120
 2022,defense,success,California,0.5042372881355932,708
 2022,defense,explosive,California,0.11581920903954802,708
 2022,defense,epa_rush,California,0.04442640556142073,316
@@ -514,6 +532,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Central Michigan,0.019662921348314606,356
 2022,offense,turnover,Central Michigan,0.024251069900142655,701
 2022,offense,stuffed,Central Michigan,0.15170278637770898,323
+2022,offense,scoring,Central Michigan,0.2932330827067669,133
 2022,defense,success,Central Michigan,0.44379562043795623,685
 2022,defense,explosive,Central Michigan,0.13138686131386862,685
 2022,defense,epa_rush,Central Michigan,0.040460403714885636,366
@@ -542,6 +561,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Charlotte,0.04225352112676056,355
 2022,offense,turnover,Charlotte,0.028744326777609682,661
 2022,offense,stuffed,Charlotte,0.14388489208633093,278
+2022,offense,scoring,Charlotte,0.2966101694915254,118
 2022,defense,success,Charlotte,0.5212922173274597,681
 2022,defense,explosive,Charlotte,0.16740088105726872,681
 2022,defense,epa_rush,Charlotte,0.16254625027266337,385
@@ -570,6 +590,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Cincinnati,0.019933554817275746,301
 2022,offense,turnover,Cincinnati,0.023297491039426525,558
 2022,offense,stuffed,Cincinnati,0.1440677966101695,236
+2022,offense,scoring,Cincinnati,0.4017857142857143,112
 2022,defense,success,Cincinnati,0.39880952380952384,672
 2022,defense,explosive,Cincinnati,0.09077380952380952,672
 2022,defense,epa_rush,Cincinnati,-0.042483194223560006,362
@@ -598,6 +619,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Clemson,0.018633540372670808,322
 2022,offense,turnover,Clemson,0.02092050209205021,717
 2022,offense,stuffed,Clemson,0.14627659574468085,376
+2022,offense,scoring,Clemson,0.4603174603174603,126
 2022,defense,success,Clemson,0.4148148148148148,675
 2022,defense,explosive,Clemson,0.1259259259259259,675
 2022,defense,epa_rush,Clemson,-0.09541225279331751,289
@@ -626,6 +648,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Coastal Carolina,0.02032520325203252,246
 2022,offense,turnover,Coastal Carolina,0.027868852459016394,610
 2022,offense,stuffed,Coastal Carolina,0.14492753623188406,345
+2022,offense,scoring,Coastal Carolina,0.41509433962264153,106
 2022,defense,success,Coastal Carolina,0.47758620689655173,580
 2022,defense,explosive,Coastal Carolina,0.13620689655172413,580
 2022,defense,epa_rush,Coastal Carolina,0.002970093404525179,273
@@ -654,6 +677,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Colorado,0.028268551236749116,283
 2022,offense,turnover,Colorado,0.028070175438596492,570
 2022,offense,stuffed,Colorado,0.16356877323420074,269
+2022,offense,scoring,Colorado,0.2524271844660194,103
 2022,defense,success,Colorado,0.5392156862745098,612
 2022,defense,explosive,Colorado,0.15359477124183007,612
 2022,defense,epa_rush,Colorado,0.13896546407946886,317
@@ -682,6 +706,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Colorado State,0.03237410071942446,278
 2022,offense,turnover,Colorado State,0.021487603305785124,605
 2022,offense,stuffed,Colorado State,0.2007168458781362,279
+2022,offense,scoring,Colorado State,0.17647058823529413,119
 2022,defense,success,Colorado State,0.4826086956521739,690
 2022,defense,explosive,Colorado State,0.12318840579710146,690
 2022,defense,epa_rush,Colorado State,0.04362183825281706,347
@@ -710,6 +735,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Connecticut,0.0391304347826087,230
 2022,offense,turnover,Connecticut,0.029806259314456036,671
 2022,offense,stuffed,Connecticut,0.2,425
+2022,offense,scoring,Connecticut,0.2692307692307692,130
 2022,defense,success,Connecticut,0.5100133511348465,749
 2022,defense,explosive,Connecticut,0.11615487316421896,749
 2022,defense,epa_rush,Connecticut,-0.005295593017020058,396
@@ -738,6 +764,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Duke,0.00967741935483871,310
 2022,offense,turnover,Duke,0.013513513513513514,666
 2022,offense,stuffed,Duke,0.11661807580174927,343
+2022,offense,scoring,Duke,0.4132231404958678,121
 2022,defense,success,Duke,0.453416149068323,644
 2022,defense,explosive,Duke,0.12111801242236025,644
 2022,defense,epa_rush,Duke,-0.1314990944199404,279
@@ -766,6 +793,7 @@ season,unit,metric,team,value,n
 2022,offense,int,East Carolina,0.013559322033898305,295
 2022,offense,turnover,East Carolina,0.01048951048951049,572
 2022,offense,stuffed,East Carolina,0.21722846441947566,267
+2022,offense,scoring,East Carolina,0.43617021276595747,94
 2022,defense,success,East Carolina,0.4580896686159844,513
 2022,defense,explosive,East Carolina,0.13060428849902533,513
 2022,defense,epa_rush,East Carolina,-0.08600071128894723,225
@@ -794,6 +822,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Eastern Michigan,0.03225806451612903,279
 2022,offense,turnover,Eastern Michigan,0.024115755627009645,622
 2022,offense,stuffed,Eastern Michigan,0.12732919254658384,322
+2022,offense,scoring,Eastern Michigan,0.40186915887850466,107
 2022,defense,success,Eastern Michigan,0.48503937007874015,635
 2022,defense,explosive,Eastern Michigan,0.11496062992125984,635
 2022,defense,epa_rush,Eastern Michigan,0.028490330307852155,340
@@ -822,6 +851,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Florida,0.031446540880503145,318
 2022,offense,turnover,Florida,0.023943661971830985,710
 2022,offense,stuffed,Florida,0.1503957783641161,379
+2022,offense,scoring,Florida,0.421875,128
 2022,defense,success,Florida,0.47706422018348627,763
 2022,defense,explosive,Florida,0.13237221494102228,763
 2022,defense,epa_rush,Florida,0.07339410433639434,406
@@ -850,6 +880,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Florida Atlantic,0.018796992481203006,266
 2022,offense,turnover,Florida Atlantic,0.019448946515397084,617
 2022,offense,stuffed,Florida Atlantic,0.10495626822157435,343
+2022,offense,scoring,Florida Atlantic,0.40860215053763443,93
 2022,defense,success,Florida Atlantic,0.48392857142857143,560
 2022,defense,explosive,Florida Atlantic,0.13392857142857142,560
 2022,defense,epa_rush,Florida Atlantic,0.018138904284053483,290
@@ -878,6 +909,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Florida International,0.029411764705882353,408
 2022,offense,turnover,Florida International,0.030261348005502064,727
 2022,offense,stuffed,Florida International,0.17049180327868851,305
+2022,offense,scoring,Florida International,0.1968503937007874,127
 2022,defense,success,Florida International,0.49037227214377405,779
 2022,defense,explosive,Florida International,0.12195121951219512,779
 2022,defense,epa_rush,Florida International,0.06391291313382175,397
@@ -906,6 +938,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Florida State,0.02147239263803681,326
 2022,offense,turnover,Florida State,0.02119205298013245,755
 2022,offense,stuffed,Florida State,0.14805825242718446,412
+2022,offense,scoring,Florida State,0.4566929133858268,127
 2022,defense,success,Florida State,0.4482269503546099,705
 2022,defense,explosive,Florida State,0.10780141843971631,705
 2022,defense,epa_rush,Florida State,-0.030308076394297234,372
@@ -934,6 +967,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Fresno State,0.030303030303030304,330
 2022,offense,turnover,Fresno State,0.024615384615384615,650
 2022,offense,stuffed,Fresno State,0.1288135593220339,295
+2022,offense,scoring,Fresno State,0.45871559633027525,109
 2022,defense,success,Fresno State,0.4369369369369369,666
 2022,defense,explosive,Fresno State,0.13513513513513514,666
 2022,defense,epa_rush,Fresno State,0.04483724833212555,345
@@ -962,6 +996,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Georgia,0.013812154696132596,362
 2022,offense,turnover,Georgia,0.020891364902506964,718
 2022,offense,stuffed,Georgia,0.166189111747851,349
+2022,offense,scoring,Georgia,0.576271186440678,118
 2022,defense,success,Georgia,0.3714759535655058,603
 2022,defense,explosive,Georgia,0.0779436152570481,603
 2022,defense,epa_rush,Georgia,-0.2106979586555834,251
@@ -990,6 +1025,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Georgia Southern,0.025821596244131457,426
 2022,offense,turnover,Georgia Southern,0.02,700
 2022,offense,stuffed,Georgia Southern,0.1524163568773234,269
+2022,offense,scoring,Georgia Southern,0.44545454545454544,110
 2022,defense,success,Georgia Southern,0.4728682170542636,645
 2022,defense,explosive,Georgia Southern,0.16434108527131783,645
 2022,defense,epa_rush,Georgia Southern,0.21597248466326058,326
@@ -1018,6 +1054,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Georgia State,0.02575107296137339,233
 2022,offense,turnover,Georgia State,0.03106508875739645,676
 2022,offense,stuffed,Georgia State,0.16745283018867924,424
+2022,offense,scoring,Georgia State,0.33613445378151263,119
 2022,defense,success,Georgia State,0.46325878594249204,626
 2022,defense,explosive,Georgia State,0.12140575079872204,626
 2022,defense,epa_rush,Georgia State,0.025663363651314032,343
@@ -1046,6 +1083,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Georgia Tech,0.024539877300613498,326
 2022,offense,turnover,Georgia Tech,0.020989505247376312,667
 2022,offense,stuffed,Georgia Tech,0.20261437908496732,306
+2022,offense,scoring,Georgia Tech,0.25984251968503935,127
 2022,defense,success,Georgia Tech,0.47702702702702704,740
 2022,defense,explosive,Georgia Tech,0.14054054054054055,740
 2022,defense,epa_rush,Georgia Tech,-0.04771985030082582,400
@@ -1074,6 +1112,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Hawai'i,0.028503562945368172,421
 2022,offense,turnover,Hawai'i,0.023746701846965697,758
 2022,offense,stuffed,Hawai'i,0.1308411214953271,321
+2022,offense,scoring,Hawai'i,0.2803030303030303,132
 2022,defense,success,Hawai'i,0.5034867503486751,717
 2022,defense,explosive,Hawai'i,0.1492329149232915,717
 2022,defense,epa_rush,Hawai'i,0.1815044213576587,394
@@ -1102,6 +1141,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Houston,0.023809523809523808,378
 2022,offense,turnover,Houston,0.02604920405209841,691
 2022,offense,stuffed,Houston,0.13651877133105803,293
+2022,offense,scoring,Houston,0.4462809917355372,121
 2022,defense,success,Houston,0.465564738292011,726
 2022,defense,explosive,Houston,0.11570247933884298,726
 2022,defense,epa_rush,Houston,0.03381409740450687,338
@@ -1130,6 +1170,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Illinois,0.008902077151335312,337
 2022,offense,turnover,Illinois,0.022222222222222223,810
 2022,offense,stuffed,Illinois,0.1513157894736842,456
+2022,offense,scoring,Illinois,0.3381294964028777,139
 2022,defense,success,Illinois,0.34294385432473445,659
 2022,defense,explosive,Illinois,0.10166919575113809,659
 2022,defense,epa_rush,Illinois,-0.12273028292219545,296
@@ -1158,6 +1199,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Indiana,0.024830699774266364,443
 2022,offense,turnover,Indiana,0.021437578814627996,793
 2022,offense,stuffed,Indiana,0.1761006289308176,318
+2022,offense,scoring,Indiana,0.2692307692307692,156
 2022,defense,success,Indiana,0.47215777262180975,862
 2022,defense,explosive,Indiana,0.11136890951276102,862
 2022,defense,epa_rush,Indiana,-0.08684284174385384,471
@@ -1186,6 +1228,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Iowa,0.026217228464419477,267
 2022,offense,turnover,Iowa,0.025041736227045076,599
 2022,offense,stuffed,Iowa,0.20134228187919462,298
+2022,offense,scoring,Iowa,0.224,125
 2022,defense,success,Iowa,0.39420289855072466,690
 2022,defense,explosive,Iowa,0.06666666666666667,690
 2022,defense,epa_rush,Iowa,-0.06838124893339613,327
@@ -1214,6 +1257,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Iowa State,0.0330188679245283,424
 2022,offense,turnover,Iowa State,0.030789825970548863,747
 2022,offense,stuffed,Iowa State,0.16722408026755853,299
+2022,offense,scoring,Iowa State,0.30578512396694213,121
 2022,defense,success,Iowa State,0.4316309719934102,607
 2022,defense,explosive,Iowa State,0.09555189456342669,607
 2022,defense,epa_rush,Iowa State,-0.16866339352495544,312
@@ -1242,6 +1286,7 @@ season,unit,metric,team,value,n
 2022,offense,int,James Madison,0.03333333333333333,270
 2022,offense,turnover,James Madison,0.02848575712143928,667
 2022,offense,stuffed,James Madison,0.1763157894736842,380
+2022,offense,scoring,James Madison,0.368,125
 2022,defense,success,James Madison,0.33697632058287796,549
 2022,defense,explosive,James Madison,0.10018214936247723,549
 2022,defense,epa_rush,James Madison,-0.2101065319856576,250
@@ -1270,6 +1315,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Kansas,0.022813688212927757,263
 2022,offense,turnover,Kansas,0.03257328990228013,614
 2022,offense,stuffed,Kansas,0.15743440233236153,343
+2022,offense,scoring,Kansas,0.49137931034482757,116
 2022,defense,success,Kansas,0.49417852522639066,773
 2022,defense,explosive,Kansas,0.1073738680465718,773
 2022,defense,epa_rush,Kansas,0.08553202705815022,386
@@ -1298,6 +1344,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Kansas State,0.01098901098901099,273
 2022,offense,turnover,Kansas State,0.01649175412293853,667
 2022,offense,stuffed,Kansas State,0.14435695538057744,381
+2022,offense,scoring,Kansas State,0.4166666666666667,120
 2022,defense,success,Kansas State,0.41884057971014493,690
 2022,defense,explosive,Kansas State,0.09420289855072464,690
 2022,defense,epa_rush,Kansas State,-0.01865808506755999,322
@@ -1326,6 +1373,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Kent State,0.025547445255474453,274
 2022,offense,turnover,Kent State,0.019858156028368795,705
 2022,offense,stuffed,Kent State,0.11750599520383694,417
+2022,offense,scoring,Kent State,0.38333333333333336,120
 2022,defense,success,Kent State,0.5122615803814714,734
 2022,defense,explosive,Kent State,0.11035422343324251,734
 2022,defense,epa_rush,Kent State,0.03900002669155423,358
@@ -1354,6 +1402,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Kentucky,0.045283018867924525,265
 2022,offense,turnover,Kentucky,0.034976152623211444,629
 2022,offense,stuffed,Kentucky,0.21846153846153846,325
+2022,offense,scoring,Kentucky,0.3482142857142857,112
 2022,defense,success,Kentucky,0.3963210702341137,598
 2022,defense,explosive,Kentucky,0.10033444816053512,598
 2022,defense,epa_rush,Kentucky,-0.06293399319697143,312
@@ -1382,6 +1431,7 @@ season,unit,metric,team,value,n
 2022,offense,int,LSU,0.012269938650306749,326
 2022,offense,turnover,LSU,0.013888888888888888,720
 2022,offense,stuffed,LSU,0.12921348314606743,356
+2022,offense,scoring,LSU,0.40350877192982454,114
 2022,defense,success,LSU,0.4324734446130501,659
 2022,defense,explosive,LSU,0.11987860394537178,659
 2022,defense,epa_rush,LSU,0.01636038654409174,334
@@ -1410,6 +1460,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Liberty,0.0471976401179941,339
 2022,offense,turnover,Liberty,0.03612903225806452,775
 2022,offense,stuffed,Liberty,0.19298245614035087,399
+2022,offense,scoring,Liberty,0.32679738562091504,153
 2022,defense,success,Liberty,0.36233766233766235,770
 2022,defense,explosive,Liberty,0.11168831168831168,770
 2022,defense,epa_rush,Liberty,-0.0838074975970745,379
@@ -1438,6 +1489,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Louisiana,0.02368421052631579,380
 2022,offense,turnover,Louisiana,0.026281208935611037,761
 2022,offense,stuffed,Louisiana,0.17174515235457063,361
+2022,offense,scoring,Louisiana,0.33093525179856115,139
 2022,defense,success,Louisiana,0.4522207267833109,743
 2022,defense,explosive,Louisiana,0.0901749663526245,743
 2022,defense,epa_rush,Louisiana,0.036291823177046725,354
@@ -1466,6 +1518,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Louisiana Monroe,0.025547445255474453,274
 2022,offense,turnover,Louisiana Monroe,0.024509803921568627,612
 2022,offense,stuffed,Louisiana Monroe,0.1597444089456869,313
+2022,offense,scoring,Louisiana Monroe,0.30327868852459017,122
 2022,defense,success,Louisiana Monroe,0.47067238912732473,699
 2022,defense,explosive,Louisiana Monroe,0.1402002861230329,699
 2022,defense,epa_rush,Louisiana Monroe,0.021527687499446092,369
@@ -1494,6 +1547,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Louisiana Tech,0.04143646408839779,362
 2022,offense,turnover,Louisiana Tech,0.03890489913544669,694
 2022,offense,stuffed,Louisiana Tech,0.18032786885245902,305
+2022,offense,scoring,Louisiana Tech,0.3582089552238806,134
 2022,defense,success,Louisiana Tech,0.4648648648648649,740
 2022,defense,explosive,Louisiana Tech,0.13783783783783785,740
 2022,defense,epa_rush,Louisiana Tech,0.20124263196599323,388
@@ -1522,6 +1576,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Louisville,0.0273972602739726,292
 2022,offense,turnover,Louisville,0.026277372262773723,685
 2022,offense,stuffed,Louisville,0.1925133689839572,374
+2022,offense,scoring,Louisville,0.3700787401574803,127
 2022,defense,success,Louisville,0.43950995405819293,653
 2022,defense,explosive,Louisville,0.14088820826952528,653
 2022,defense,epa_rush,Louisville,-0.024805198342985064,334
@@ -1550,6 +1605,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Marshall,0.03867403314917127,181
 2022,offense,turnover,Marshall,0.021568627450980392,510
 2022,offense,stuffed,Marshall,0.22580645161290322,310
+2022,offense,scoring,Marshall,0.22772277227722773,101
 2022,defense,success,Marshall,0.32516703786191536,449
 2022,defense,explosive,Marshall,0.0801781737193764,449
 2022,defense,epa_rush,Marshall,-0.26600894626485233,189
@@ -1578,6 +1634,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Maryland,0.01718213058419244,291
 2022,offense,turnover,Maryland,0.01779935275080906,618
 2022,offense,stuffed,Maryland,0.1605351170568562,299
+2022,offense,scoring,Maryland,0.36607142857142855,112
 2022,defense,success,Maryland,0.4376899696048632,658
 2022,defense,explosive,Maryland,0.09422492401215805,658
 2022,defense,epa_rush,Maryland,0.00237081191492553,324
@@ -1606,6 +1663,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Memphis,0.01977401129943503,354
 2022,offense,turnover,Memphis,0.023545706371191136,722
 2022,offense,stuffed,Memphis,0.1906158357771261,341
+2022,offense,scoring,Memphis,0.4263565891472868,129
 2022,defense,success,Memphis,0.4692737430167598,716
 2022,defense,explosive,Memphis,0.10614525139664804,716
 2022,defense,epa_rush,Memphis,-0.09640495595184255,330
@@ -1634,6 +1692,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Miami,0.025714285714285714,350
 2022,offense,turnover,Miami,0.022792022792022793,702
 2022,offense,stuffed,Miami,0.1676829268292683,328
+2022,offense,scoring,Miami,0.3697478991596639,119
 2022,defense,success,Miami,0.4226289517470882,601
 2022,defense,explosive,Miami,0.14309484193011648,601
 2022,defense,epa_rush,Miami,-0.041260384678044076,304
@@ -1662,6 +1721,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Miami (OH),0.009950248756218905,201
 2022,offense,turnover,Miami (OH),0.014893617021276596,470
 2022,offense,stuffed,Miami (OH),0.17131474103585656,251
+2022,offense,scoring,Miami (OH),0.308411214953271,107
 2022,defense,success,Miami (OH),0.4342857142857143,525
 2022,defense,explosive,Miami (OH),0.08,525
 2022,defense,epa_rush,Miami (OH),-0.022788684990716537,232
@@ -1690,6 +1750,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Michigan,0.010238907849829351,293
 2022,offense,turnover,Michigan,0.017948717948717947,780
 2022,offense,stuffed,Michigan,0.14526315789473684,475
+2022,offense,scoring,Michigan,0.5806451612903226,124
 2022,defense,success,Michigan,0.35857805255023184,647
 2022,defense,explosive,Michigan,0.07882534775888717,647
 2022,defense,epa_rush,Michigan,-0.18302132609958455,283
@@ -1718,6 +1779,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Michigan State,0.0273224043715847,366
 2022,offense,turnover,Michigan State,0.02130681818181818,704
 2022,offense,stuffed,Michigan State,0.19753086419753085,324
+2022,offense,scoring,Michigan State,0.336,125
 2022,defense,success,Michigan State,0.4770992366412214,786
 2022,defense,explosive,Michigan State,0.12213740458015267,786
 2022,defense,epa_rush,Michigan State,0.003071839344887178,427
@@ -1746,6 +1808,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Middle Tennessee,0.024725274725274724,364
 2022,offense,turnover,Middle Tennessee,0.02553191489361702,705
 2022,offense,stuffed,Middle Tennessee,0.20569620253164558,316
+2022,offense,scoring,Middle Tennessee,0.29770992366412213,131
 2022,defense,success,Middle Tennessee,0.44712182061579653,747
 2022,defense,explosive,Middle Tennessee,0.1111111111111111,747
 2022,defense,epa_rush,Middle Tennessee,-0.09219238822597202,340
@@ -1774,6 +1837,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Minnesota,0.03669724770642202,218
 2022,offense,turnover,Minnesota,0.01804511278195489,665
 2022,offense,stuffed,Minnesota,0.11670480549199085,437
+2022,offense,scoring,Minnesota,0.4424778761061947,113
 2022,defense,success,Minnesota,0.3776595744680851,564
 2022,defense,explosive,Minnesota,0.10283687943262411,564
 2022,defense,epa_rush,Minnesota,-0.0879181282473448,269
@@ -1802,6 +1866,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Mississippi State,0.011009174311926606,545
 2022,offense,turnover,Mississippi State,0.01668806161745828,779
 2022,offense,stuffed,Mississippi State,0.15023474178403756,213
+2022,offense,scoring,Mississippi State,0.391304347826087,138
 2022,defense,success,Mississippi State,0.4281767955801105,724
 2022,defense,explosive,Mississippi State,0.12430939226519337,724
 2022,defense,epa_rush,Mississippi State,0.03984436520346847,357
@@ -1830,6 +1895,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Missouri,0.0390625,256
 2022,offense,turnover,Missouri,0.02711864406779661,590
 2022,offense,stuffed,Missouri,0.20063694267515925,314
+2022,offense,scoring,Missouri,0.3157894736842105,114
 2022,defense,success,Missouri,0.4175257731958763,582
 2022,defense,explosive,Missouri,0.13917525773195877,582
 2022,defense,epa_rush,Missouri,-0.06159888252072522,283
@@ -1858,6 +1924,7 @@ season,unit,metric,team,value,n
 2022,offense,int,NC State,0.02040816326530612,343
 2022,offense,turnover,NC State,0.02676056338028169,710
 2022,offense,stuffed,NC State,0.17579250720461095,347
+2022,offense,scoring,NC State,0.3779527559055118,127
 2022,defense,success,NC State,0.3824959481361426,617
 2022,defense,explosive,NC State,0.1166936790923825,617
 2022,defense,epa_rush,NC State,-0.044889931206358195,247
@@ -1886,6 +1953,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Navy,0.05504587155963303,109
 2022,offense,turnover,Navy,0.019261637239165328,623
 2022,offense,stuffed,Navy,0.11530815109343936,503
+2022,offense,scoring,Navy,0.31,100
 2022,defense,success,Navy,0.4357976653696498,514
 2022,defense,explosive,Navy,0.13618677042801555,514
 2022,defense,epa_rush,Navy,-0.1326909193362781,236
@@ -1914,6 +1982,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Nebraska,0.041935483870967745,310
 2022,offense,turnover,Nebraska,0.03193033381712627,689
 2022,offense,stuffed,Nebraska,0.1534090909090909,352
+2022,offense,scoring,Nebraska,0.2826086956521739,138
 2022,defense,success,Nebraska,0.513095238095238,840
 2022,defense,explosive,Nebraska,0.11071428571428571,840
 2022,defense,epa_rush,Nebraska,0.06162874234263214,450
@@ -1942,6 +2011,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Nevada,0.017123287671232876,292
 2022,offense,turnover,Nevada,0.026402640264026403,606
 2022,offense,stuffed,Nevada,0.16666666666666666,288
+2022,offense,scoring,Nevada,0.25,108
 2022,defense,success,Nevada,0.4724540901502504,599
 2022,defense,explosive,Nevada,0.12353923205342238,599
 2022,defense,epa_rush,Nevada,0.05700092209623109,354
@@ -1970,6 +2040,7 @@ season,unit,metric,team,value,n
 2022,offense,int,New Mexico,0.044642857142857144,224
 2022,offense,turnover,New Mexico,0.03189792663476874,627
 2022,offense,stuffed,New Mexico,0.18356164383561643,365
+2022,offense,scoring,New Mexico,0.20454545454545456,132
 2022,defense,success,New Mexico,0.47092198581560285,705
 2022,defense,explosive,New Mexico,0.09787234042553192,705
 2022,defense,epa_rush,New Mexico,0.03792140164293588,398
@@ -1998,6 +2069,7 @@ season,unit,metric,team,value,n
 2022,offense,int,New Mexico State,0.06417112299465241,187
 2022,offense,turnover,New Mexico State,0.03587443946188341,446
 2022,offense,stuffed,New Mexico State,0.21428571428571427,252
+2022,offense,scoring,New Mexico State,0.23595505617977527,89
 2022,defense,success,New Mexico State,0.47398843930635837,519
 2022,defense,explosive,New Mexico State,0.10982658959537572,519
 2022,defense,epa_rush,New Mexico State,0.0452256818900216,302
@@ -2026,6 +2098,7 @@ season,unit,metric,team,value,n
 2022,offense,int,North Carolina,0.008130081300813009,369
 2022,offense,turnover,North Carolina,0.021828103683492497,733
 2022,offense,stuffed,North Carolina,0.1661721068249258,337
+2022,offense,scoring,North Carolina,0.496,125
 2022,defense,success,North Carolina,0.5301204819277109,747
 2022,defense,explosive,North Carolina,0.1285140562248996,747
 2022,defense,epa_rush,North Carolina,0.07480149506082778,376
@@ -2054,6 +2127,7 @@ season,unit,metric,team,value,n
 2022,offense,int,North Texas,0.0425531914893617,282
 2022,offense,turnover,North Texas,0.03194888178913738,626
 2022,offense,stuffed,North Texas,0.1467065868263473,334
+2022,offense,scoring,North Texas,0.39166666666666666,120
 2022,defense,success,North Texas,0.49700598802395207,668
 2022,defense,explosive,North Texas,0.12574850299401197,668
 2022,defense,epa_rush,North Texas,0.14651808425330926,328
@@ -2082,6 +2156,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Northern Illinois,0.03873239436619718,284
 2022,offense,turnover,Northern Illinois,0.023876404494382022,712
 2022,offense,stuffed,Northern Illinois,0.12857142857142856,420
+2022,offense,scoring,Northern Illinois,0.368,125
 2022,defense,success,Northern Illinois,0.4573002754820937,726
 2022,defense,explosive,Northern Illinois,0.12121212121212122,726
 2022,defense,epa_rush,Northern Illinois,0.011720804542909054,374
@@ -2110,6 +2185,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Northwestern,0.041025641025641026,390
 2022,offense,turnover,Northwestern,0.03549571603427173,817
 2022,offense,stuffed,Northwestern,0.17560975609756097,410
+2022,offense,scoring,Northwestern,0.22137404580152673,131
 2022,defense,success,Northwestern,0.4888010540184453,759
 2022,defense,explosive,Northwestern,0.11594202898550725,759
 2022,defense,epa_rush,Northwestern,0.019741982386130938,445
@@ -2138,6 +2214,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Notre Dame,0.027777777777777776,252
 2022,offense,turnover,Notre Dame,0.019174041297935103,678
 2022,offense,stuffed,Notre Dame,0.1393643031784841,409
+2022,offense,scoring,Notre Dame,0.375,120
 2022,defense,success,Notre Dame,0.409375,640
 2022,defense,explosive,Notre Dame,0.1171875,640
 2022,defense,epa_rush,Notre Dame,0.06112954672165437,309
@@ -2166,6 +2243,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Ohio,0.01529051987767584,327
 2022,offense,turnover,Ohio,0.016566265060240965,664
 2022,offense,stuffed,Ohio,0.17405063291139242,316
+2022,offense,scoring,Ohio,0.45185185185185184,135
 2022,defense,success,Ohio,0.4696969696969697,726
 2022,defense,explosive,Ohio,0.13360881542699724,726
 2022,defense,epa_rush,Ohio,-0.02845756558359349,300
@@ -2194,6 +2272,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Ohio State,0.013422818791946308,298
 2022,offense,turnover,Ohio State,0.00909090909090909,660
 2022,offense,stuffed,Ohio State,0.14325842696629212,356
+2022,offense,scoring,Ohio State,0.5511811023622047,127
 2022,defense,success,Ohio State,0.35152487961476725,623
 2022,defense,explosive,Ohio State,0.08828250401284109,623
 2022,defense,epa_rush,Ohio State,-0.16242847491515663,330
@@ -2222,6 +2301,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Oklahoma,0.017361111111111112,288
 2022,offense,turnover,Oklahoma,0.017366136034732273,691
 2022,offense,stuffed,Oklahoma,0.13838120104438642,383
+2022,offense,scoring,Oklahoma,0.38345864661654133,133
 2022,defense,success,Oklahoma,0.4731774415405777,727
 2022,defense,explosive,Oklahoma,0.13204951856946354,727
 2022,defense,epa_rush,Oklahoma,0.10691079250636268,382
@@ -2250,6 +2330,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Oklahoma State,0.03359173126614987,387
 2022,offense,turnover,Oklahoma State,0.031413612565445025,764
 2022,offense,stuffed,Oklahoma State,0.1745152354570637,361
+2022,offense,scoring,Oklahoma State,0.3783783783783784,148
 2022,defense,success,Oklahoma State,0.4238156209987196,781
 2022,defense,explosive,Oklahoma State,0.12804097311139565,781
 2022,defense,epa_rush,Oklahoma State,0.009452137862046048,351
@@ -2278,6 +2359,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Old Dominion,0.02346041055718475,341
 2022,offense,turnover,Old Dominion,0.023411371237458192,598
 2022,offense,stuffed,Old Dominion,0.1762114537444934,227
+2022,offense,scoring,Old Dominion,0.2540983606557377,122
 2022,defense,success,Old Dominion,0.4648786717752235,783
 2022,defense,explosive,Old Dominion,0.13282247765006386,783
 2022,defense,epa_rush,Old Dominion,-0.06546487048020289,447
@@ -2306,6 +2388,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Ole Miss,0.029197080291970802,274
 2022,offense,turnover,Ole Miss,0.028,750
 2022,offense,stuffed,Ole Miss,0.19098712446351931,466
+2022,offense,scoring,Ole Miss,0.45454545454545453,121
 2022,defense,success,Ole Miss,0.4671328671328671,715
 2022,defense,explosive,Ole Miss,0.1076923076923077,715
 2022,defense,epa_rush,Ole Miss,0.0416724834119381,361
@@ -2334,6 +2417,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Oregon,0.024539877300613498,326
 2022,offense,turnover,Oregon,0.016238159675236806,739
 2022,offense,stuffed,Oregon,0.1386861313868613,411
+2022,offense,scoring,Oregon,0.5727272727272728,110
 2022,defense,success,Oregon,0.4900763358778626,655
 2022,defense,explosive,Oregon,0.09770992366412214,655
 2022,defense,epa_rush,Oregon,-0.019120220696768612,261
@@ -2362,6 +2446,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Oregon State,0.04961832061068702,262
 2022,offense,turnover,Oregon State,0.03363914373088685,654
 2022,offense,stuffed,Oregon State,0.185378590078329,383
+2022,offense,scoring,Oregon State,0.39655172413793105,116
 2022,defense,success,Oregon State,0.425,640
 2022,defense,explosive,Oregon State,0.1234375,640
 2022,defense,epa_rush,Oregon State,0.01370377971139337,259
@@ -2390,6 +2475,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Penn State,0.020710059171597635,338
 2022,offense,turnover,Penn State,0.022408963585434174,714
 2022,offense,stuffed,Penn State,0.1763085399449036,363
+2022,offense,scoring,Penn State,0.4153846153846154,130
 2022,defense,success,Penn State,0.41304347826086957,690
 2022,defense,explosive,Penn State,0.12173913043478261,690
 2022,defense,epa_rush,Penn State,-0.06976029291622325,302
@@ -2418,6 +2504,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Pittsburgh,0.02821316614420063,319
 2022,offense,turnover,Pittsburgh,0.03183023872679045,754
 2022,offense,stuffed,Pittsburgh,0.1718377088305489,419
+2022,offense,scoring,Pittsburgh,0.3475177304964539,141
 2022,defense,success,Pittsburgh,0.37926136363636365,704
 2022,defense,explosive,Pittsburgh,0.11505681818181818,704
 2022,defense,epa_rush,Pittsburgh,-0.09263759797132011,290
@@ -2446,6 +2533,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Purdue,0.0297029702970297,404
 2022,offense,turnover,Purdue,0.024,750
 2022,offense,stuffed,Purdue,0.17272727272727273,330
+2022,offense,scoring,Purdue,0.3488372093023256,129
 2022,defense,success,Purdue,0.4068627450980392,612
 2022,defense,explosive,Purdue,0.10130718954248366,612
 2022,defense,epa_rush,Purdue,-0.130073831898475,302
@@ -2474,6 +2562,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Rice,0.050156739811912224,319
 2022,offense,turnover,Rice,0.04090909090909091,660
 2022,offense,stuffed,Rice,0.11912225705329153,319
+2022,offense,scoring,Rice,0.358974358974359,117
 2022,defense,success,Rice,0.4777397260273973,584
 2022,defense,explosive,Rice,0.1643835616438356,584
 2022,defense,epa_rush,Rice,0.04393900654111312,294
@@ -2502,6 +2591,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Rutgers,0.043795620437956206,274
 2022,offense,turnover,Rutgers,0.025196850393700787,635
 2022,offense,stuffed,Rutgers,0.14739884393063585,346
+2022,offense,scoring,Rutgers,0.2682926829268293,123
 2022,defense,success,Rutgers,0.42272727272727273,660
 2022,defense,explosive,Rutgers,0.1,660
 2022,defense,epa_rush,Rutgers,0.028825905638557848,345
@@ -2530,6 +2620,7 @@ season,unit,metric,team,value,n
 2022,offense,int,SMU,0.02304147465437788,434
 2022,offense,turnover,SMU,0.029797377830750895,839
 2022,offense,stuffed,SMU,0.1421188630490956,387
+2022,offense,scoring,SMU,0.48226950354609927,141
 2022,defense,success,SMU,0.45875,800
 2022,defense,explosive,SMU,0.13875,800
 2022,defense,epa_rush,SMU,0.19715713963878584,431
@@ -2558,6 +2649,7 @@ season,unit,metric,team,value,n
 2022,offense,int,San Diego State,0.0311284046692607,257
 2022,offense,turnover,San Diego State,0.02821316614420063,638
 2022,offense,stuffed,San Diego State,0.19834710743801653,363
+2022,offense,scoring,San Diego State,0.3170731707317073,123
 2022,defense,success,San Diego State,0.43174603174603177,630
 2022,defense,explosive,San Diego State,0.10158730158730159,630
 2022,defense,epa_rush,San Diego State,-0.09426178901776852,261
@@ -2586,6 +2678,7 @@ season,unit,metric,team,value,n
 2022,offense,int,San José State,0.009202453987730062,326
 2022,offense,turnover,San José State,0.005253940455341506,571
 2022,offense,stuffed,San José State,0.2112676056338028,213
+2022,offense,scoring,San José State,0.38235294117647056,102
 2022,defense,success,San José State,0.4176991150442478,565
 2022,defense,explosive,San José State,0.11150442477876106,565
 2022,defense,epa_rush,San José State,-0.07211485961875244,294
@@ -2614,6 +2707,7 @@ season,unit,metric,team,value,n
 2022,offense,int,South Alabama,0.020588235294117647,340
 2022,offense,turnover,South Alabama,0.0163265306122449,735
 2022,offense,stuffed,South Alabama,0.13527851458885942,377
+2022,offense,scoring,South Alabama,0.4112903225806452,124
 2022,defense,success,South Alabama,0.3886255924170616,633
 2022,defense,explosive,South Alabama,0.09636650868878358,633
 2022,defense,epa_rush,South Alabama,-0.10689428557497578,260
@@ -2642,6 +2736,7 @@ season,unit,metric,team,value,n
 2022,offense,int,South Carolina,0.037800687285223365,291
 2022,offense,turnover,South Carolina,0.048013245033112585,604
 2022,offense,stuffed,South Carolina,0.14383561643835616,292
+2022,offense,scoring,South Carolina,0.3548387096774194,124
 2022,defense,success,South Carolina,0.49711815561959655,694
 2022,defense,explosive,South Carolina,0.11239193083573487,694
 2022,defense,epa_rush,South Carolina,0.12018597854991099,389
@@ -2670,6 +2765,7 @@ season,unit,metric,team,value,n
 2022,offense,int,South Florida,0.02888086642599278,277
 2022,offense,turnover,South Florida,0.03296703296703297,637
 2022,offense,stuffed,South Florida,0.10315186246418338,349
+2022,offense,scoring,South Florida,0.3559322033898305,118
 2022,defense,success,South Florida,0.5233236151603499,686
 2022,defense,explosive,South Florida,0.16034985422740525,686
 2022,defense,epa_rush,South Florida,0.2463946344151305,369
@@ -2698,6 +2794,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Southern Mississippi,0.050359712230215826,278
 2022,offense,turnover,Southern Mississippi,0.03599374021909233,639
 2022,offense,stuffed,Southern Mississippi,0.21921921921921922,333
+2022,offense,scoring,Southern Mississippi,0.2878787878787879,132
 2022,defense,success,Southern Mississippi,0.40772532188841204,699
 2022,defense,explosive,Southern Mississippi,0.13447782546494993,699
 2022,defense,epa_rush,Southern Mississippi,-0.041419244998257804,352
@@ -2726,6 +2823,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Stanford,0.019662921348314606,356
 2022,offense,turnover,Stanford,0.03106508875739645,676
 2022,offense,stuffed,Stanford,0.1993006993006993,286
+2022,offense,scoring,Stanford,0.3114754098360656,122
 2022,defense,success,Stanford,0.48348348348348347,666
 2022,defense,explosive,Stanford,0.15915915915915915,666
 2022,defense,epa_rush,Stanford,0.22644753310989582,349
@@ -2754,6 +2852,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Syracuse,0.030837004405286344,227
 2022,offense,turnover,Syracuse,0.02099236641221374,524
 2022,offense,stuffed,Syracuse,0.17037037037037037,270
+2022,offense,scoring,Syracuse,0.411214953271028,107
 2022,defense,success,Syracuse,0.4800693240901213,577
 2022,defense,explosive,Syracuse,0.10051993067590988,577
 2022,defense,epa_rush,Syracuse,0.0533577793727614,336
@@ -2782,6 +2881,7 @@ season,unit,metric,team,value,n
 2022,offense,int,TCU,0.008928571428571428,336
 2022,offense,turnover,TCU,0.011936339522546418,754
 2022,offense,stuffed,TCU,0.16455696202531644,395
+2022,offense,scoring,TCU,0.4855072463768116,138
 2022,defense,success,TCU,0.4247104247104247,777
 2022,defense,explosive,TCU,0.13127413127413126,777
 2022,defense,epa_rush,TCU,-0.0058372358748051585,374
@@ -2810,6 +2910,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Temple,0.02046783625730994,342
 2022,offense,turnover,Temple,0.03257328990228013,614
 2022,offense,stuffed,Temple,0.20599250936329588,267
+2022,offense,scoring,Temple,0.2831858407079646,113
 2022,defense,success,Temple,0.45840130505709625,613
 2022,defense,explosive,Temple,0.12398042414355628,613
 2022,defense,epa_rush,Temple,0.0565327468432993,330
@@ -2838,6 +2939,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Tennessee,0.009316770186335404,322
 2022,offense,turnover,Tennessee,0.01871657754010695,748
 2022,offense,stuffed,Tennessee,0.12655086848635236,403
+2022,offense,scoring,Tennessee,0.5905511811023622,127
 2022,defense,success,Tennessee,0.4349593495934959,738
 2022,defense,explosive,Tennessee,0.10298102981029811,738
 2022,defense,epa_rush,Tennessee,-0.17320389320371035,308
@@ -2866,6 +2968,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Texas,0.02364864864864865,296
 2022,offense,turnover,Texas,0.018151815181518153,606
 2022,offense,stuffed,Texas,0.17785234899328858,298
+2022,offense,scoring,Texas,0.42342342342342343,111
 2022,defense,success,Texas,0.4260089686098655,669
 2022,defense,explosive,Texas,0.10164424514200299,669
 2022,defense,epa_rush,Texas,-0.07384237656933454,305
@@ -2894,6 +2997,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Texas A&M,0.01871657754010695,374
 2022,offense,turnover,Texas A&M,0.030390738060781478,691
 2022,offense,stuffed,Texas A&M,0.2054794520547945,292
+2022,offense,scoring,Texas A&M,0.29411764705882354,136
 2022,defense,success,Texas A&M,0.4144144144144144,777
 2022,defense,explosive,Texas A&M,0.1377091377091377,777
 2022,defense,epa_rush,Texas A&M,-0.006666104731307403,468
@@ -2922,6 +3026,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Texas State,0.021806853582554516,321
 2022,offense,turnover,Texas State,0.018518518518518517,594
 2022,offense,stuffed,Texas State,0.13229571984435798,257
+2022,offense,scoring,Texas State,0.2956521739130435,115
 2022,defense,success,Texas State,0.4410828025477707,628
 2022,defense,explosive,Texas State,0.09554140127388536,628
 2022,defense,epa_rush,Texas State,-0.15735952846718737,281
@@ -2950,6 +3055,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Texas Tech,0.03282275711159737,457
 2022,offense,turnover,Texas Tech,0.029411764705882353,850
 2022,offense,stuffed,Texas Tech,0.15877437325905291,359
+2022,offense,scoring,Texas Tech,0.4172661870503597,139
 2022,defense,success,Texas Tech,0.41354466858789624,694
 2022,defense,explosive,Texas Tech,0.1340057636887608,694
 2022,defense,epa_rush,Texas Tech,0.007431228437857439,361
@@ -2978,6 +3084,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Toledo,0.03103448275862069,290
 2022,offense,turnover,Toledo,0.024709302325581394,688
 2022,offense,stuffed,Toledo,0.1763157894736842,380
+2022,offense,scoring,Toledo,0.41605839416058393,137
 2022,defense,success,Toledo,0.4073550212164074,707
 2022,defense,explosive,Toledo,0.11456859971711457,707
 2022,defense,epa_rush,Toledo,-0.001112698759789967,370
@@ -3006,6 +3113,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Troy,0.03519061583577713,341
 2022,offense,turnover,Troy,0.024205748865355523,661
 2022,offense,stuffed,Troy,0.1522491349480969,289
+2022,offense,scoring,Troy,0.3130434782608696,115
 2022,defense,success,Troy,0.4497878359264498,707
 2022,defense,explosive,Troy,0.08628005657708628,707
 2022,defense,epa_rush,Troy,-0.0589099215882578,345
@@ -3034,6 +3142,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Tulane,0.017421602787456445,287
 2022,offense,turnover,Tulane,0.015895953757225433,692
 2022,offense,stuffed,Tulane,0.14921465968586387,382
+2022,offense,scoring,Tulane,0.44166666666666665,120
 2022,defense,success,Tulane,0.45821325648414984,694
 2022,defense,explosive,Tulane,0.08213256484149856,694
 2022,defense,epa_rush,Tulane,0.04144404650950319,352
@@ -3062,6 +3171,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Tulsa,0.026954177897574125,371
 2022,offense,turnover,Tulsa,0.02617801047120419,764
 2022,offense,stuffed,Tulsa,0.1388101983002833,353
+2022,offense,scoring,Tulsa,0.3972602739726027,146
 2022,defense,success,Tulsa,0.4318766066838046,778
 2022,defense,explosive,Tulsa,0.13496143958868895,778
 2022,defense,epa_rush,Tulsa,0.028549480363245817,470
@@ -3090,6 +3200,7 @@ season,unit,metric,team,value,n
 2022,offense,int,UAB,0.024509803921568627,204
 2022,offense,turnover,UAB,0.024305555555555556,576
 2022,offense,stuffed,UAB,0.13725490196078433,357
+2022,offense,scoring,UAB,0.4563106796116505,103
 2022,defense,success,UAB,0.4451718494271686,611
 2022,defense,explosive,UAB,0.09983633387888707,611
 2022,defense,epa_rush,UAB,0.06416597439648208,308
@@ -3118,6 +3229,7 @@ season,unit,metric,team,value,n
 2022,offense,int,UCF,0.026143790849673203,306
 2022,offense,turnover,UCF,0.020380434782608696,736
 2022,offense,stuffed,UCF,0.14180929095354522,409
+2022,offense,scoring,UCF,0.4358974358974359,117
 2022,defense,success,UCF,0.436046511627907,688
 2022,defense,explosive,UCF,0.11627906976744186,688
 2022,defense,epa_rush,UCF,-0.06733040176286682,323
@@ -3146,6 +3258,7 @@ season,unit,metric,team,value,n
 2022,offense,int,UCLA,0.018404907975460124,326
 2022,offense,turnover,UCLA,0.02109704641350211,711
 2022,offense,stuffed,UCLA,0.11859838274932614,371
+2022,offense,scoring,UCLA,0.5663716814159292,113
 2022,defense,success,UCLA,0.48735955056179775,712
 2022,defense,explosive,UCLA,0.11095505617977527,712
 2022,defense,epa_rush,UCLA,0.02578285863588952,318
@@ -3174,6 +3287,7 @@ season,unit,metric,team,value,n
 2022,offense,int,UMass,0.0371900826446281,242
 2022,offense,turnover,UMass,0.02962962962962963,675
 2022,offense,stuffed,UMass,0.15458937198067632,414
+2022,offense,scoring,UMass,0.19047619047619047,126
 2022,defense,success,UMass,0.41423948220064727,618
 2022,defense,explosive,UMass,0.15210355987055016,618
 2022,defense,epa_rush,UMass,0.039113755362785566,356
@@ -3202,6 +3316,7 @@ season,unit,metric,team,value,n
 2022,offense,int,UNLV,0.022123893805309734,226
 2022,offense,turnover,UNLV,0.02736842105263158,475
 2022,offense,stuffed,UNLV,0.13793103448275862,232
+2022,offense,scoring,UNLV,0.3146067415730337,89
 2022,defense,success,UNLV,0.5185909980430529,511
 2022,defense,explosive,UNLV,0.13111545988258316,511
 2022,defense,epa_rush,UNLV,0.08556365681971032,275
@@ -3230,6 +3345,7 @@ season,unit,metric,team,value,n
 2022,offense,int,USC,0.0027624309392265192,362
 2022,offense,turnover,USC,0.00995732574679943,703
 2022,offense,stuffed,USC,0.1393188854489164,323
+2022,offense,scoring,USC,0.5833333333333334,108
 2022,defense,success,USC,0.49321266968325794,663
 2022,defense,explosive,USC,0.1282051282051282,663
 2022,defense,epa_rush,USC,0.19866023701618737,283
@@ -3258,6 +3374,7 @@ season,unit,metric,team,value,n
 2022,offense,int,UT San Antonio,0.019886363636363636,352
 2022,offense,turnover,UT San Antonio,0.020689655172413793,725
 2022,offense,stuffed,UT San Antonio,0.10893854748603352,358
+2022,offense,scoring,UT San Antonio,0.4715447154471545,123
 2022,defense,success,UT San Antonio,0.39714285714285713,700
 2022,defense,explosive,UT San Antonio,0.10142857142857142,700
 2022,defense,epa_rush,UT San Antonio,-0.03423874490574682,316
@@ -3286,6 +3403,7 @@ season,unit,metric,team,value,n
 2022,offense,int,UTEP,0.03254437869822485,338
 2022,offense,turnover,UTEP,0.029197080291970802,685
 2022,offense,stuffed,UTEP,0.1165644171779141,326
+2022,offense,scoring,UTEP,0.3620689655172414,116
 2022,defense,success,UTEP,0.45,620
 2022,defense,explosive,UTEP,0.1435483870967742,620
 2022,defense,epa_rush,UTEP,-0.03843758047968246,327
@@ -3314,6 +3432,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Utah,0.013333333333333334,300
 2022,offense,turnover,Utah,0.017518248175182483,685
 2022,offense,stuffed,Utah,0.15079365079365079,378
+2022,offense,scoring,Utah,0.5092592592592593,108
 2022,defense,success,Utah,0.4203935599284436,559
 2022,defense,explosive,Utah,0.14311270125223613,559
 2022,defense,epa_rush,Utah,0.05353764560754069,252
@@ -3342,6 +3461,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Utah State,0.03125,256
 2022,offense,turnover,Utah State,0.0234375,640
 2022,offense,stuffed,Utah State,0.1763085399449036,363
+2022,offense,scoring,Utah State,0.26666666666666666,120
 2022,defense,success,Utah State,0.42543171114599687,637
 2022,defense,explosive,Utah State,0.14442700156985872,637
 2022,defense,epa_rush,Utah State,0.1137657640331239,362
@@ -3370,6 +3490,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Vanderbilt,0.019543973941368076,307
 2022,offense,turnover,Vanderbilt,0.027338129496402876,695
 2022,offense,stuffed,Vanderbilt,0.15119363395225463,377
+2022,offense,scoring,Vanderbilt,0.3161764705882353,136
 2022,defense,success,Vanderbilt,0.4869684499314129,729
 2022,defense,explosive,Vanderbilt,0.13717421124828533,729
 2022,defense,epa_rush,Vanderbilt,0.01672801304273395,342
@@ -3398,6 +3519,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Virginia,0.03426791277258567,321
 2022,offense,turnover,Virginia,0.0330188679245283,636
 2022,offense,stuffed,Virginia,0.14184397163120568,282
+2022,offense,scoring,Virginia,0.25806451612903225,124
 2022,defense,success,Virginia,0.44935805991440797,701
 2022,defense,explosive,Virginia,0.09415121255349501,701
 2022,defense,epa_rush,Virginia,-0.10134985874528836,362
@@ -3426,6 +3548,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Virginia Tech,0.02631578947368421,342
 2022,offense,turnover,Virginia Tech,0.02109704641350211,711
 2022,offense,stuffed,Virginia Tech,0.16224188790560473,339
+2022,offense,scoring,Virginia Tech,0.2323943661971831,142
 2022,defense,success,Virginia Tech,0.4011220196353436,713
 2022,defense,explosive,Virginia Tech,0.13604488078541374,713
 2022,defense,epa_rush,Virginia Tech,-0.0002179894361833737,328
@@ -3454,6 +3577,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Wake Forest,0.03551912568306011,366
 2022,offense,turnover,Wake Forest,0.029177718832891247,754
 2022,offense,stuffed,Wake Forest,0.19273743016759776,358
+2022,offense,scoring,Wake Forest,0.4453125,128
 2022,defense,success,Wake Forest,0.45041322314049587,726
 2022,defense,explosive,Wake Forest,0.11707988980716254,726
 2022,defense,epa_rush,Wake Forest,-0.048360871297967754,350
@@ -3482,6 +3606,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Washington,0.0136986301369863,438
 2022,offense,turnover,Washington,0.016216216216216217,740
 2022,offense,stuffed,Washington,0.1423728813559322,295
+2022,offense,scoring,Washington,0.5871559633027523,109
 2022,defense,success,Washington,0.4984709480122324,654
 2022,defense,explosive,Washington,0.12844036697247707,654
 2022,defense,epa_rush,Washington,0.07007370954710465,331
@@ -3510,6 +3635,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Washington State,0.017142857142857144,350
 2022,offense,turnover,Washington State,0.018803418803418803,585
 2022,offense,stuffed,Washington State,0.21153846153846154,208
+2022,offense,scoring,Washington State,0.3486238532110092,109
 2022,defense,success,Washington State,0.4278688524590164,610
 2022,defense,explosive,Washington State,0.12459016393442623,610
 2022,defense,epa_rush,Washington State,-0.071248055659441,280
@@ -3538,6 +3664,7 @@ season,unit,metric,team,value,n
 2022,offense,int,West Virginia,0.020887728459530026,383
 2022,offense,turnover,West Virginia,0.022636484687083888,751
 2022,offense,stuffed,West Virginia,0.17563739376770537,353
+2022,offense,scoring,West Virginia,0.44144144144144143,111
 2022,defense,success,West Virginia,0.4675716440422323,663
 2022,defense,explosive,West Virginia,0.13725490196078433,663
 2022,defense,epa_rush,West Virginia,0.028697486916946614,325
@@ -3566,6 +3693,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Western Kentucky,0.017241379310344827,406
 2022,offense,turnover,Western Kentucky,0.02014388489208633,695
 2022,offense,stuffed,Western Kentucky,0.1392857142857143,280
+2022,offense,scoring,Western Kentucky,0.45901639344262296,122
 2022,defense,success,Western Kentucky,0.4422809457579972,719
 2022,defense,explosive,Western Kentucky,0.09318497913769123,719
 2022,defense,epa_rush,Western Kentucky,-0.017549937676500416,349
@@ -3594,6 +3722,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Western Michigan,0.051194539249146756,293
 2022,offense,turnover,Western Michigan,0.04035874439461883,669
 2022,offense,stuffed,Western Michigan,0.1495601173020528,341
+2022,offense,scoring,Western Michigan,0.25,136
 2022,defense,success,Western Michigan,0.4892638036809816,652
 2022,defense,explosive,Western Michigan,0.13650306748466257,652
 2022,defense,epa_rush,Western Michigan,-0.034461735573765834,349
@@ -3622,6 +3751,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Wisconsin,0.03862660944206009,233
 2022,offense,turnover,Wisconsin,0.019834710743801654,605
 2022,offense,stuffed,Wisconsin,0.14857142857142858,350
+2022,offense,scoring,Wisconsin,0.375,120
 2022,defense,success,Wisconsin,0.40217391304347827,644
 2022,defense,explosive,Wisconsin,0.09782608695652174,644
 2022,defense,epa_rush,Wisconsin,-0.13309029887870266,328
@@ -3650,6 +3780,7 @@ season,unit,metric,team,value,n
 2022,offense,int,Wyoming,0.03463203463203463,231
 2022,offense,turnover,Wyoming,0.024549918166939442,611
 2022,offense,stuffed,Wyoming,0.1557377049180328,366
+2022,offense,scoring,Wyoming,0.3360655737704918,122
 2022,defense,success,Wyoming,0.4318840579710145,690
 2022,defense,explosive,Wyoming,0.11159420289855072,690
 2022,defense,epa_rush,Wyoming,0.05813384161296161,326

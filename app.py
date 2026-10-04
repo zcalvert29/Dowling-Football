@@ -131,14 +131,15 @@ def dchs_self_scout():
         bd.render_sequencing(df, _week_games(), v.TEAM, "What DCHS calls after...")
 
 
-def dchs_red_zone():
-    page_header("DCHS Red Zone")
-    off, deff = st.tabs(["DCHS offense", "DCHS defense"])
-    with off:
-        bd.render_red_zone(df, _week_games(), v.TEAM, "offense", "DCHS offense", good_high=True, key="rz_o")
-    with deff:
-        bd.render_red_zone(df, _week_games(), v.TEAM, "defense", "Opponents vs DCHS defense", good_high=False,
-                           key="rz_d")
+def dchs_o_red_zone():
+    page_header("DCHS O Red Zone")
+    bd.render_red_zone(df, _week_games(), v.TEAM, "offense", "DCHS offense", good_high=True, key="rz_o")
+
+
+def dchs_d_red_zone():
+    page_header("DCHS D Red Zone")
+    bd.render_red_zone(df, _week_games(), v.TEAM, "defense", "Opponents vs DCHS defense", good_high=False,
+                       key="rz_d")
 
 
 def _week_games():
@@ -155,7 +156,7 @@ def dchs_d_overview():
     v.render_d_3rd_downs(df_any_down)
     v.render_d_vs_formation(df, table=forms)
     v.render_usage_scatter(forms, "Opponent formations vs DCHS D: EPA vs success", good_high=False,
-                           noun="Formation")
+                           noun="Formation", min_plays=10)
 
 
 def dchs_d_run_game():
@@ -187,6 +188,8 @@ def scout_opposing_offense():
         v.render_opp_tendencies(df, opponent)
         v.render_opp_3rd_downs(df_any_down, opponent)
         v.render_opp_4th_downs(df_any_down, opponent)
+        ins.render_down_calls(df_any_down, opponent, 3)
+        ins.render_down_calls(df_any_down, opponent, 4)
         ins.render_best_plays(df, opponent)
     with tree:
         bd.render_tendency_tree(df, opponent, f"{opponent} formation tree", key="tree_opp")
@@ -198,8 +201,10 @@ def scout_opposing_offense():
         bd.render_field_position(df, _week_games(), opponent, f"{opponent} offense by field position")
     with run_game:
         v.render_run_gaps(df, "offense", opponent, f"{opponent} O Run Gaps", good_high=False)
+        v.render_opp_play_calls(df, opponent, "Run")
     with pass_game:
         v.render_pass_zones(df, "offense", opponent, f"{opponent} O Pass Zones", key="pz_opp_o", good_high=False)
+        v.render_opp_play_calls(df, opponent, "Pass")
     with red_zone:
         bd.render_red_zone(df, _week_games(), opponent, "offense", f"{opponent} offense", good_high=False,
                            key="rz_opp")
@@ -219,9 +224,12 @@ def team_profiles():
 
 def scouting_report():
     page_header("Scouting Report", show_definitions=False)
+    st.subheader("Team profiles")
+    profiles.render_profiles_page(df, _week_games(), opponent)
+    st.divider()
     qol.notes_box("opponent", opponent, opponent)
     html = ins.build_report_html(df, df_any_down, opponent, " · ".join(active_filter_chips()),
-                                 notes=qol.latest_note("opponent", opponent))
+                                 notes=qol.latest_note("opponent", opponent), df_games=_week_games())
     st.download_button("Download printable report", html, file_name=f"{opponent}_scouting_report.html",
                        mime="text/html", type="primary")
     st.caption("Opens in any browser; use Print → Save as PDF for the binder.")
@@ -233,32 +241,56 @@ def scouting_report():
         v.render_pass_zones(df, "offense", opponent, "Where they throw", key="pz_report", good_high=False)
     forms = v.opp_formations_table(df, opponent)
     v.show_table("Formations", forms, good_high=False)
+    c1, c2 = st.columns(2)
+    with c1:
+        v.render_opp_play_calls(df, opponent, "Run")
+    with c2:
+        v.render_opp_play_calls(df, opponent, "Pass")
     ins.render_best_plays(df, opponent)
 
 
 # ---- Pages: game review --------------------------------------------------------
-def _game_picker(allow_all: bool) -> str | None:
-    options = ins.games(df_all)[::-1]  # newest first
-    if allow_all:
-        options = options + ["__all__"]
-    pick = st.selectbox("Game", options, key="g_game_all" if allow_all else "g_game",
-                        format_func=lambda g: "All games" if g == "__all__" else ins.game_label(df_all, g))
-    return None if pick == "__all__" else pick
+GAME_KINDS = ["Dowling games", "Scout games"]
+
+
+def _game_picker(allow_all: bool) -> tuple[str | None, str]:
+    """
+    Dowling games or scout film first, then the game. Returns (game_id or None for all Dowling games, team): the
+    team is the side the page is told from, Dowling for Dowling games and the first team in the game_id for scout
+    film. Scout games are labeled with both teams ("W1 Johnston vs Waukee").
+    """
+    kind = st.segmented_control("Games", GAME_KINDS, key="g_kind", default=GAME_KINDS[0]) or GAME_KINDS[0]
+    if kind == GAME_KINDS[0]:
+        options = ins.games(ins.dowling_only(df_all))[::-1]  # newest first
+        if allow_all:
+            options = options + ["__all__"]
+        pick = st.selectbox("Game", options, key="g_game_all" if allow_all else "g_game",
+                            format_func=lambda g: "All Dowling games" if g == "__all__" else ins.game_label(df_all, g))
+        return (None if pick == "__all__" else pick), v.TEAM
+    options = ins.games(ins.scout_only(df_all))[::-1]
+    if not options:
+        st.info("No scout games loaded yet.")
+        st.stop()
+    pick = st.selectbox("Game", options, key="g_game_scout", format_func=lambda g: ins.scout_game_label(df_all, g))
+    return pick, ins.game_teams(pick)[0]
 
 
 def game_recap():
     page_header("Game Recap", show_filters=False)
     c1, c2 = st.columns([2, 3])
     with c1:
-        gid = _game_picker(allow_all=True)
+        gid, team = _game_picker(allow_all=True)
     with c2:
         half = st.radio("Show", ["Full game", "First half", "Second half"], horizontal=True, key="g_half")
     if gid is None:
-        st.caption("All games: drive charts and the scoreboard need a single game, so this shows the "
+        st.caption("All Dowling games: drive charts and the scoreboard need a single game, so this shows the "
                    "head-to-head numbers and play logs for the whole season.")
-    if gid is not None:
-        qol.notes_box("game", gid, ins.game_label(df_all, gid))
-    ins.render_game_recap(df_all, gid, half)
+        ins.render_game_recap(ins.dowling_only(df_all), None, half)
+        return
+    scout = team != v.TEAM
+    label = ins.scout_game_label(df_all, gid) if scout else ins.game_label(df_all, gid)
+    qol.notes_box("game", gid, label)
+    ins.render_game_recap(df_all, gid, half, team=team)
 
 
 def season_drives_page():
@@ -269,10 +301,20 @@ def season_drives_page():
 
 def win_prob_fourth_downs():
     page_header("Win Probability & 4th Downs", show_definitions=False, show_filters=False)
-    gid = _game_picker(allow_all=True)
-    if gid is not None:
-        ins.render_win_probability(df_all[df_all["game_id"] == gid], ins.opponent_of(gid))
-    ins.render_fourth_down_review(df_all if gid is None else df_all[df_all["game_id"] == gid])
+    gid, team = _game_picker(allow_all=True)
+    if gid is None:
+        ins.render_fourth_down_review(ins.dowling_only(df_all))
+        return
+    g = df_all[df_all["game_id"] == gid]
+    other = ins.other_team(g, team) or ins.game_teams(gid)[1]
+    ins.render_win_probability(g, other, team=team)
+    if team == v.TEAM:
+        ins.render_fourth_down_review(g)
+        return
+    # Scout film: both teams' 4th downs, one display each.
+    for side in (team, other):
+        st.subheader(f"{side} 4th downs")
+        ins.render_fourth_down_review(g, team=side)
 
 
 # ---- Pages: special teams -------------------------------------------------------
@@ -324,12 +366,13 @@ FILTERED_PAGES = {
         st.Page(dchs_o_pass_game, title="DCHS O Pass Game", url_path="dchs-o-pass-game"),
         st.Page(dchs_o_weekly_trends, title="DCHS O Weekly Trends", url_path="dchs-o-weekly-trends"),
         st.Page(dchs_self_scout, title="DCHS Self-Scout", url_path="dchs-self-scout"),
-        st.Page(dchs_red_zone, title="DCHS Red Zone", url_path="dchs-red-zone"),
+        st.Page(dchs_o_red_zone, title="DCHS O Red Zone", url_path="dchs-red-zone"),
     ],
     "DCHS Defense": [
         st.Page(dchs_d_overview, title="DCHS D Overview", url_path="dchs-d-overview"),
         st.Page(dchs_d_run_game, title="DCHS D Run Game", url_path="dchs-d-run-game"),
         st.Page(dchs_d_pass_game, title="DCHS D Pass Game", url_path="dchs-d-pass-game"),
+        st.Page(dchs_d_red_zone, title="DCHS D Red Zone", url_path="dchs-d-red-zone"),
     ],
     "Special Teams": [
         st.Page(special_teams_page, title="Special Teams", url_path="special-teams"),

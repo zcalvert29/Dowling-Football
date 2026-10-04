@@ -453,6 +453,11 @@ RZ_RESULTS = [("Touchdown", "#1D9E75"), ("FG Made", "#E8B923"), ("FG Missed", "#
               ("End of Game", "#888780")]
 
 
+# Red zone tables: no explosive rate (not what matters this close to the goal), and small samples aren't grayed
+# out since nearly every red zone row is a small sample.
+RZ_MEASURES = [m for m in v.PLAY_RESULT_MEASURES if m != "Explosive Rate"]
+
+
 def render_red_zone(df: pd.DataFrame, df_games: pd.DataFrame, team: str, side: str, label: str,
                     good_high: bool, key: str) -> None:
     """
@@ -504,17 +509,25 @@ def render_red_zone(df: pd.DataFrame, df_games: pd.DataFrame, team: str, side: s
     fmt = {"Run": "{:.0%}", "Pass": "{:.0%}", "Success Rate": "{:.0%}", "EPA per Play": "{:+.2f}",
            "TD on the play": "{:.0%}"}
     st.dataframe(zt.style.format(fmt), width="stretch")
-    forms = v.crosstab(rz, "OFF FORM", v.PLAY_RESULT_MEASURES, sort_by_count=True)
-    v.show_table("Formations inside the 20", forms, good_high=good_high)
+    forms = v.crosstab(rz, "OFF FORM", RZ_MEASURES, sort_by_count=True)
+    v.show_table("Formations inside the 20", forms, good_high=good_high, gray_low_n=False)
     # Full width, not side by side: half-width tables cut off the Plays column.
-    if rz["OFF PLAY"].notna().mean() >= 0.5:
-        calls = v.crosstab(rz, "OFF PLAY", v.PLAY_RESULT_MEASURES, sort_by_count=True)
-        v.show_table("Play calls inside the 20", calls, good_high=good_high)
-    else:
-        dirs = rz.assign(Direction=rz["PLAY TYPE"].astype(str) + " " +
-                         rz["PLAY DIR"].map({"L": "left", "R": "right"}).fillna("(no dir.)"))
-        v.show_table("Run/pass by direction inside the 20",
-                     v.crosstab(dirs, "Direction", v.PLAY_RESULT_MEASURES, sort_by_count=True), good_high=good_high)
+    by_call = rz["OFF PLAY"].notna().mean() >= 0.5
+    for where, lo, hi in (("between the 11 and 20 yard line", 11, 20), ("inside the 10 yard line", 1, 10)):
+        band = rz[rz["YARDLINE_100"].between(lo, hi)]
+        if by_call:
+            title = f"Play calls {where}"
+            t = v.crosstab(band, "OFF PLAY", RZ_MEASURES, sort_by_count=True)
+        else:
+            title = f"Run/pass by direction {where}"
+            dirs = band.assign(Direction=band["PLAY TYPE"].astype(str) + " " +
+                               band["PLAY DIR"].map({"L": "left", "R": "right"}).fillna("(no dir.)"))
+            t = v.crosstab(dirs, "Direction", RZ_MEASURES, sort_by_count=True)
+        if band.empty:
+            st.markdown(f"**{title}**")
+            st.info("No plays here with the current filters.")
+        else:
+            v.show_table(title, t, good_high=good_high, gray_low_n=False)
     st.caption("Trips use whole drives from the selected weeks; the zone, formation and call tables follow every "
                "sidebar filter. TD on the play = share of snaps that scored right there.")
 
@@ -887,6 +900,163 @@ def _strip_html(s: dict) -> str:
             f'min-width:0">{"".join(cells)}</div>')
 
 
+def _esc(x) -> str:
+    return str(x).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def _fit(text: str, px: float, char_px: float = 6.1) -> str:
+    """Trim text to roughly px wide at 11px type (SVG has no ellipsis)."""
+    n = max(4, int(px / char_px))
+    return text if len(text) <= n else text[: n - 1].rstrip() + "…"
+
+
+def field_svg(s: dict, drives: pd.DataFrame, team: str) -> str:
+    """
+    A football field (team driving left to right). Each field-position zone gets a card in its own part of the
+    field: share of snaps, run/pass split, EPA, success, 3rd-down conversions, and the most common run and pass
+    calls there. Dots under the field are drive starts (gold = the drive scored); the zone where they run the
+    most plays gets a gold outline. Returned as an <img> with an SVG data URI, since st.html strips inline <svg>.
+    """
+    import base64
+
+    W, H = 1000, 486
+    x_own, x_opp = 100.0, 900.0                 # goal lines; end zones are the 80px on either side
+    yd = (x_opp - x_own) / 100                 # px per yard
+    top, bot = 40, 444                         # sideline to sideline
+    X = lambda yards_from_own_goal: x_own + yards_from_own_goal * yd
+    font = 'font-family="Source Sans Pro, Segoe UI, Helvetica, Arial, sans-serif"'
+    white, gold = "#FFFFFF", "#F5D547"
+    run_c, pass_c = "#F0A84B", "#A9A2F5"        # lighter run/pass colors that read on dark green
+    p = [f'<rect x="0" y="0" width="{W}" height="{H}" rx="10" fill="#24572C"/>']
+
+    # Turf, end zones, lines, hashes, numbers
+    for i in range(10):
+        p.append(f'<rect x="{X(i * 10):.1f}" y="{top}" width="{10 * yd:.1f}" height="{bot - top}" '
+                 f'fill="{"#3B8A47" if i % 2 == 0 else "#358041"}"/>')
+    for x, label in ((20, "OWN"), (x_opp, "OPP")):
+        p.append(f'<rect x="{x}" y="{top}" width="80" height="{bot - top}" fill="#2B6634"/>')
+        cx, cy = x + 40, (top + bot) / 2
+        p.append(f'<text x="{cx}" y="{cy}" transform="rotate({-90 if label == "OWN" else 90} {cx} {cy})" '
+                 f'text-anchor="middle" dominant-baseline="central" fill="{white}" fill-opacity=".5" {font} '
+                 f'font-size="24" font-weight="700" letter-spacing="8">{label}</text>')
+    for y5 in range(5, 100, 5):
+        p.append(f'<line x1="{X(y5):.1f}" y1="{top}" x2="{X(y5):.1f}" y2="{bot}" stroke="{white}" '
+                 f'stroke-opacity="{".6" if y5 % 10 == 0 else ".28"}" stroke-width="{1.6 if y5 % 10 == 0 else 1}"/>')
+    for y1 in range(1, 100):
+        if y1 % 5:
+            for hy in (top + (bot - top) * 0.36, top + (bot - top) * 0.64):
+                p.append(f'<line x1="{X(y1):.1f}" y1="{hy - 3:.1f}" x2="{X(y1):.1f}" y2="{hy + 3:.1f}" '
+                         f'stroke="{white}" stroke-opacity=".3"/>')
+    for y10 in range(10, 100, 10):
+        p.append(f'<text x="{X(y10):.1f}" y="{bot - 12}" text-anchor="middle" fill="{white}" fill-opacity=".75" '
+                 f'{font} font-size="17" font-weight="700">{y10 if y10 <= 50 else 100 - y10}</text>')
+    p.append(f'<rect x="20" y="{top}" width="{W - 40}" height="{bot - top}" fill="none" stroke="{white}" '
+             f'stroke-width="2.5"/>')
+    for x in (X(0), X(100)):
+        p.append(f'<line x1="{x:.1f}" y1="{top}" x2="{x:.1f}" y2="{bot}" stroke="{white}" stroke-width="4"/>')
+    for x in (20, 60, 80):                       # zone boundaries, with a gap around the yard number
+        for y_a, y_b in ((top - 4, bot - 34), (bot - 6, bot + 4)):
+            p.append(f'<line x1="{X(x):.1f}" y1="{y_a}" x2="{X(x):.1f}" y2="{y_b}" stroke="{gold}" '
+                     f'stroke-width="2.5" stroke-dasharray="8 6"/>')
+
+    # Zone cards
+    bounds = {"Backed up": (0, 20), "Neutral": (20, 60), "FG range": (60, 80), "Red zone": (80, 100)}
+    busiest = max(s["zones"], key=lambda k: s["zones"][k]["n"]) if s["total"] else None
+    card_top, card_h = top + 10, 362
+    for name, where, *_rest in FP_ZONES:
+        z = s["zones"][name]
+        a, b = bounds[name]
+        x0, x1 = X(a) + 6, X(b) - 6
+        cx, w = (x0 + x1) / 2, x1 - x0
+        y = card_top
+        outline = f' stroke="{gold}" stroke-width="2"' if name == busiest and z["n"] else ""
+        p.append(f'<rect x="{x0:.1f}" y="{y}" width="{w:.1f}" height="{card_h}" rx="8" fill="#0B2410" '
+                 f'fill-opacity=".66"{outline}/>')
+
+        def t(yy, txt, size=11, weight=400, op="1", color=white, anchor="middle", tx=None):
+            p.append(f'<text x="{(cx if tx is None else tx):.1f}" y="{yy:.1f}" text-anchor="{anchor}" fill="{color}" '
+                     f'fill-opacity="{op}" {font} font-size="{size}" font-weight="{weight}">{_esc(txt)}</text>')
+
+        t(y + 20, name, 15, 700)
+        t(y + 36, where, 11, 400, ".75")
+        if name == busiest and z["n"]:
+            t(y + 50, "most snaps", 10, 700, "1", gold)
+        if z["n"] == 0:
+            t(y + 150, "No snaps here", 13, 600, ".85")
+            ds = z["drive_starts"]
+            t(y + 170, f"{ds} drive{'' if ds == 1 else 's'} started", 11, 400, ".75")
+            continue
+        t(y + 80, f"{z['share']:.0%}", 28, 700)
+        if z["n"] < FP_SMALL:
+            t(y + 97, f"{z['n']} plays · small sample", 11, 600, "1", gold)
+        else:
+            t(y + 97, f"of snaps · {z['n']} plays", 11, 400, ".8")
+        bw = min(w - 24, 170)
+        bx, rs = cx - bw / 2, z["run_share"]
+        p.append(f'<rect x="{bx:.1f}" y="{y + 106}" width="{bw * rs:.1f}" height="8" fill="{run_c}"/>'
+                 f'<rect x="{bx + bw * rs:.1f}" y="{y + 106}" width="{bw * (1 - rs):.1f}" height="8" fill="{pass_c}"/>')
+        t(y + 129, f"Run {rs:.0%} · Pass {1 - rs:.0%}", 11, 400, ".9")
+        pill_c = "#1D9E75" if z["epa"] >= 0 else "#E24B4A"
+        p.append(f'<rect x="{cx - 44:.1f}" y="{y + 138}" width="88" height="22" rx="11" fill="{pill_c}"/>')
+        t(y + 154, f"EPA {z['epa']:+.2f}", 12, 700)
+        tp, tn = z["third_pass"]
+        third = f" · 3rd {z['third_conv']}/{tn}" if tn else ""
+        t(y + 177, f"Success {z['success']:.0%}{third}", 11, 400, ".9")
+
+        # Common calls: stacked in narrow zones, side by side in the wide neutral zone
+        p.append(f'<line x1="{x0 + 8:.1f}" y1="{y + 190}" x2="{x1 - 8:.1f}" y2="{y + 190}" stroke="{white}" '
+                 f'stroke-opacity=".2"/>')
+        tagged = z.get("calls_tagged", False)
+        wide = w > 250
+        blocks = (("Run", run_c, "runs", "by direction"), ("Pass", pass_c, "passes", "by zone"))
+        for i, (kind, color, plural, sub) in enumerate(blocks):
+            if wide:
+                col_w = (w - 30) / 2
+                lx, room, yy = x0 + 12 + i * (col_w + 10), col_w, y + 208
+            else:
+                lx, room, yy = x0 + 10, w - 20, y + 208 + i * 70
+            items = (z.get(f"calls_{kind}") or [])[:3]
+            head = f"Top {plural}" if tagged else f"{plural.capitalize()} {sub}"
+            t(yy, _fit(head, room, 6.6), 11, 700, "1", color, "start", lx)
+            if not items:
+                t(yy + 16, "none", 11, 400, ".55", white, "start", lx)
+            for k, (call, c) in enumerate(items):
+                count = f" ({c})"
+                t(yy + 16 * (k + 1), _fit(str(call), room - 6.1 * len(count)) + count, 11, 400, ".92", white,
+                  "start", lx)
+        ds, sc = z["drive_starts"], z["drive_scores"]
+        t(y + card_h - 10, f"{ds} drive{'' if ds == 1 else 's'} started" + (f", {sc} scored" if ds else ""),
+          11, 400, ".75")
+
+    # Top band: direction + legend. Bottom band: drive starts.
+    p.append(f'<text x="24" y="26" fill="{white}" {font} font-size="14" font-weight="700">{_esc(team)} driving '
+             f'&#8594;</text>')
+    legend = [(run_c, "Run"), (pass_c, "Pass"), (gold, "Drive start, scored"), ("#DDE6DE", "Drive start")]
+    lx = W - 24
+    for color, label in reversed(legend):
+        lx -= 6.2 * len(label) + 30
+        shape = (f'<circle cx="{lx + 5}" cy="21" r="5" fill="{color}"/>' if "Drive" in label else
+                 f'<rect x="{lx}" y="16" width="10" height="10" rx="2" fill="{color}"/>')
+        p.append(shape + f'<text x="{lx + 15}" y="25" fill="{white}" fill-opacity=".85" {font} '
+                         f'font-size="12">{label}</text>')
+    p.append(f'<text x="60" y="{bot + 25}" text-anchor="middle" fill="{white}" fill-opacity=".7" {font} '
+             f'font-size="11">Drive starts</text>')
+    if drives is not None and not drives.empty:
+        stack = {}
+        for _, r in drives.sort_values("start").iterrows():
+            key = int(round(r["start"] / 2))
+            k = stack.get(key, 0)
+            stack[key] = k + 1
+            c = gold if r.get("points", 0) > 0 else "#DDE6DE"
+            p.append(f'<circle cx="{X(min(max(r["start"], 0), 100)):.1f}" cy="{bot + 12 + (k % 3) * 9:.1f}" r="4" '
+                     f'fill="{c}" stroke="#24572C" stroke-width="1"/>')
+    svg = (f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}">'
+           f'{"".join(p)}</svg>')
+    b64 = base64.b64encode(svg.encode("utf-8")).decode("ascii")
+    return (f'<img src="data:image/svg+xml;base64,{b64}" alt="{_esc(team)} offense by field position" '
+            f'style="width:100%;max-width:1150px;height:auto;display:block;margin:4px 0 10px">')
+
+
 def _chip(text: str) -> str:
     return (f'<span style="display:inline-block;font-size:12px;background:rgba(128,128,128,.12);border-radius:6px;'
             f'padding:2px 8px;margin:0 4px 4px 0">{text}</span>')
@@ -972,8 +1142,7 @@ def render_field_position(df: pd.DataFrame, df_games: pd.DataFrame, team: str, t
     n_games = d["game_id"].nunique()
     s = field_position_summary(d, drives)
     st.html(f'<div style="font-size:13px;opacity:.7;margin-bottom:6px">{len(d)} snaps · {s["drives"]} drives · '
-            f'{n_games} game{"" if n_games == 1 else "s"}</div>' + _strip_html(s) + LEGEND.replace(
-                "tell / lean / small sample = how much to trust a 70%+ split", "Strip widths match each zone's yardage"))
+            f'{n_games} game{"" if n_games == 1 else "s"}</div>' + field_svg(s, drives, team))
     reads = field_position_reads(s)
     if reads:
         st.html('<div style="background:rgba(128,128,128,.08);border-radius:8px;padding:10px 14px;font-size:14px;'

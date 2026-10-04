@@ -95,8 +95,14 @@ def load_data(path: str) -> pd.DataFrame:
 
     # Mixed int/str codes (3, 6, "IOWA") -> consistent strings
     df["COVERAGE"] = df["COVERAGE"].map(lambda v: str(v) if pd.notna(v) else None)
-    df["MEN IN BOX"] = df["MEN IN BOX"].astype("Int64")
-    df["DN"] = df["DN"].astype("Int64")
+    # A stray letter in a number column (e.g. "C" typed into MEN IN BOX) becomes blank instead of crashing the app.
+    for col in ("MEN IN BOX", "DN"):
+        num = pd.to_numeric(df[col], errors="coerce")
+        bad = df[col].notna() & num.isna()
+        if bad.any():
+            st.warning(f"{int(bad.sum())} row(s) in {path} have a non-number in {col} "
+                       f"({', '.join(sorted(df.loc[bad, col].astype(str).unique()))}); those cells are treated as blank.")
+        df[col] = num.round().astype("Int64")
 
     # Older curated files won't have 'completion' yet; derive it the same
     # way curate_pbp.py does so the pass-zone visuals still work.
@@ -214,7 +220,7 @@ def crosstab(df: pd.DataFrame, rows, measures, sort_by_count: bool = False) -> p
     return out
 
 
-def style_table(table: pd.DataFrame, good_high: bool = True, overall: dict | None = None):
+def style_table(table: pd.DataFrame, good_high: bool = True, overall: dict | None = None, gray_low_n: bool = True):
     """
     Format a crosstab and color cells green (good for Dowling) or red (bad
     for Dowling) when they're clearly above/below the table's overall
@@ -254,7 +260,7 @@ def style_table(table: pd.DataFrame, good_high: bool = True, overall: dict | Non
         return styles
 
     sty = table.style.format(fmt, na_rep="").apply(color_col, axis=0)
-    if "Plays" in table.columns:
+    if gray_low_n and "Plays" in table.columns:
         low = (table["Plays"] < LOW_N_ROWS).to_numpy()
         sty = sty.apply(
             lambda row: [LOW_N_STYLE if low[table.index.get_loc(row.name)] else "" for _ in row], axis=1
@@ -262,7 +268,8 @@ def style_table(table: pd.DataFrame, good_high: bool = True, overall: dict | Non
     return sty
 
 
-def show_table(title: str, table: pd.DataFrame, good_high: bool = True, caption: str | None = None) -> None:
+def show_table(title: str, table: pd.DataFrame, good_high: bool = True, caption: str | None = None,
+               gray_low_n: bool = True) -> None:
     st.markdown(f"**{title}**")
     overall = table.attrs.get("overall", {})
     if "Plays" in table.columns and MIN_PLAYS > 1:
@@ -271,7 +278,7 @@ def show_table(title: str, table: pd.DataFrame, good_high: bool = True, caption:
         st.info("No plays match the current filters.")
         return
     config = {c: st.column_config.Column(help=METRIC_HELP[c]) for c in table.columns if c in METRIC_HELP}
-    st.dataframe(style_table(table, good_high, overall), width="stretch", column_config=config)
+    st.dataframe(style_table(table, good_high, overall, gray_low_n), width="stretch", column_config=config)
     if caption:
         st.caption(caption)
 
@@ -353,11 +360,15 @@ def render_takeaways(table: pd.DataFrame, noun: str, good_high: bool = True) -> 
             st.caption(sub)
 
 
-def render_usage_scatter(table: pd.DataFrame, title: str, good_high: bool = True, noun: str = "Formation") -> None:
+def render_usage_scatter(table: pd.DataFrame, title: str, good_high: bool = True, noun: str = "Formation",
+                         min_plays: int = 0) -> None:
     """
     Success rate (x) vs EPA per play (y) for each row of a crosstab, dot
     size = plays. Dashed lines mark the averages, splitting the chart into
     four coaching quadrants. Hover any dot for name, EPA, success, plays.
+    min_plays drops rows below that many plays from the chart (the dashed
+    average lines still use every play), so one 2-play outlier can't
+    stretch the axes.
     """
     need = {"Plays", "EPA per Play", "Success Rate"}
     if table.empty or not need <= set(table.columns):
@@ -365,7 +376,14 @@ def render_usage_scatter(table: pd.DataFrame, title: str, good_high: bool = True
     data = table.reset_index()
     data = data.rename(columns={data.columns[0]: noun}).dropna(subset=["EPA per Play", "Success Rate"])
     data[noun] = data[noun].astype(str)
+    hidden = 0
+    if min_plays:
+        hidden = int((data["Plays"] < min_plays).sum())
+        data = data[data["Plays"] >= min_plays]
     if data.empty:
+        if hidden:
+            st.markdown(f"**{title}**")
+            st.info(f"Nothing has {min_plays}+ plays yet with the current filters.")
         return
     overall = table.attrs.get("overall", {})
     avg_epa = overall.get("EPA per Play", data["EPA per Play"].mean())
@@ -430,9 +448,11 @@ def render_usage_scatter(table: pd.DataFrame, title: str, good_high: bool = True
         )
     chart = alt.layer(epa_line, sr_line, *corner_layers, points, labels).properties(height=380)
     st.altair_chart(chart, width="stretch")
+    hidden_txt = (f" {hidden} {noun.lower()}{'' if hidden == 1 else 's'} with fewer than {min_plays} plays "
+                  f"{'is' if hidden == 1 else 'are'} left off the chart (still in the table)." if hidden else "")
     st.caption(f"Dashed lines: average EPA ({avg_epa:+.2f}) and success rate ({avg_sr:.0%}). Bigger dots = more "
                f"plays. Faded dots have fewer than {TAKEAWAY_MIN_PLAYS} plays and only {label_min}+ play rows are "
-               "labeled; hover any dot for the details.")
+               f"labeled; hover any dot for the details.{hidden_txt}")
 
 
 # ---------------------------------------------------------------------------
@@ -881,11 +901,21 @@ def render_run_gaps(df: pd.DataFrame, side: str, team: str, title: str, good_hig
 # Weekly trends (Dowling Catholic offense, all weeks)
 # ---------------------------------------------------------------------------
 def week_labels(df: pd.DataFrame) -> dict:
-    """WEEK -> 'W1 Valley' using the opponent in each week's game_id."""
+    """
+    WEEK -> 'W6 CR Kennedy': Dowling's opponent that week. Weeks with only scout film (no Dowling game) fall back
+    to the first game's second team.
+    """
     labels = {}
-    for week, gid in df.dropna(subset=["WEEK"]).groupby("WEEK")["game_id"].first().items():
-        parts = str(gid).split("_")
-        opp = parts[1] if len(parts) > 1 else ""
+    d = df.dropna(subset=["WEEK"])
+    is_dchs = (d["offense"] == TEAM) | (d["defense"] == TEAM)
+    for week, g in d.groupby("WEEK"):
+        mine = g[is_dchs.loc[g.index]]
+        if len(mine):
+            teams = set(mine["offense"].dropna()) | set(mine["defense"].dropna())
+            opp = next((t for t in sorted(teams) if t != TEAM), "")
+        else:
+            parts = str(g["game_id"].iat[0]).split("_")
+            opp = parts[1] if len(parts) > 1 else ""
         labels[week] = f"W{int(week)} {opp}".strip()
     return labels
 
@@ -897,7 +927,8 @@ def render_weekly_trend(df, col, title, fmt):
     if d.empty:
         st.info("No plays match the current filters.")
         return
-    labels = week_labels(df)
+    # Only weeks Dowling played, labeled with Dowling's opponent (not other teams' scout film from that week).
+    labels = {w: lab for w, lab in week_labels(df).items() if w in set(d["WEEK"].dropna())}
     data = d.groupby(["WEEK", "PLAY TYPE"])[col].mean().rename("value").reset_index()
     data["Week"] = data["WEEK"].map(labels)
     data["Play type"] = data["PLAY TYPE"].map({"Run": "Rush", "Pass": "Pass"})
@@ -1021,14 +1052,39 @@ def render_opp_tendencies(df, opponent):
 def render_opp_3rd_downs(df, opponent):
     d = downs(run_pass(df[df["offense"] == opponent]), [3])
     t = crosstab(d, "Distance", ["Pass Rate", "Rush Rate", "3rd Down Conversion Rate", "3rd Down Conversions", "Plays"])
-    show_table(f"{opponent} Offense 3rd Downs", t, good_high=False)
+    show_table(f"{opponent} Offense 3rd Downs", t, good_high=False, gray_low_n=False)
     return t
 
 
 def render_opp_4th_downs(df, opponent):
     d = downs(run_pass(df[df["offense"] == opponent]), [4])
     t = crosstab(d, "Distance", ["Pass Rate", "Rush Rate", "4th Down Conversion Rate", "Plays"])
-    show_table(f"{opponent} Offense 4th Downs", t, good_high=False)
+    show_table(f"{opponent} Offense 4th Downs", t, good_high=False, gray_low_n=False)
+    return t
+
+
+def opp_play_call_table(df, team, play_type):
+    """Opponent run or pass plays by OFF PLAY (same columns as DCHS Run Scheme / Pass Game Detail)."""
+    d = run_pass(df[df["offense"] == team], [play_type])
+    d = d[d["OFF PLAY"].notna() & (d["RESULT"] != "Penalty")]
+    return crosstab(d, "OFF PLAY", PLAY_RESULT_MEASURES, sort_by_count=True)
+
+
+def render_opp_play_calls(df, team, play_type, chart: bool = True):
+    """Table + EPA-vs-success chart of the opponent's run or pass plays (OFF PLAY only)."""
+    kind = "Run" if play_type == "Run" else "Pass"
+    t = opp_play_call_table(df, team, play_type)
+    base = run_pass(df[df["offense"] == team], [play_type])
+    if t.empty:
+        st.markdown(f"**{team} {kind} Plays**")
+        st.info(f"None of {team}'s {kind.lower()} plays here have an OFF PLAY tag yet." if len(base)
+                else "No plays match the current filters.")
+        return t
+    show_table(f"{team} {kind} Plays", t, good_high=False)
+    tag_note(base, "OFF PLAY", "play call")
+    if chart:
+        render_usage_scatter(t, f"{team} {kind.lower()} plays: EPA vs success", good_high=False,
+                             noun=f"{kind} play")
     return t
 
 

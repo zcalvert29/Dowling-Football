@@ -263,8 +263,14 @@ def _unit_line(d: pd.DataFrame) -> dict:
 
 
 def render_home(df: pd.DataFrame, opponents: list[str], pages: dict) -> None:
+    """
+    df = every game loaded. The "Up next" card reads the opponent's film from any game it's in (that's the
+    point of scouting film); everything about Dowling (last game vs season, tagging checks, data-through date)
+    uses only games Dowling played.
+    """
     st.title("Dowling Scouting Dashboard")
     st.caption(ins.last_updated_text(df))
+    dchs = ins.dowling_only(df)
     default_opp = _secret("next_opponent") or st.session_state.get("f_opp") or (opponents[0] if opponents else None)
     st.session_state.setdefault("f_opp", default_opp if default_opp in opponents else (opponents[0] if opponents else None))
 
@@ -292,17 +298,17 @@ def render_home(df: pd.DataFrame, opponents: list[str], pages: dict) -> None:
     with c2:
         with st.container(border=True):
             st.markdown("**Needs attention**")
-            items = _attention_items(df)
+            items = _attention_items(dchs)
             if not items:
                 st.caption("Nothing flagged.")
             for kind, text in items:
                 st.markdown(f":{'red' if kind == 'danger' else 'orange'}[●] {text}")
             st.page_link(pages["tagging"], label="Tagging coverage", icon=":material/sell:")
 
-    gs = ins.games(df)
+    gs = ins.games(dchs)
     if len(gs) >= 2:
-        last, rest = df[df["game_id"] == gs[-1]], df[df["game_id"] != gs[-1]]
-        st.markdown(f"**Last game vs season average** ({ins.game_label(df, gs[-1])} compared to the other "
+        last, rest = dchs[dchs["game_id"] == gs[-1]], dchs[dchs["game_id"] != gs[-1]]
+        st.markdown(f"**Last game vs season average** ({ins.game_label(dchs, gs[-1])} compared to Dowling's other "
                     f"{len(gs) - 1} games)")
         cols = st.columns(6)
         o_last, o_rest = _unit_line(last[last["offense"] == TEAM]), _unit_line(rest[rest["offense"] == TEAM])

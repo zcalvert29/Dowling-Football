@@ -69,9 +69,53 @@ def game_date_of(game_id: str) -> str:
 
 
 def games(df: pd.DataFrame) -> list[str]:
-    """game_ids in week order."""
-    g = df.dropna(subset=["game_id"]).groupby("game_id")["WEEK"].min().sort_values()
-    return g.index.tolist()
+    """game_ids in week order (game date breaks ties when two games share a week)."""
+    g = df.dropna(subset=["game_id"]).groupby("game_id")["WEEK"].min().reset_index()
+    g["_date"] = ["_".join(str(x).split("_")[2:5]) for x in g["game_id"]]
+    return g.sort_values(["WEEK", "_date"], kind="stable")["game_id"].tolist()
+
+
+def teams_in_game(g: pd.DataFrame) -> list[str]:
+    """The two teams in one game, from who had the ball (game_id order isn't reliable for scout film)."""
+    return sorted(set(g["offense"].dropna()) | set(g["defense"].dropna()))
+
+
+def other_team(g: pd.DataFrame, team: str) -> str | None:
+    rest = [t for t in teams_in_game(g) if t != team]
+    return rest[0] if rest else None
+
+
+def dowling_game_ids(df: pd.DataFrame) -> set:
+    """Games Dowling actually played in (everything else is scout film of other teams)."""
+    return set(df.loc[(df["offense"] == TEAM) | (df["defense"] == TEAM), "game_id"].dropna())
+
+
+def dowling_only(df: pd.DataFrame) -> pd.DataFrame:
+    return df[df["game_id"].isin(dowling_game_ids(df))]
+
+
+def scout_only(df: pd.DataFrame) -> pd.DataFrame:
+    return df[~df["game_id"].isin(dowling_game_ids(df))]
+
+
+def game_teams(game_id: str) -> tuple[str, str]:
+    """(first, second) team from the game_id. The first is the side team_score / opponent_score were kept for."""
+    parts = str(game_id).split("_")
+    return parts[0], (parts[1] if len(parts) > 1 else "")
+
+
+def scout_game_label(df: pd.DataFrame, game_id: str) -> str:
+    """'W1 Johnston vs Waukee'."""
+    week = df.loc[df["game_id"] == game_id, "WEEK"].min()
+    a, b = game_teams(game_id)
+    return (f"W{int(week)} " if pd.notna(week) else "") + f"{a} vs {b}"
+
+
+def score_for(row: pd.Series, team: str) -> tuple[int, int]:
+    """(team's score, other team's score) from a row's team_score / opponent_score."""
+    first, _ = game_teams(row["game_id"])
+    a, b = int(row["team_score"]), int(row["opponent_score"])
+    return (a, b) if team == first else (b, a)
 
 
 def game_label(df: pd.DataFrame, game_id: str) -> str:
@@ -81,12 +125,18 @@ def game_label(df: pd.DataFrame, game_id: str) -> str:
 
 
 def last_updated_text(df: pd.DataFrame) -> str:
-    gs = games(df)
+    """'Data through Week 6 vs CR Kennedy (Oct 2)': Dowling's most recent game, not the latest scout film."""
+    d = dowling_only(df)
+    gs = games(d)
     if not gs:
-        return "No games loaded"
+        return "No Dowling games loaded"
     last = gs[-1]
+    g = d[d["game_id"] == last]
+    week = g["WEEK"].min()
+    opp = other_team(g, TEAM) or opponent_of(last)
     when = game_date_of(last)
-    return f"Data through {game_label(df, last)}" + (f" ({when})" if when else "")
+    wk = f"Week {int(week)} vs " if pd.notna(week) else "vs "
+    return f"Data through {wk}{opp}" + (f" ({when})" if when else "")
 
 
 # ---------------------------------------------------------------------------
@@ -292,8 +342,12 @@ def show_plays(title: str, d: pd.DataFrame, good_high: bool = True) -> None:
     st.dataframe(sty, width="stretch", hide_index=True)
 
 
-def render_game_recap(df: pd.DataFrame, game_id: str, half: str) -> None:
-    """Full recap for one game (or season-wide logs when game_id is None)."""
+def render_game_recap(df: pd.DataFrame, game_id: str, half: str, team: str = TEAM) -> None:
+    """
+    Full recap for one game (or season-wide logs when game_id is None). `team` is the side the recap is told
+    from: Dowling for Dowling games, the first team in the game_id for scout film.
+    """
+    TEAM = team  # noqa: N806 — everything below reads from this team's side
     g = df if game_id is None else df[df["game_id"] == game_id]
     if half == "First half":
         g = g[g["QTR"] <= 2]
@@ -302,12 +356,13 @@ def render_game_recap(df: pd.DataFrame, game_id: str, half: str) -> None:
     if g.empty:
         st.info("No plays for this selection.")
         return
-    opp = None if game_id is None else opponent_of(game_id)
+    opp = None if game_id is None else (other_team(df[df["game_id"] == game_id], team) or opponent_of(game_id))
     them = opp or "Opponents"
+    scout = team != v.TEAM
 
     if game_id is not None:
         last = g.iloc[-1]
-        us, they = int(last["team_score"]), int(last["opponent_score"])
+        us, they = score_for(last, team)
         when = {"First half": "at halftime", "Second half": "final"}.get(half, "final")
         st.subheader(f"{TEAM} {us}, {opp} {they} ({when})")
 
@@ -353,12 +408,15 @@ def render_game_recap(df: pd.DataFrame, game_id: str, half: str) -> None:
         show_plays(f"{TEAM} best plays", ours_rp.nlargest(5, "epa"))
         show_plays(f"{TEAM} worst plays", ours_rp.nsmallest(5, "epa"))
     with c2:
-        show_plays(f"{them} best plays (our worst on D)", theirs_rp.nlargest(5, "epa"), good_high=False)
-        show_plays(f"{them} worst plays (our best on D)", theirs_rp.nsmallest(5, "epa"), good_high=False)
+        show_plays(f"{them} best plays" + ("" if scout else " (our worst on D)"), theirs_rp.nlargest(5, "epa"),
+                   good_high=scout)
+        show_plays(f"{them} worst plays" + ("" if scout else " (our best on D)"), theirs_rp.nsmallest(5, "epa"),
+                   good_high=scout)
 
     expl = pd.to_numeric(rp["explosive_play"], errors="coerce") == 1
     show_plays(f"Explosive plays for {TEAM}", rp[expl & (rp["offense"] == TEAM)])
-    show_plays(f"Explosive plays allowed", rp[expl & (rp["offense"] != TEAM)], good_high=False)
+    show_plays(f"Explosive plays for {them}" if scout else "Explosive plays allowed",
+               rp[expl & (rp["offense"] != TEAM)], good_high=scout)
 
 
 # ---------------------------------------------------------------------------
@@ -433,6 +491,33 @@ def render_best_plays(df: pd.DataFrame, team: str, n: int = 10) -> None:
     show_plays(f"{team} best {n} plays (most likely to come back)", rp.nlargest(n, "epa"), good_high=False)
 
 
+CONVERTED_COL = {3: "THIRD_DOWN_CONVERTED", 4: "FOURTH_DOWN_CONVERTED"}
+
+
+def render_down_calls(df: pd.DataFrame, team: str, down: int) -> None:
+    """
+    Every run/pass `team` ran on 3rd or 4th down, in game order, laid out like the best-plays table plus a
+    Converted column. Converted comes from THIRD_DOWN_CONVERTED / FOURTH_DOWN_CONVERTED (1 = gained the line
+    to gain on that snap; a first down by penalty isn't counted).
+    """
+    label = {3: "3rd", 4: "4th"}[down]
+    title = f"{team} {label} down calls and results"
+    d = v.run_pass(df[(df["offense"] == team) & (df["DN"] == down)])
+    st.markdown(f"**{title}**")
+    if d.empty:
+        st.info(f"No {label} down plays match the current filters.")
+        return
+    d = d.sort_values(["WEEK", "game_id", "PLAY #"], kind="stable")
+    t = plays_table(d)
+    conv = pd.to_numeric(d[CONVERTED_COL[down]], errors="coerce")
+    t.insert(0, "Converted", ["Yes" if x == 1 else "No" if x == 0 else "" for x in conv])
+    sty = t.style.format(na_rep="").format({"EPA": "{:+.2f}"}, na_rep="")   # no colors: just the log
+    made = int((conv == 1).sum())
+    st.dataframe(sty, width="stretch", hide_index=True)
+    st.caption(f"Converted {made} of {int(conv.notna().sum())}. Every {label} down run or pass in the selected games, "
+               "oldest first.")
+
+
 def _side_metrics(d: pd.DataFrame) -> dict:
     """Offensive numbers for a set of plays (an offense's plays, or the plays a defense faced)."""
     rp = v.run_pass(d)
@@ -503,6 +588,10 @@ def _matchup_table(off: dict, deff: dict, base: dict, off_name: str, def_name: s
                         ).set_index("Metric")
 
 
+# Columns still computed (they drive the colors) but not shown on the Matchup page.
+MATCHUP_HIDDEN = ["Average offense", "Projected", "Edge"]
+
+
 def _fmt_metric(k, x):
     if pd.isna(x):
         return "–"
@@ -517,11 +606,15 @@ GOOD_CSS, BAD_CSS = "background-color:#E1F5EE;color:#085041", "background-color:
 
 
 def _show_matchup(title: str, t: pd.DataFrame, dowling_on_offense: bool) -> None:
-    """Colors are from Dowling's point of view: green = good for Dowling, red = bad."""
+    """
+    Shows the offense and defense columns only. Colors are from Dowling's point of view (green = good for
+    Dowling) and need to be clearly away from an average offense, except EPA in the opposing offense's column,
+    which is simply green when positive and red when negative.
+    """
     st.markdown(f"**{title}**")
     off_col, def_col = t.columns[0], t.columns[1]
-    shown = t.copy()
-    for col in [off_col, def_col, "Average offense", "Projected"]:
+    shown = t[[off_col, def_col]].copy()
+    for col in shown.columns:
         shown[col] = [_fmt_metric(k, x) for k, x in zip(t.index, t[col])]
 
     def good_for_dowling(offense_above_avg: bool) -> bool:
@@ -533,14 +626,14 @@ def _show_matchup(title: str, t: pd.DataFrame, dowling_on_offense: bool) -> None
         styles = {c: "" for c in shown.columns}
         if thr:
             b0 = t.loc[k, "Average offense"]
-            for col in (off_col, def_col, "Projected"):
+            for col in (off_col, def_col):
                 x = t.loc[k, col]
-                if pd.notna(x) and pd.notna(b0) and abs(x - b0) >= thr:
+                if pd.isna(x):
+                    continue
+                if "EPA" in k and col == off_col and not dowling_on_offense:
+                    styles[col] = GOOD_CSS if x > 0 else BAD_CSS if x < 0 else ""
+                elif pd.notna(b0) and abs(x - b0) >= thr:
                     styles[col] = GOOD_CSS if good_for_dowling(x > b0) else BAD_CSS
-            edge = t.loc[k, "Edge"]
-            if edge and edge != "Even":
-                dowling_edge = (edge == off_col) == dowling_on_offense
-                styles["Edge"] = GOOD_CSS if dowling_edge else BAD_CSS
         return [styles[c] for c in shown.columns]
 
     st.dataframe(shown.style.apply(style_row, axis=1), width="stretch")
@@ -576,11 +669,9 @@ def render_matchup(df: pd.DataFrame, opponent: str) -> None:
                 f"twice." if h2h and not others.empty else "")
     st.caption(
         "Every number is from the offense's point of view: what the offense gets, and what the defense gives up. "
-        "Both are compared to an average offense (EPA 0; rates = every offense in the data combined), so a "
-        "defense that allows positive EPA is a weakness. Projected = offense + defense − average, after pulling "
-        "small samples toward average (one game of film counts for about half; a season of plays for nearly all "
-        "of it). The edge goes to the offense if the projection is clearly above average, to the defense if "
-        "clearly below, otherwise Even. Green = good for Dowling, red = bad. "
+        f"EPA in the {opponent} offense column is green when positive and red when negative. Every other colored "
+        "cell is clearly above or below an average offense (EPA 0; rates = every offense in the data combined), "
+        "with green = good for Dowling and red = bad. "
         f"{opponent}'s numbers come from the {len(opp_games)} game(s) in the data that include them.{h2h_note}"
     )
 
@@ -596,11 +687,18 @@ def render_coverage_by_formation(df: pd.DataFrame, top_n: int = 10) -> None:
     d = d[d["OFF FORM"].isin(forms) & d["COVERAGE"].isin(covs)]
     t = pd.crosstab(d["OFF FORM"], d["COVERAGE"], normalize="index").reindex(index=forms, columns=covs)
     t.insert(0, "Plays", d["OFF FORM"].value_counts().reindex(forms))
-    sty = t.style.format({c: "{:.0%}" for c in covs}, na_rep="–").background_gradient(
-        cmap="Blues", subset=list(covs), vmin=0, vmax=1)
+    t.insert(1, "EPA per Play", d.groupby("OFF FORM")["epa"].mean().reindex(forms))
+
+    def epa_color(col):  # the opponent's EPA: positive is bad for Dowling
+        return ["" if pd.isna(x) else BAD_CSS if x >= 0.10 else GOOD_CSS if x <= -0.10 else "" for x in col]
+
+    sty = (t.style.format({c: "{:.1%}" for c in covs}, na_rep="–").format({"EPA per Play": "{:+.2f}"}, na_rep="–")
+           .background_gradient(cmap="Blues", subset=list(covs), vmin=0, vmax=1)
+           .apply(epa_color, subset=["EPA per Play"]))
     st.dataframe(sty, width="stretch")
     st.caption("Each row is one opponent formation: the share of those snaps Dowling played each coverage. "
-               "A dark cell is a coverage we lean on against that look.")
+               "A dark cell is a coverage we lean on against that look. EPA per Play is what the opponent gained "
+               "from that formation (green = Dowling held it down, red = it hurt us).")
 
 
 # ---------------------------------------------------------------------------
@@ -621,12 +719,18 @@ def _table_html(t: pd.DataFrame, fmt: dict, index: bool = True) -> str:
 
 
 def build_report_html(df: pd.DataFrame, df_any_down: pd.DataFrame, opponent: str, filters_text: str,
-                      notes: str = "") -> str:
+                      notes: str = "", df_games: pd.DataFrame | None = None) -> str:
     import html as _html
+
+    import profiles
 
     ink = "#31333F"
     sections = [f"<h1>{opponent} offense scouting report</h1>",
                 f'<p class="sub">{TEAM} · {filters_text} · generated {_date.today():%b %d, %Y}</p>']
+    if df_games is not None:
+        prof = profiles.profiles_report_html(df, df_games, opponent)
+        if prof:
+            sections.append(f'<div><h2>Team profiles</h2>{prof}</div>')
     if notes:
         sections.append(f'<div class="block"><h2>Staff notes</h2><p style="white-space:pre-wrap">'
                         f'{_html.escape(notes)}</p></div>')
@@ -643,6 +747,11 @@ def build_report_html(df: pd.DataFrame, df_any_down: pd.DataFrame, opponent: str
     if not forms.empty:
         fmt = {c: v.FORMATS[c] for c in forms.columns if c in v.FORMATS}
         sections.append(f'<div class="block"><h2>Formations</h2>{_table_html(forms, fmt)}</div>')
+    for kind in ("Run", "Pass"):
+        calls = v.opp_play_call_table(df, opponent, kind)
+        if not calls.empty:
+            fmt = {c: v.FORMATS[c] for c in calls.columns if c in v.FORMATS}
+            sections.append(f'<div class="block"><h2>{kind} plays</h2>{_table_html(calls, fmt)}</div>')
     best = v.run_pass(df[df["offense"] == opponent]).nlargest(10, "epa")
     if not best.empty:
         sections.append(f'<div class="block"><h2>Their best plays</h2>'
@@ -744,7 +853,8 @@ def _with_pre_snap_score(g: pd.DataFrame) -> pd.DataFrame:
     g = g.sort_values(["game_id", "PLAY #"]).copy()
     pre_team = g.groupby("game_id")["team_score"].shift(1, fill_value=0)
     pre_opp = g.groupby("game_id")["opponent_score"].shift(1, fill_value=0)
-    ours = g["offense"] == TEAM
+    # team_score belongs to the first team in the game_id (Dowling in Dowling games).
+    ours = g["offense"] == g["game_id"].astype(str).str.split("_").str[0]
     g["pre_off_score"] = np.where(ours, pre_team, pre_opp)
     g["pre_def_score"] = np.where(ours, pre_opp, pre_team)
     return g
@@ -799,27 +909,27 @@ def _predict_wp(d: pd.DataFrame) -> np.ndarray:
 
 
 @st.cache_data(show_spinner=False)
-def win_probability(g: pd.DataFrame) -> pd.DataFrame:
-    """Dowling's win probability before each scrimmage play of one game."""
+def win_probability(g: pd.DataFrame, team: str = TEAM) -> pd.DataFrame:
+    """`team`'s win probability before each scrimmage play of one game (column dchs_wp)."""
     d = _estimate_clock(_scrimmage(g))
     if d.empty:
         return d
     off_wp = _predict_wp(d)
-    d["dchs_wp"] = np.where(d["offense"] == TEAM, off_wp, 1 - off_wp)
+    d["dchs_wp"] = np.where(d["offense"] == team, off_wp, 1 - off_wp)
     d["play_n"] = np.arange(1, len(d) + 1)
     return d
 
 
-def render_win_probability(g: pd.DataFrame, opponent: str) -> None:
+def render_win_probability(g: pd.DataFrame, opponent: str, team: str = TEAM) -> None:
     import model_utils as mu
 
     st.markdown("**Win probability**")
-    d = win_probability(g)
+    d = win_probability(g, team)
     if d.empty:
         st.info("No scrimmage plays in this game.")
         return
-    last = g.iloc[-1]
-    final = 1.0 if last["team_score"] > last["opponent_score"] else 0.0 if last["team_score"] < last["opponent_score"] else 0.5
+    us, them = score_for(g.sort_values("PLAY #").iloc[-1], team)
+    final = 1.0 if us > them else 0.0 if us < them else 0.5
     line = pd.concat([d[["play_n", "dchs_wp", "clock"]],
                       pd.DataFrame({"play_n": [len(d) + 1], "dchs_wp": [final], "clock": ["Final"]})])
     q_marks = d.groupby("QTR")["play_n"].min().iloc[1:].reset_index()
@@ -830,7 +940,7 @@ def render_win_probability(g: pd.DataFrame, opponent: str) -> None:
             align="left", dx=4, color=GRAY).encode(x="play_n:Q", y=alt.value(10), text="lab:N"),
         alt.Chart(line).mark_line(color="#185FA5", strokeWidth=2.5, interpolate="step-after").encode(
             x=alt.X("play_n:Q", title="Play"),
-            y=alt.Y("dchs_wp:Q", title=f"{TEAM} win probability", scale=alt.Scale(domain=[0, 1]),
+            y=alt.Y("dchs_wp:Q", title=f"{team} win probability", scale=alt.Scale(domain=[0, 1]),
                     axis=alt.Axis(format=".0%")),
             tooltip=[alt.Tooltip("clock:N", title="Est. clock"), alt.Tooltip("dchs_wp:Q", format=".0%", title="WP")]),
     ).properties(height=320)
@@ -875,15 +985,15 @@ def _spot_text(ytg: float, opp: str) -> str:
 
 
 @st.cache_data(show_spinner="Checking every 4th down...")
-def fourth_down_review(df: pd.DataFrame) -> pd.DataFrame:
-    """Every Dowling 4th down: what we did vs what the 4th Down Bot recommends (neutral site)."""
+def fourth_down_review(df: pd.DataFrame, team: str = TEAM) -> pd.DataFrame:
+    """Every 4th down by `team`: what they did vs what the 4th Down Bot recommends (neutral site)."""
     import fourth_down_core as fd
     import model_utils as mu
 
     parts = []
     for gid in games(df):
         d = _estimate_clock(_scrimmage(df[df["game_id"] == gid]))
-        parts.append(d[(d["offense"] == TEAM) & (d["DN"] == 4)])
+        parts.append(d[(d["offense"] == team) & (d["DN"] == 4)])
     d = pd.concat(parts) if parts else pd.DataFrame()
     if d.empty:
         return pd.DataFrame()
@@ -898,7 +1008,7 @@ def fourth_down_review(df: pd.DataFrame) -> pd.DataFrame:
     rows = []
     for i, (_, r) in enumerate(d.iterrows()):
         gid = r["game_id"]
-        opp = opponent_of(gid)
+        opp = other_team(df[df["game_id"] == gid], team) or opponent_of(gid)
         one = fd._to_options(res, i)
         wp = one["wp"]
         pt = r["PLAY TYPE"]
@@ -917,18 +1027,21 @@ def fourth_down_review(df: pd.DataFrame) -> pd.DataFrame:
         us, them = int(r["pre_off_score"]), int(r["pre_def_score"])
         score = f"up {us}-{them}" if us > them else f"down {us}-{them}" if us < them else f"tied {us}-{them}"
         rows.append({
-            "game": gid, "Game": game_label(df, gid), "opp": opp, "Est. clock": r["clock"], "score_text": score,
+            "game": gid, "Game": game_label(df, gid) if team == TEAM else scout_game_label(df, gid), "opp": opp, "Est. clock": r["clock"], "score_text": score,
             "dist": int(r["DIST"]), "ytg": float(r["YARDLINE_100"]),
             "Situation": f"4th & {int(r['DIST'])} at {_spot_text(r['YARDLINE_100'], opp)}",
             "We chose": did, "Model": best, "Strength": mu.strength_tier(float(calls["margin"][i])),
             "WP if we": chosen, "WP if model": best_wp, "WP left (pts)": left, "category": category,
             "options": one["options"], "Result": r["RESULT"], "break_even": float(be[i]),
+            "team": team, "who": "We" if team == TEAM else team,
         })
     return pd.DataFrame(rows)
 
 
 # --- Ledger ------------------------------------------------------------------
 def ledger_html(t: pd.DataFrame) -> str:
+    who = t["who"].iat[0] if "who" in t and len(t) else "We"
+    call_head = "Our call vs model" if who == "We" else f"{who}'s call vs model"
     decided = int((t["category"] == "Decided").sum())
     t = t[t["category"] != "Decided"]
     n = len(t)
@@ -969,7 +1082,7 @@ def ledger_html(t: pd.DataFrame) -> str:
             f'<div><div style="font-weight:600">{r["Situation"]}</div>'
             f'<div style="font-size:12px;opacity:.7">{r["Game"]} · {r["Est. clock"]} · {r["score_text"]}</div></div>'
             f'<div style="font-size:12px"><span style="padding:1px 8px;border-radius:999px;background:rgba(128,128,128,.15)">'
-            f'We: {OPTION_SHORT[r["We chose"]]}</span> → <span style="padding:1px 8px;border-radius:999px;'
+            f'{r.get("who", "We")}: {OPTION_SHORT[r["We chose"]]}</span> → <span style="padding:1px 8px;border-radius:999px;'
             f'background:#E1F5EE;color:#085041">Model: {OPTION_SHORT[r["Model"]]}</span>'
             f'<div style="opacity:.7;margin-top:3px">{odds}</div></div>'
             f'<div><div style="font-weight:600;margin-bottom:3px">{"&lt; 0.1" if pts < 0.05 else f"+{pts:.1f}"} pts</div>'
@@ -980,7 +1093,7 @@ def ledger_html(t: pd.DataFrame) -> str:
     return (f'<div style="font-family:inherit"><div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));'
             f'gap:8px">{kpi}</div>{bar}{legend}'
             f'<div style="font-size:12px;opacity:.6;display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1.1fr) '
-            f'150px;gap:12px;padding-bottom:4px"><span>Disagreements</span><span>Our call vs model</span>'
+            f'150px;gap:12px;padding-bottom:4px"><span>Disagreements</span><span>{call_head}</span>'
             f'<span>Win prob. at stake</span></div>{body}</div>')
 
 
@@ -1005,6 +1118,8 @@ def decision_map_grid(score_diff: int = 0) -> list[list[str]]:
 
 
 def decision_map_html(t: pd.DataFrame, grid: list[list[str]]) -> str:
+    who = t["who"].iat[0] if "who" in t and len(t) else "We"
+    dots_head = "Our decisions (letter = what we did)" if who == "We" else f"{who} decisions (letter = what they did)"
     max_d = len(MAP_DIST)
     cells = []
     for i, ytg in enumerate(MAP_YTG):
@@ -1020,7 +1135,7 @@ def decision_map_html(t: pd.DataFrame, grid: list[list[str]]) -> str:
         key = (round(r["ytg"]), min(r["dist"], 15))
         k = seen[key] = seen.get(key, 0) + 1
         col = GREEN if r["category"] == "Agreed" else RED if r["category"] == "Costly" else GRAY
-        tip = (f'{r["Game"]} {r["Est. clock"]} · {r["score_text"]} · {r["Situation"]}&#10;We: {r["We chose"]} · '
+        tip = (f'{r["Game"]} {r["Est. clock"]} · {r["score_text"]} · {r["Situation"]}&#10;{r.get("who", "We")}: {r["We chose"]} · '
                f'Model: {r["Model"]}' + ("" if r["category"] == "Agreed" else f' ({r["WP left (pts)"]:.1f} pts)'))
         x = 100 - r["ytg"] + (k - 1) * 2.2
         y = (min(r["dist"], 15) - 0.5) / max_d * 100
@@ -1042,8 +1157,8 @@ def decision_map_html(t: pd.DataFrame, grid: list[list[str]]) -> str:
         f'<div style="display:flex;flex-wrap:wrap;gap:14px;margin-bottom:6px;opacity:.8"><span>Model\'s call (tie game, '
         f'start of Q3, neutral site):</span>{sw(MAP_COLORS["G"], "Go")}{sw(MAP_COLORS["F"], "Field goal")}'
         f'{sw(MAP_COLORS["P"], "Punt")}{sw(MAP_COLORS["T"], "Toss-up")}</div>'
-        f'<div style="display:flex;flex-wrap:wrap;gap:14px;margin-bottom:8px;opacity:.8"><span>Our decisions '
-        f'(letter = what we did):</span>{dot(GREEN, "Agreed")}{dot(RED, "Disagreed, cost 1+ point")}'
+        f'<div style="display:flex;flex-wrap:wrap;gap:14px;margin-bottom:8px;opacity:.8"><span>{dots_head}:'
+        f'</span>{dot(GREEN, "Agreed")}{dot(RED, "Disagreed, cost 1+ point")}'
         f'{dot(GRAY, "Disagreed, toss-up")}</div>'
         f'<div style="display:grid;grid-template-columns:34px 1fr;gap:6px">'
         f'<div style="position:relative;height:330px;opacity:.6">{yticks}</div>'
@@ -1071,20 +1186,24 @@ def decision_card_html(r: pd.Series) -> str:
              f'<span style="position:absolute;top:0;bottom:0;left:{line}%;border-left:2px solid #EF9F27"></span></div>')
     did, best, cat = r["We chose"], r["Model"], r["category"]
     verb = {"Go for it": "went for it", "Field goal": "kicked the field goal", "Punt": "punted"}[did]
+    who = r.get("who", "We") if isinstance(r.get("who", "We"), str) else "We"
+    team_name = r.get("team", TEAM) if isinstance(r.get("team", TEAM), str) else TEAM
+    short = "Dowling" if team_name == TEAM else team_name
+    our_call = "Our call" if who == "We" else f"{who}'s call"
     if cat == "Decided":
         box, text = ("rgba(128,128,128,.12)", "inherit"), (
-            f'We {verb}. The game was already decided here (win probability {r["WP if model"]:.0%} for the best '
+            f'{who} {verb}. The game was already decided here (win probability {r["WP if model"]:.0%} for the best '
             f'option), so this one doesn\'t count in the ledger.')
     elif cat == "Agreed":
-        box, text = ("#E1F5EE", "#085041"), f'We {verb}, and the model agrees ({r["Strength"].lower()}).'
+        box, text = ("#E1F5EE", "#085041"), f'{who} {verb}, and the model agrees ({r["Strength"].lower()}).'
     elif cat == "Toss-up":
-        box, text = ("rgba(128,128,128,.12)", "inherit"), (f'We {verb}; the model slightly prefers '
+        box, text = ("rgba(128,128,128,.12)", "inherit"), (f'{who} {verb}; the model slightly prefers '
                                                             f'{best.lower()}, but it\'s a toss-up (under 1 point).')
     elif cat == "Costly":
-        box, text = ("#FAEEDA", "#633806"), (f'We {verb}. The model says <b>{best.lower()}</b>, worth '
+        box, text = ("#FAEEDA", "#633806"), (f'{who} {verb}. The model says <b>{best.lower()}</b>, worth '
                                              f'+{r["WP left (pts)"]:.1f} win probability points.')
     else:
-        box, text = ("rgba(128,128,128,.12)", "inherit"), f"We {verb}; that option isn't modeled from this spot."
+        box, text = ("rgba(128,128,128,.12)", "inherit"), f"{who} {verb}; that option isn't modeled from this spot."
     opts = []
     for name in ("Go for it", "Field goal", "Punt"):
         o = r["options"].get(name)
@@ -1092,7 +1211,7 @@ def decision_card_html(r: pd.Series) -> str:
         if name == best:
             chips += '<span style="font-size:11px;padding:1px 8px;border-radius:999px;background:#E1F5EE;color:#085041;margin-right:4px">Model\'s call</span>'
         if name == did:
-            chips += '<span style="font-size:11px;padding:1px 8px;border-radius:999px;background:rgba(128,128,128,.18)">Our call</span>'
+            chips += '<span style="font-size:11px;padding:1px 8px;border-radius:999px;background:rgba(128,128,128,.18)">{our_call}</span>'
         if o is None:
             why = "Not an option inside the 35" if name == "Punt" else "Out of field goal range"
             opts.append(f'<div style="display:grid;grid-template-columns:120px 1fr 60px;gap:12px;align-items:center;'
@@ -1118,7 +1237,7 @@ def decision_card_html(r: pd.Series) -> str:
     return (f'<div style="font-family:inherit;max-width:760px">'
             f'<div style="display:flex;flex-wrap:wrap;gap:6px 16px;align-items:baseline;margin-bottom:6px">'
             f'<span style="font-size:20px;font-weight:600">{r["Situation"]}</span>'
-            f'<span style="font-size:13px;opacity:.7">{r["Game"]} · {r["Est. clock"]} (est.) · Dowling {r["score_text"]}'
+            f'<span style="font-size:13px;opacity:.7">{r["Game"]} · {r["Est. clock"]} (est.) · {short} {r["score_text"]}'
             f' · result: {r["Result"]}</span></div>{field}'
             f'<div style="background:{box[0]};color:{box[1]};border-radius:8px;padding:10px 14px;margin:12px 0;'
             f'font-size:14px">{text}</div>{"".join(opts)}'
@@ -1127,10 +1246,10 @@ def decision_card_html(r: pd.Series) -> str:
             f'ball, orange = line to gain.</div></div>')
 
 
-def render_fourth_down_review(df: pd.DataFrame) -> None:
-    t = fourth_down_review(df)
+def render_fourth_down_review(df: pd.DataFrame, team: str = TEAM) -> None:
+    t = fourth_down_review(df, team)
     if t.empty:
-        st.info("No Dowling 4th downs in the selected games.")
+        st.info(f"No {'Dowling' if team == TEAM else team} 4th downs in the selected games.")
         return
     st.markdown("**Season ledger**" if df["game_id"].nunique() > 1 else "**Decision ledger**")
     st.html(ledger_html(t))
@@ -1145,7 +1264,7 @@ def render_fourth_down_review(df: pd.DataFrame) -> None:
     labels = {i: f'{r["Game"]} · {r["Est. clock"]} · {r["Situation"]} ({r["category"].lower()})'
               for i, r in order.iterrows()}
     scope = "all" if df["game_id"].nunique() > 1 else str(df["game_id"].iat[0])
-    pick = st.selectbox("Pick a decision", list(labels), format_func=labels.get, key=f"g_fd_pick_{scope}")
+    pick = st.selectbox("Pick a decision", list(labels), format_func=labels.get, key=f"g_fd_pick_{scope}_{team}")
     st.html(decision_card_html(t.loc[pick]))
     st.caption("Same math as the 4th Down Bot: score at the snap, estimated clock scaled to the model's 15-minute "
                "quarters, neutral site, 3 timeouts each, no weather. Under 1 point of win probability is a toss-up.")

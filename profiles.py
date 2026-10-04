@@ -25,7 +25,7 @@ import pandas as pd
 BENCHMARK_PATH = "cfb_benchmarks.csv"
 HS_TOUCHBACK = 20     # high school touchback spot (yards from own goal)
 CFB_TOUCHBACK = 25    # college touchback spot
-Z_LIMIT = 3.0         # radar runs from -3 SD (center) to +3 SD (edge)
+Z_LIMIT = 2.0         # radar runs from -2 SD (center) to +2 SD (edge)
 
 
 # ---------------------------------------------------------------------------
@@ -41,18 +41,20 @@ class Metric:
     help: str
 
 
+# Offense and defense share one axis order (clockwise from the top), so each offense axis sits in the same spot
+# as the defense axis it's measured against: Scoring Rate <-> Stop Rate, 3rd Down Conv. <-> 3rd Down Stop, etc.
 OFFENSE = [
     Metric("success", "Success Rate", True, "pct", 40, "Plays that stay on schedule (40% / 70% / 100% of the yards needed on 1st / 2nd / 3rd-4th)."),
-    Metric("explosive", "Explosive Rate", True, "pct", 40, "Runs of 10+ yards or passes of 20+ yards."),
-    Metric("epa_rush", "EPA per Rush", True, "epa", 25, "Expected points added per run."),
-    Metric("epa_pass", "EPA per Pass", True, "epa", 20, "Expected points added per pass (sacks and scrambles included)."),
-    Metric("ypp", "Yards per Play", True, "num", 40, "Yards gained per run or pass."),
-    Metric("comp", "Completion %", True, "pct", 20, "Completions / attempts (interceptions count as incompletions)."),
+    Metric("scoring", "Scoring Rate", True, "pct", 10, "Drives that ended in points (touchdown or field goal)."),
     Metric("conv3", "3rd Down Conv.", True, "pct", 10, "3rd downs that gained the line to gain."),
-    Metric("sack", "Sack Rate", False, "pct", 20, "Sacks per pass play."),
-    Metric("int", "INT Rate", False, "pct", 20, "Interceptions per pass attempt."),
+    Metric("explosive", "Explosive Rate", True, "pct", 40, "Runs of 10+ yards or passes of 20+ yards."),
     Metric("turnover", "Turnover %", False, "pct", 40, "Interceptions and fumbles per play."),
+    Metric("int", "INT Rate", False, "pct", 20, "Interceptions per pass attempt."),
+    Metric("sack", "Sack Rate", False, "pct", 20, "Sacks per pass play."),
+    Metric("comp", "Completion %", True, "pct", 20, "Completions / attempts (interceptions count as incompletions)."),
     Metric("stuffed", "Stuffed Run %", False, "pct", 25, "Runs that gained 0 or fewer yards."),
+    Metric("epa_pass", "EPA per Pass", True, "epa", 20, "Expected points added per pass (sacks and scrambles included)."),
+    Metric("epa_rush", "EPA per Rush", True, "epa", 25, "Expected points added per run."),
 ]
 
 DEFENSE = [
@@ -60,14 +62,13 @@ DEFENSE = [
     Metric("stop", "Stop Rate", True, "pct", 10, "Opponent drives that ended without points."),
     Metric("conv3", "3rd Down Stop", False, "pct", 10, "Opponent 3rd downs converted (fewer is better)."),
     Metric("explosive", "Explosive Rate", False, "pct", 40, "Opponent runs of 10+ / passes of 20+."),
-    Metric("epa_rush", "EPA per Rush", False, "epa", 25, "Expected points added per opponent run."),
-    Metric("epa_pass", "EPA per Pass", False, "epa", 20, "Expected points added per opponent pass."),
-    Metric("ypp", "Yards per Play", False, "num", 40, "Yards allowed per run or pass."),
+    Metric("turnover", "Turnover %", True, "pct", 40, "Takeaways per opponent play."),
+    Metric("int", "INT Rate", True, "pct", 20, "Interceptions per opponent attempt."),
+    Metric("sack", "Sack Rate", True, "pct", 20, "Sacks per opponent pass play."),
     Metric("comp", "Completion %", False, "pct", 20, "Opponent completion rate."),
     Metric("stuffed", "Stuff Rate", True, "pct", 25, "Opponent runs held to 0 or fewer yards."),
-    Metric("sack", "Sack Rate", True, "pct", 20, "Sacks per opponent pass play."),
-    Metric("int", "INT Rate", True, "pct", 20, "Interceptions per opponent attempt."),
-    Metric("turnover", "Turnover %", True, "pct", 40, "Takeaways per opponent play."),
+    Metric("epa_pass", "EPA per Pass", False, "epa", 20, "Expected points added per opponent pass."),
+    Metric("epa_rush", "EPA per Rush", False, "epa", 25, "Expected points added per opponent run."),
 ]
 
 SPECIAL_TEAMS = [
@@ -125,6 +126,9 @@ def team_metrics(tables: dict, team: str) -> dict:
         if unit == "defense":
             dd = drives[drives["defense"] == team]
             m["stop"] = ((~dd["scored"]).mean() if len(dd) else np.nan, len(dd))
+        else:
+            od = drives[drives["offense"] == team]
+            m["scoring"] = (od["scored"].mean() if len(od) else np.nan, len(od))
         out[unit] = m
 
     ko_k, ko_r = kicks[(kicks["kind"] == "ko") & (kicks["kicker"] == team)], kicks[(kicks["kind"] == "ko") & (kicks["receiver"] == team)]
@@ -168,8 +172,13 @@ def standardize_hudl(df: pd.DataFrame, team: str = "Dowling Catholic") -> dict:
     drives, kicks = [], []
     for gid, g in df.groupby("game_id", sort=False):
         g = g.sort_values("PLAY #").reset_index(drop=True)
-        opp = ins.opponent_of(gid)
-        for off, deff in ((team, opp), (opp, team)):
+        # The two teams that actually played. (Pairing every game with Dowling credited Dowling's defense
+        # with drives from scout film of other teams' games.)
+        game_teams = ins.teams_in_game(g)
+        if len(game_teams) != 2:
+            continue
+        a, b = game_teams
+        for off, deff in ((a, b), (b, a)):
             ds = ins.drive_summary(g, off)
             for res in ds.get("result", []):
                 drives.append({"game": gid, "offense": off, "defense": deff, "scored": res in ("Touchdown", "FG Made")})
@@ -182,7 +191,7 @@ def standardize_hudl(df: pd.DataFrame, team: str = "Dowling Catholic") -> dict:
             nxt = g.loc[later[0]]
             start = 100 - nxt["YARDLINE_100"]
             if r["PLAY TYPE"] in _KICKOFFS:
-                kicker = opp if nxt["offense"] == team else team
+                kicker = b if nxt["offense"] == a else a
                 kicks.append({"kind": "ko", "kicker": kicker, "receiver": nxt["offense"], "value": start - HS_TOUCHBACK})
             elif r["offense"] != nxt["offense"]:
                 kicks.append({"kind": "punt", "kicker": r["offense"], "receiver": nxt["offense"],
@@ -321,7 +330,8 @@ def _esc(x) -> str:
 
 
 def radar_html(title: str, subtitle: str, teams: list[tuple[str, pd.DataFrame]], ink: str = "#31333F",
-               height: int = 600) -> str:
+               height: int = 600, colors: list[str] | None = None, width: int = 760,
+               interactive: bool = True) -> str:
     """
     Self-contained SVG radar (no JavaScript libraries, so nothing can fail to
     load). teams = [(name, score_team() frame), ...]; the first sets the axes.
@@ -329,7 +339,8 @@ def radar_html(title: str, subtitle: str, teams: list[tuple[str, pd.DataFrame]],
     """
     labels = teams[0][1]["Metric"].tolist()
     n_ax = len(labels)
-    W, H = 760, height - 90          # room above the SVG for the title and legend
+    colors = colors or TEAM_COLORS
+    W, H = width, height - 90        # room above the SVG for the title and legend
     cx, cy, R = W / 2, H / 2, H / 2 - 42
     dark = ink == "#FAFAFA"
     grid = "rgba(250,250,250,.18)" if dark else "rgba(49,51,63,.16)"
@@ -361,7 +372,7 @@ def radar_html(title: str, subtitle: str, teams: list[tuple[str, pd.DataFrame]],
 
     for k, (name, t) in enumerate(teams):                            # team shapes
         t = t.set_index("Metric").reindex(labels)
-        color = TEAM_COLORS[k % len(TEAM_COLORS)]
+        color = colors[k % len(colors)]
         zs = t["SD vs median"].astype(float).fillna(-Z_LIMIT).tolist()
         poly = " ".join(f"{x:.1f},{y:.1f}" for x, y in (pt(z, i) for i, z in enumerate(zs)))
         parts.append(f'<polygon points="{poly}" fill="{color}" fill-opacity="{0.28 if k == 0 else 0.16}" '
@@ -389,8 +400,13 @@ def radar_html(title: str, subtitle: str, teams: list[tuple[str, pd.DataFrame]],
 
     legend = "" if len(teams) == 1 else "".join(
         f'<span style="display:inline-flex;align-items:center;gap:6px;margin:0 9px">'
-        f'<span style="width:18px;border-top:2.5px {"solid" if i == 0 else "dashed"} {TEAM_COLORS[i]}"></span>'
+        f'<span style="width:18px;border-top:2.5px {"solid" if i == 0 else "dashed"} {colors[i % len(colors)]}"></span>'
         f'{_esc(n)}</span>' for i, (n, _) in enumerate(teams))
+    if not interactive:
+        return (f'<div style="font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:{ink}">'
+                f'<div style="text-align:center;font-size:15px;font-weight:600">{_esc(title)}</div>'
+                f'<div style="text-align:center;font-size:12px;opacity:.7;margin:2px 0 4px">{_esc(subtitle)}</div>'
+                f'<svg viewBox="0 0 {W} {H}" style="width:100%;display:block;margin:0 auto">{"".join(parts)}</svg></div>')
     return f"""
 <div style="font-family:'Source Sans Pro',-apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:{ink};position:relative">
   <div style="text-align:center;font-size:17px;font-weight:600">{_esc(title)}</div>
@@ -419,7 +435,8 @@ document.querySelectorAll(".pt").forEach(el => {{
 </script>"""
 
 
-def render_radar(title: str, subtitle: str, teams: list[tuple[str, pd.DataFrame]], height: int = 600) -> None:
+def render_radar(title: str, subtitle: str, teams: list[tuple[str, pd.DataFrame]], height: int = 600,
+                 colors: list[str] | None = None, width: int = 760) -> None:
     import streamlit as st
     import streamlit.components.v1 as components
 
@@ -428,7 +445,7 @@ def render_radar(title: str, subtitle: str, teams: list[tuple[str, pd.DataFrame]
         return
     theme = getattr(getattr(st.context, "theme", None), "type", None)
     ink = "#FAFAFA" if theme == "dark" else "#31333F"
-    components.html(radar_html(title, subtitle, teams, ink, height), height=height)
+    components.html(radar_html(title, subtitle, teams, ink, height, colors, width), height=height)
     with st.expander("See the numbers"):
         for name, t in teams:
             shown = t[["Metric", "Value", "FBS median", "SD vs median", "Better than", "n"]].copy()
@@ -447,6 +464,54 @@ def render_radar(title: str, subtitle: str, teams: list[tuple[str, pd.DataFrame]
 # ---------------------------------------------------------------------------
 # Page
 # ---------------------------------------------------------------------------
+def profile_charts(df_plays: pd.DataFrame, df_games: pd.DataFrame, opponent: str, team: str = "Dowling Catholic",
+                   bench_path: str = BENCHMARK_PATH, cache=None) -> dict | None:
+    """
+    Everything the profile charts need: {"season", "n_ours", "n_theirs", "rows"}, where rows is three
+    (left, right) pairs of (title, subtitle, team name, score_team frame, color): Dowling O | opponent D,
+    Dowling D | opponent O, Dowling ST | opponent ST. None if the benchmark file is missing.
+    """
+    try:
+        bench = load_benchmarks(bench_path)
+    except FileNotFoundError:
+        return None
+    stats = benchmark_stats(bench)
+    std = cache(standardize_hudl) if cache else standardize_hudl
+    plays_tables, game_tables = std(df_plays, team), std(df_games, team)
+    # Offense/defense from filtered plays; drives and kicks from whole games.
+    tables = {"plays": plays_tables["plays"], "drives": game_tables["drives"],
+              "kicks": game_tables["kicks"], "fgs": game_tables["fgs"]}
+    ours, theirs = team_metrics(tables, team), team_metrics(tables, opponent)
+    games_of = lambda t: df_games.loc[(df_games["offense"] == t) | (df_games["defense"] == t), "game_id"].nunique()
+    n_ours, n_theirs = games_of(team), games_of(opponent)
+    plural = lambda n: f"{n} game{'' if n == 1 else 's'}"
+    pairs = [(("offense", "Offense"), ("defense", "Defense")), (("defense", "Defense"), ("offense", "Offense")),
+             (("special_teams", "Special Teams"), ("special_teams", "Special Teams"))]
+    rows = [((f"{team} {ol}", plural(n_ours), team, score_team(ours, stats, ou), TEAM_COLORS[0]),
+             (f"{opponent} {tl}", plural(n_theirs), opponent, score_team(theirs, stats, tu), TEAM_COLORS[1]))
+            for (ou, ol), (tu, tl) in pairs]
+    return {"season": int(bench["season"].iat[0]), "n_ours": n_ours, "n_theirs": n_theirs, "rows": rows}
+
+
+def profiles_report_html(df_plays: pd.DataFrame, df_games: pd.DataFrame, opponent: str,
+                         team: str = "Dowling Catholic") -> str:
+    """The six radars as static HTML (no hover script) for the printable scouting report."""
+    p = profile_charts(df_plays, df_games, opponent, team)
+    if p is None:
+        return ""
+    cells = []
+    for left, right in p["rows"]:
+        for title, sub, name, frame, color in (left, right):
+            if frame.empty:
+                cells.append("<div></div>")
+                continue
+            cells.append(radar_html(title, sub, [(name, frame)], "#31333F", 520, [color], 620, interactive=False))
+    return ('<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 16px">' + "".join(
+        f'<div style="break-inside:avoid">{c}</div>' for c in cells) + "</div>"
+            f'<p style="font-size:12px;color:#666">Each axis = distance from the {p["season"]} FBS median in FBS '
+            f'standard deviations (±{Z_LIMIT:.0f}); farther out is better. Hollow points are small samples.</p>')
+
+
 def render_profiles_page(df_plays: pd.DataFrame, df_games: pd.DataFrame, opponent: str,
                          team: str = "Dowling Catholic", bench_path: str = BENCHMARK_PATH) -> None:
     """
@@ -456,35 +521,22 @@ def render_profiles_page(df_plays: pd.DataFrame, df_games: pd.DataFrame, opponen
     """
     import streamlit as st
 
-    try:
-        bench = load_benchmarks(bench_path)
-    except FileNotFoundError:
+    p = profile_charts(df_plays, df_games, opponent, team, bench_path,
+                       cache=st.cache_data(show_spinner="Scoring against FBS..."))
+    if p is None:
         st.error(f"{bench_path} not found. Run build_cfb_benchmarks.py to create it, then commit it with the app.")
         return
-    stats = benchmark_stats(bench)
-    season = int(bench["season"].iat[0])
-
-    cached = st.cache_data(show_spinner="Scoring against FBS...")(standardize_hudl)
-    plays_tables = cached(df_plays, team)
-    game_tables = cached(df_games, team)
-    # Offense/defense from filtered plays; drives and kicks from whole games.
-    tables = {"plays": plays_tables["plays"], "drives": game_tables["drives"],
-              "kicks": game_tables["kicks"], "fgs": game_tables["fgs"]}
-    ours = team_metrics(tables, team)
-    theirs = team_metrics(tables, opponent)
-
-    compare = st.toggle(f"Overlay {opponent}", value=True, key="f_prof_overlay")
-    st.caption(f"Each axis = how far the number is from the {season} FBS median, in FBS standard deviations "
-               f"(the spread between FBS teams). Farther out is always better. Hollow points are small samples; "
-               f"triangles are beyond ±{Z_LIMIT:.0f} SD and pinned to the edge. Hover any point for the numbers.")
-    n_opp_games = df_games.loc[(df_games["offense"] == opponent) | (df_games["defense"] == opponent), "game_id"].nunique()
-    sub = f"vs {season} FBS teams · Dowling: {df_games['game_id'].nunique()} games · {opponent}: {n_opp_games} game(s)"
-    for unit in ("offense", "defense", "special_teams"):
-        teams = [(team, score_team(ours, stats, unit))]
-        if compare:
-            teams.append((opponent, score_team(theirs, stats, unit)))
-        title = f"{team} {UNIT_TITLES[unit]}" if not compare else f"{UNIT_TITLES[unit].capitalize()}: {team} vs {opponent}"
-        render_radar(title, sub, teams)
+    n_ours, n_theirs = p["n_ours"], p["n_theirs"]
+    st.caption(f"Each axis = how far the number is from the {p['season']} FBS median, in FBS standard deviations "
+               f"(the spread between FBS teams). The middle ring is the median; farther out is always better. Offense "
+               f"and defense axes sit in the same spots (scoring rate across from stop rate, and so on). Hollow "
+               f"points are small samples; triangles are beyond ±{Z_LIMIT:.0f} SD and pinned to the edge. Hover any "
+               f"point for the numbers. {team}: {n_ours} game{'' if n_ours == 1 else 's'} · {opponent}: {n_theirs} "
+               f"game{'' if n_theirs == 1 else 's'} of film.")
+    for left, right in p["rows"]:
+        for col, (title, sub, name, frame, color) in zip(st.columns(2), (left, right)):
+            with col:
+                render_radar(title, sub, [(name, frame)], height=520, colors=[color], width=620)
     st.caption(
         "Same definitions on both sides: our curated data for the team, cfbfastR play-by-play for FBS. "
         "Kickoffs are measured from the touchback spot (HS 20, college 25) so the different rules don't decide the "

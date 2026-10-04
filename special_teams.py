@@ -33,7 +33,7 @@ def kick_events(df: pd.DataFrame) -> pd.DataFrame:
     rows = []
     for gid, g in df.groupby("game_id", sort=False):
         g = g.sort_values("PLAY #").reset_index(drop=True)
-        opp = ins.opponent_of(gid)
+        opp = ins.other_team(g, TEAM) or ins.opponent_of(gid)
         week = g["WEEK"].iat[0]
         scrim = g.index[g["DN"].isin([1, 2, 3, 4]) & ~g["PLAY TYPE"].isin(KICKOFFS | XPS | TWO_PTS)
                         & g["YARDLINE_100"].notna()].to_numpy()
@@ -45,7 +45,9 @@ def kick_events(df: pd.DataFrame) -> pd.DataFrame:
             start = 100 - nxt["YARDLINE_100"]           # yards from the receiver's own goal
             if r["PLAY TYPE"] in KICKOFFS:
                 receiver = nxt["offense"]
-                kicker = opp if receiver == TEAM else TEAM
+                kicker = ins.other_team(g, receiver)   # whoever didn't receive it (works for any two teams)
+                if kicker is None:
+                    continue
                 rows.append({"game": gid, "week": week, "opp": opp, "kind": "Kickoff", "kicker": kicker,
                              "receiver": receiver, "QTR": r["QTR"], "spot": np.nan, "start": start,
                              "net": np.nan, "result": r["RESULT"], "ret": r.get("RET YARDS", np.nan)})
@@ -101,7 +103,7 @@ def field_position_by_game(df: pd.DataFrame) -> pd.DataFrame:
     rows = []
     for gid in ins.games(df):
         g = df[df["game_id"] == gid]
-        opp = ins.opponent_of(gid)
+        opp = ins.other_team(g, TEAM) or ins.opponent_of(gid)
         ours, theirs = ins.drive_summary(g, TEAM), ins.drive_summary(g, opp)
         rows.append({"game": gid, "Game": ins.game_label(df, gid),
                      "us": ours["start"].mean() if len(ours) else np.nan,
@@ -160,9 +162,8 @@ def render_fg_range(df: pd.DataFrame) -> None:
     import fourth_down_core as fd
 
     st.markdown("**Field goal range vs the 4th Down Bot's model**")
-    fg = df[df["PLAY TYPE"].isin(FGS)].copy()
+    fg = df[df["PLAY TYPE"].isin(FGS) & (df["offense"] == TEAM)].copy()   # Dowling's kicks only
     fg["Distance"] = fg["YARDLINE_100"] + 17
-    fg["Kicker"] = np.where(fg["offense"] == TEAM, TEAM, "Opponents")
     fg["Result"] = np.where(fg["RESULT"] == "Good", "Made", "Missed")
     fg["y"] = np.where(fg["Result"] == "Made", 1.0, 0.0)
     curve = pd.DataFrame({"Distance": np.arange(18, 63)})
@@ -175,10 +176,11 @@ def render_fg_range(df: pd.DataFrame) -> None:
         x="Distance:Q", y="y:Q",
         color=alt.Color("Result:N", scale=alt.Scale(domain=["Made", "Missed"], range=["#1D9E75", "#E24B4A"]),
                         legend=alt.Legend(orient="top", title=None)),
-        shape=alt.Shape("Kicker:N", scale=alt.Scale(domain=[TEAM, "Opponents"], range=["circle", "diamond"]),
-                        legend=alt.Legend(orient="top", title=None)),
-        tooltip=["Kicker", "Distance", "Result", alt.Tooltip("WEEK:Q", title="Week")])
-    st.altair_chart(alt.layer(line, pts).properties(height=300), width="stretch")
+        tooltip=["Distance", "Result", alt.Tooltip("WEEK:Q", title="Week")])
+    layers = [line, pts] if len(fg) else [line]
+    st.altair_chart(alt.layer(*layers).properties(height=300), width="stretch")
+    if fg.empty:
+        st.caption("No Dowling field goal attempts in the selected weeks.")
     st.caption("The curve is the make probability the 4th Down Bot uses for every kick-or-go decision. As the "
                "season adds kicks, this shows whether it's too optimistic or too pessimistic about your kicker.")
 
@@ -237,30 +239,47 @@ def render_kick_logs(df: pd.DataFrame, ev: pd.DataFrame) -> None:
 
 
 def render_st_epa(df: pd.DataFrame) -> None:
-    """EPA by special teams unit. Kickoffs are left out: their EP is fixed, so their EPA isn't meaningful yet."""
+    """
+    Dowling's special teams EPA by unit, all from Dowling's point of view. In the data, a punt's "offense" is the
+    punting team and a kickoff's "offense" is the receiving team, with EPA from that team's side; return units
+    use it as is when Dowling is that team, or flipped when Dowling is the one defending the kick.
+    """
     st.markdown("**Special teams EPA by unit**")
-    units = {"Punts": PUNTS, "Field goals": FGS, "PATs and 2-point tries": XPS | TWO_PTS}
+    k = df[df["epa"].notna()]
+    ours, theirs = k["offense"] == TEAM, (k["offense"] != TEAM) & (k["defense"] == TEAM)
+    units = [
+        ("Punts", k[k["PLAY TYPE"].isin(PUNTS) & ours], 1),
+        ("Punt returns", k[k["PLAY TYPE"].isin(PUNTS) & theirs], -1),
+        ("Kickoffs", k[k["PLAY TYPE"].isin(KICKOFFS) & theirs], -1),
+        ("Kickoff returns", k[k["PLAY TYPE"].isin(KICKOFFS) & ours], 1),
+        ("Field goals", k[k["PLAY TYPE"].isin(FGS) & ours], 1),
+        ("PATs and 2-point tries", k[k["PLAY TYPE"].isin(XPS | TWO_PTS) & ours], 1),
+    ]
     rows = []
-    for name, types in units.items():
-        k = df[df["PLAY TYPE"].isin(types) & df["epa"].notna()]
-        for side, label in ((k["offense"] == TEAM, TEAM), (k["offense"] != TEAM, "Opponents")):
-            s = k[side]
-            rows.append({"Unit": name, "Kicking team": label, "Plays": len(s), "Total EPA": s["epa"].sum(),
-                         "EPA per kick": s["epa"].mean() if len(s) else np.nan})
-    t = pd.DataFrame(rows).set_index(["Unit", "Kicking team"])
+    for name, s_, sign in units:
+        e = sign * s_["epa"]
+        rows.append({"Unit": name, "Plays": len(s_), "Total EPA": e.sum(), "EPA per play": e.mean() if len(s_) else np.nan})
+    t = pd.DataFrame(rows).set_index("Unit")
 
     def color(col):
         return ["" if pd.isna(x) else "background-color:#E1F5EE;color:#085041" if x > 0.05 else
                 "background-color:#FCEBEB;color:#791F1F" if x < -0.05 else "" for x in col]
 
-    st.dataframe(t.style.format({"Total EPA": "{:+.1f}", "EPA per kick": "{:+.2f}"}, na_rep="–")
-                 .apply(color, subset=["EPA per kick"]), width="stretch")
-    st.caption("EPA from the kicking team's point of view; compare Dowling to opponents rather than to zero. A punt "
-               "starts from a 4th-down situation with very low expected points, so a normal punt scores as positive. "
-               "Kickoffs aren't scored yet because the EP framework gives every kickoff the same fixed value.")
+    st.dataframe(t.style.format({"Total EPA": "{:+.1f}", "EPA per play": "{:+.2f}"}, na_rep="–")
+                 .apply(color, subset=["EPA per play"]), width="stretch")
+    st.caption("EPA from Dowling's point of view, so above 0 is good for Dowling on every row. A punt starts from a "
+               "4th-down situation with very low expected points, so a normal punt scores as positive, and a "
+               "normal punt return scores slightly negative. A kickoff touchback scores about −0.3 for the return team "
+               "(+0.3 for the kicking team), so a kickoff return is only adding value if it beats that, and kickoff "
+               "coverage is doing its job when it's at or above it.")
 
 
 def render_special_teams_page(df_games: pd.DataFrame) -> None:
+    # Only games Dowling played: scout film of other teams' kicks doesn't say anything about Dowling's units.
+    df_games = ins.dowling_only(df_games)
+    if df_games.empty:
+        st.info("No Dowling games in the selected weeks.")
+        return
     ev = kick_events(df_games)
     render_unit_cards(df_games, ev)
     render_field_position_battle(df_games)
