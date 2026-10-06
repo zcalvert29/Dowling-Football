@@ -72,11 +72,11 @@ DEFENSE = [
 ]
 
 SPECIAL_TEAMS = [
-    Metric("fg", "Field Goals", True, "pct", 3, "Field goal make rate (PATs aren't in the college data, so they're left out)."),
-    Metric("ko_cov", "Kickoff", False, "yds", 5, "Where opponents start after our kickoffs, vs the touchback spot (HS 20, college 25)."),
-    Metric("ko_ret", "Kick Return", True, "yds", 5, "Where we start after their kickoffs, vs the touchback spot."),
-    Metric("punt", "Punt", True, "num", 5, "Net punt: punt spot to where the opponent's next snap is."),
-    Metric("punt_ret", "Punt Return", False, "num", 5, "Opponent net punt against us (fewer net yards = better return)."),
+    Metric("fg_epa", "Field Goals", True, "epa", 3, "EPA per field goal try: 3 points if made, the field position given up if missed, compared to the expected points before the kick."),
+    Metric("ko_epa", "Kickoff", True, "epa", 5, "EPA per kickoff, compared to a touchback (HS 20, college 25): above 0 = opponents started worse than a touchback."),
+    Metric("ko_ret_epa", "Kick Return", True, "epa", 5, "EPA per kickoff received, compared to a touchback: above 0 = we started better than a touchback."),
+    Metric("punt_epa", "Punt", True, "epa", 5, "EPA per punt: the field position the punt flipped, in points."),
+    Metric("punt_ret_epa", "Punt Return", True, "epa", 5, "EPA per punt received (the opponent's punt EPA, flipped)."),
 ]
 
 UNITS = {"offense": OFFENSE, "defense": DEFENSE, "special_teams": SPECIAL_TEAMS}
@@ -134,14 +134,85 @@ def team_metrics(tables: dict, team: str) -> dict:
     ko_k, ko_r = kicks[(kicks["kind"] == "ko") & (kicks["kicker"] == team)], kicks[(kicks["kind"] == "ko") & (kicks["receiver"] == team)]
     pu_k, pu_r = kicks[(kicks["kind"] == "punt") & (kicks["kicker"] == team)], kicks[(kicks["kind"] == "punt") & (kicks["receiver"] == team)]
     f = fgs[fgs["kicker"] == team]
+    epa = lambda d, sign=1: (sign * d["epa"].mean() if "epa" in d and d["epa"].notna().any() else np.nan,
+                             int(d["epa"].notna().sum()) if "epa" in d else 0)
     out["special_teams"] = {
         "fg": (f["made"].mean() if len(f) else np.nan, len(f)),
         "ko_cov": (ko_k["value"].mean(), len(ko_k)),
         "ko_ret": (ko_r["value"].mean(), len(ko_r)),
         "punt": (pu_k["value"].mean(), len(pu_k)),
         "punt_ret": (pu_r["value"].mean(), len(pu_r)),
+        "fg_epa": epa(f), "ko_epa": epa(ko_k), "ko_ret_epa": epa(ko_r, -1),
+        "punt_epa": epa(pu_k), "punt_ret_epa": epa(pu_r, -1),
     }
     return out
+
+
+# ---------------------------------------------------------------------------
+# Special teams EPA, computed the same way for both sources
+#
+# The Hudl file and cfbfastR each carry their own EPA, built on different EP
+# models and different kickoff conventions, so they can't be compared
+# directly. Instead every kick is priced here with the app's own EP model, in
+# one neutral context (tie game, middle of a half, all timeouts), from the
+# kicking team's point of view:
+#   kickoff  EP the receiver would have at the touchback spot minus EP at
+#            their real start (HS touchback 20, college 25, so the rule
+#            difference doesn't decide the axis)
+#   punt     -(receiver's EP at their first snap) - (punter's EP at the punt)
+#   FG       3 if made, else -(opponent's EP taking over at the spot of the
+#            kick, or the 20 if that's closer), minus the kicker's EP before
+# A return unit's EPA is the kicking team's EPA flipped.
+# ---------------------------------------------------------------------------
+NEUTRAL_HALF_SECONDS = 900.0
+
+
+def _ep_many(ytg, down, dist) -> np.ndarray:
+    import model_utils as mu
+
+    ytg = np.clip(np.asarray(ytg, dtype=float), 1, 99)
+    down = np.asarray(down, dtype=float)
+    dist = np.clip(np.asarray(dist, dtype=float), 1, None)
+    if getattr(mu, "_ep_booster", None) is None:
+        return np.array([mu._heuristic_ep(y) for y in ytg])
+    import xgboost as xgb
+    n = len(ytg)
+    half = np.full(n, NEUTRAL_HALF_SECONDS)
+    x = np.column_stack([ytg, *[(down == k).astype(float) for k in (1, 2, 3, 4)], dist, half, np.zeros(n),
+                         np.full(n, 3.0), np.full(n, 3.0), (half <= 120).astype(float), (dist >= ytg).astype(float)])
+    return mu._ep_booster.predict(xgb.DMatrix(x, feature_names=mu.EP_FEATURE_ORDER))
+
+
+def _first_down_ep(ytg) -> np.ndarray:
+    ytg = np.clip(np.asarray(ytg, dtype=float), 1, 99)
+    return _ep_many(ytg, np.ones(len(ytg)), np.minimum(10.0, ytg))
+
+
+def add_st_epa(kicks: pd.DataFrame, fgs: pd.DataFrame, touchback_ytg: float) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Adds an "epa" column (kicking team's view) to the kicks and field goal tables."""
+    kicks = kicks.reset_index(drop=True).copy()
+    kicks["epa"] = np.nan
+    ko = kicks["kind"] == "ko"
+    if ko.any():
+        r = kicks.loc[ko, "recv_ytg"]
+        kicks.loc[ko, "epa"] = _first_down_ep(np.full(len(r), touchback_ytg)) - _first_down_ep(r)
+    pu = (kicks["kind"] == "punt") & kicks["spot_ytg"].notna()
+    if pu.any():
+        k = kicks[pu]
+        # Always priced as 4th down: a kick is a 4th-down choice, and the neutral mid-half context would
+        # overvalue the rare end-of-half kick tagged on an earlier down.
+        before = _ep_many(k["spot_ytg"], np.full(len(k), 4.0), k["dist"].fillna(10))
+        kicks.loc[pu, "epa"] = -_first_down_ep(k["recv_ytg"]) - before
+    fgs = fgs.reset_index(drop=True).copy()
+    fgs["epa"] = np.nan
+    ok = fgs["ytg"].notna()
+    if ok.any():
+        f = fgs[ok]
+        before = _ep_many(f["ytg"], np.full(len(f), 4.0), f["dist"].fillna(10))
+        opp_ytg = np.minimum(100 - (f["ytg"].to_numpy(dtype=float) + 7), 100 - 20)
+        after = np.where(f["made"].to_numpy(), 3.0, -_first_down_ep(opp_ytg))
+        fgs.loc[ok, "epa"] = after - before
+    return kicks, fgs
 
 
 # ---------------------------------------------------------------------------
@@ -192,14 +263,19 @@ def standardize_hudl(df: pd.DataFrame, team: str = "Dowling Catholic") -> dict:
             start = 100 - nxt["YARDLINE_100"]
             if r["PLAY TYPE"] in _KICKOFFS:
                 kicker = b if nxt["offense"] == a else a
-                kicks.append({"kind": "ko", "kicker": kicker, "receiver": nxt["offense"], "value": start - HS_TOUCHBACK})
+                kicks.append({"kind": "ko", "kicker": kicker, "receiver": nxt["offense"], "value": start - HS_TOUCHBACK,
+                              "recv_ytg": nxt["YARDLINE_100"], "spot_ytg": np.nan, "down": np.nan, "dist": np.nan})
             elif r["offense"] != nxt["offense"]:
                 kicks.append({"kind": "punt", "kicker": r["offense"], "receiver": nxt["offense"],
-                              "value": r["YARDLINE_100"] - start})
+                              "value": r["YARDLINE_100"] - start, "recv_ytg": nxt["YARDLINE_100"],
+                              "spot_ytg": r["YARDLINE_100"], "down": r["DN"], "dist": r["DIST"]})
     fg = df[df["PLAY TYPE"].isin(_FGS)]
-    fgs = pd.DataFrame({"kicker": fg["offense"], "made": fg["RESULT"] == "Good"})
+    fgs = pd.DataFrame({"kicker": fg["offense"], "made": fg["RESULT"] == "Good", "ytg": fg["YARDLINE_100"],
+                        "down": fg["DN"], "dist": fg["DIST"]})
+    kicks = pd.DataFrame(kicks, columns=["kind", "kicker", "receiver", "value", "recv_ytg", "spot_ytg", "down", "dist"])
+    kicks, fgs = add_st_epa(kicks, fgs, 100 - HS_TOUCHBACK)
     return {"plays": plays, "drives": pd.DataFrame(drives, columns=["game", "offense", "defense", "scored"]),
-            "kicks": pd.DataFrame(kicks, columns=["kind", "kicker", "receiver", "value"]), "fgs": fgs}
+            "kicks": kicks, "fgs": fgs}
 
 
 # ---------------------------------------------------------------------------
@@ -255,10 +331,15 @@ def standardize_cfbfastr(d: pd.DataFrame) -> dict:
             k = k[k["pos_team"] != k["recv"]]
             k["kicker"] = k["pos_team"]
             val = k["yards_to_goal"] - (100 - k["recv_ytg"])
-        kicks.append(pd.DataFrame({"kind": kind, "kicker": k["kicker"], "receiver": k["recv"], "value": val}))
+        kicks.append(pd.DataFrame({"kind": kind, "kicker": k["kicker"], "receiver": k["recv"], "value": val,
+                                   "recv_ytg": k["recv_ytg"], "spot_ytg": k["yards_to_goal"] if kind == "punt" else np.nan,
+                                   "down": k["down"] if kind == "punt" else np.nan,
+                                   "dist": k["distance"] if kind == "punt" else np.nan}))
     fg = d[d["fg_inds"] == 1]
-    fgs = pd.DataFrame({"kicker": fg["pos_team"], "made": fg["fg_made"].fillna(False).astype(bool)})
-    return {"plays": plays, "drives": drives, "kicks": pd.concat(kicks, ignore_index=True), "fgs": fgs}
+    fgs = pd.DataFrame({"kicker": fg["pos_team"], "made": fg["fg_made"].fillna(False).astype(bool),
+                        "ytg": fg["yards_to_goal"], "down": fg["down"], "dist": fg["distance"]})
+    kicks, fgs = add_st_epa(pd.concat(kicks, ignore_index=True), fgs, 100 - CFB_TOUCHBACK)
+    return {"plays": plays, "drives": drives, "kicks": kicks, "fgs": fgs}
 
 
 def fbs_teams(d: pd.DataFrame, min_plays: int = 300) -> list[str]:

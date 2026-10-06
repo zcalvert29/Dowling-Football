@@ -28,6 +28,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Air Force,6.085714285714285,35
 2022,special_teams,punt,Air Force,35.69565217391305,23
 2022,special_teams,punt_ret,Air Force,41.861111111111114,36
+2022,special_teams,fg_epa,Air Force,0.33592677116394043,12
+2022,special_teams,ko_epa,Air Force,-0.08354557856269505,46
+2022,special_teams,ko_ret_epa,Air Force,0.4062928182738168,35
+2022,special_teams,punt_epa,Air Force,-0.39501922124105954,23
+2022,special_teams,punt_ret_epa,Air Force,-0.10805903706285688,36
 2022,offense,success,Akron,0.4672727272727273,550
 2022,offense,explosive,Akron,0.09636363636363636,550
 2022,offense,epa_rush,Akron,-0.17057831854332503,189
@@ -57,6 +62,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Akron,12.325,40
 2022,special_teams,punt,Akron,25.322580645161292,31
 2022,special_teams,punt_ret,Akron,41.8,25
+2022,special_teams,fg_epa,Akron,-0.2456000362123762,14
+2022,special_teams,ko_epa,Akron,-0.628354663848877,25
+2022,special_teams,ko_ret_epa,Akron,0.8613924071192741,40
+2022,special_teams,punt_epa,Akron,-1.1274259450935549,31
+2022,special_teams,punt_ret_epa,Akron,0.08313598215579987,25
 2022,offense,success,Alabama,0.4897435897435897,780
 2022,offense,explosive,Alabama,0.15128205128205127,780
 2022,offense,epa_rush,Alabama,0.08822186388037037,372
@@ -86,6 +96,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Alabama,0.10256410256410256,39
 2022,special_teams,punt,Alabama,39.35294117647059,34
 2022,special_teams,punt_ret,Alabama,36.455882352941174,68
+2022,special_teams,fg_epa,Alabama,0.5498825931549072,25
+2022,special_teams,ko_epa,Alabama,0.06216525159231046,82
+2022,special_teams,ko_ret_epa,Alabama,-0.028107050137642104,39
+2022,special_teams,punt_epa,Alabama,-0.18373000271180095,34
+2022,special_teams,punt_ret_epa,Alabama,0.3873450561043094,68
 2022,offense,success,Appalachian State,0.4924554183813443,729
 2022,offense,explosive,Appalachian State,0.13717421124828533,729
 2022,offense,epa_rush,Appalachian State,0.06886275113496425,387
@@ -115,6 +130,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Appalachian State,3.7872340425531914,47
 2022,special_teams,punt,Appalachian State,34.911764705882355,34
 2022,special_teams,punt_ret,Appalachian State,39.111111111111114,45
+2022,special_teams,fg_epa,Appalachian State,-0.9516783237457276,5
+2022,special_teams,ko_epa,Appalachian State,-0.10263508443648998,52
+2022,special_teams,ko_ret_epa,Appalachian State,0.2546671489451794,47
+2022,special_teams,punt_epa,Appalachian State,-0.4899227172136307,34
+2022,special_teams,punt_ret_epa,Appalachian State,0.20601280331611632,45
 2022,offense,success,Arizona,0.5118694362017804,674
 2022,offense,explosive,Arizona,0.1661721068249258,674
 2022,offense,epa_rush,Arizona,0.035970820193869345,274
@@ -144,6 +164,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Arizona,4.348484848484849,66
 2022,special_teams,punt,Arizona,36.30769230769231,26
 2022,special_teams,punt_ret,Arizona,28.14814814814815,27
+2022,special_teams,fg_epa,Arizona,0.5069885113660026,17
+2022,special_teams,ko_epa,Arizona,-0.25598650720884214,53
+2022,special_teams,ko_ret_epa,Arizona,0.2799156696507425,66
+2022,special_teams,punt_epa,Arizona,-0.2816270286074051,26
+2022,special_teams,punt_ret_epa,Arizona,0.9078473680549197,27
 2022,offense,success,Arizona State,0.4616858237547893,522
 2022,offense,explosive,Arizona State,0.12643678160919541,522
 2022,offense,epa_rush,Arizona State,0.003957330080649985,226
@@ -173,6 +198,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Arizona State,0.7924528301886793,53
 2022,special_teams,punt,Arizona State,40.729729729729726,37
 2022,special_teams,punt_ret,Arizona State,40.241379310344826,29
+2022,special_teams,fg_epa,Arizona State,0.2626690732108222,9
+2022,special_teams,ko_epa,Arizona State,0.0875200996032128,39
+2022,special_teams,ko_ret_epa,Arizona State,0.058289259109856946,53
+2022,special_teams,punt_epa,Arizona State,-0.03762545335937191,37
+2022,special_teams,punt_ret_epa,Arizona State,0.07009193018592637,29
 2022,offense,success,Arkansas,0.49195710455764075,746
 2022,offense,explosive,Arkansas,0.1487935656836461,746
 2022,offense,epa_rush,Arkansas,0.0011810738310480372,451
@@ -202,6 +232,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Arkansas,2.037037037037037,54
 2022,special_teams,punt,Arkansas,35.609756097560975,41
 2022,special_teams,punt_ret,Arkansas,42.0,36
+2022,special_teams,fg_epa,Arkansas,0.3177249828974406,12
+2022,special_teams,ko_epa,Arkansas,-0.02040447570659496,54
+2022,special_teams,ko_ret_epa,Arkansas,0.11594748276251333,54
+2022,special_teams,punt_epa,Arkansas,-0.394297265061518,41
+2022,special_teams,punt_ret_epa,Arkansas,-0.03389178216457367,36
 2022,offense,success,Arkansas State,0.3852080123266564,649
 2022,offense,explosive,Arkansas State,0.1016949152542373,649
 2022,offense,epa_rush,Arkansas State,-0.14132632782916024,300
@@ -231,6 +266,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Arkansas State,1.3018867924528301,53
 2022,special_teams,punt,Arkansas State,40.422222222222224,45
 2022,special_teams,punt_ret,Arkansas State,39.15217391304348,46
+2022,special_teams,fg_epa,Arkansas State,1.3009175245578473,13
+2022,special_teams,ko_epa,Arkansas State,0.20003302817074758,53
+2022,special_teams,ko_ret_epa,Arkansas State,0.07692480312203462,53
+2022,special_teams,punt_epa,Arkansas State,-0.03635475022925271,45
+2022,special_teams,punt_ret_epa,Arkansas State,0.13929647725561392,46
 2022,offense,success,Army,0.5232744783306581,623
 2022,offense,explosive,Army,0.13643659711075443,623
 2022,offense,epa_rush,Army,0.19357395401493502,525
@@ -260,6 +300,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Army,2.6956521739130435,46
 2022,special_teams,punt,Army,30.666666666666668,30
 2022,special_teams,punt_ret,Army,37.84,25
+2022,special_teams,fg_epa,Army,-0.3734093223299299,7
+2022,special_teams,ko_epa,Army,-0.038169345077203244,49
+2022,special_teams,ko_ret_epa,Army,0.17092416597449261,46
+2022,special_teams,punt_epa,Army,-0.7371005331476529,30
+2022,special_teams,punt_ret_epa,Army,0.29459396719932557,25
 2022,offense,success,Auburn,0.41025641025641024,663
 2022,offense,explosive,Auburn,0.15233785822021115,663
 2022,offense,epa_rush,Auburn,0.04205077590226121,374
@@ -289,6 +334,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Auburn,1.7692307692307692,52
 2022,special_teams,punt,Auburn,42.43589743589744,39
 2022,special_teams,punt_ret,Auburn,39.46666666666667,45
+2022,special_teams,fg_epa,Auburn,-0.33866449594497683,20
+2022,special_teams,ko_epa,Auburn,-0.3643736475851478,41
+2022,special_teams,ko_ret_epa,Auburn,0.13326256435651046,52
+2022,special_teams,punt_epa,Auburn,0.20954283193135873,39
+2022,special_teams,punt_ret_epa,Auburn,0.11427358984947204,45
 2022,offense,success,BYU,0.4524647887323944,568
 2022,offense,explosive,BYU,0.13204225352112675,568
 2022,offense,epa_rush,BYU,0.02944841633864767,267
@@ -318,6 +368,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,BYU,0.4909090909090909,55
 2022,special_teams,punt,BYU,40.61538461538461,26
 2022,special_teams,punt_ret,BYU,38.07692307692308,26
+2022,special_teams,fg_epa,BYU,-0.6595725615819296,12
+2022,special_teams,ko_epa,BYU,-0.17316433139469312,46
+2022,special_teams,ko_ret_epa,BYU,0.030490225011652165,55
+2022,special_teams,punt_epa,BYU,-0.2237641834295713,26
+2022,special_teams,punt_ret_epa,BYU,0.13691076177817124,26
 2022,offense,success,Ball State,0.4438964241676942,811
 2022,offense,explosive,Ball State,0.09864364981504316,811
 2022,offense,epa_rush,Ball State,-0.03305487617752396,358
@@ -347,6 +402,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Ball State,0.9090909090909091,55
 2022,special_teams,punt,Ball State,37.30357142857143,56
 2022,special_teams,punt_ret,Ball State,36.672413793103445,58
+2022,special_teams,fg_epa,Ball State,0.059639428791246916,19
+2022,special_teams,ko_epa,Ball State,0.012021167524929705,58
+2022,special_teams,ko_ret_epa,Ball State,0.044909063252535734,55
+2022,special_teams,punt_epa,Ball State,-0.21485949786646025,56
+2022,special_teams,punt_ret_epa,Ball State,0.4288516904002634,58
 2022,offense,success,Baylor,0.5098814229249012,759
 2022,offense,explosive,Baylor,0.13175230566534915,759
 2022,offense,epa_rush,Baylor,0.1302206806052777,426
@@ -376,6 +436,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Baylor,3.019607843137255,51
 2022,special_teams,punt,Baylor,35.61290322580645,31
 2022,special_teams,punt_ret,Baylor,37.57142857142857,42
+2022,special_teams,fg_epa,Baylor,0.4167626036538018,9
+2022,special_teams,ko_epa,Baylor,-0.2508895860777961,63
+2022,special_teams,ko_ret_epa,Baylor,0.17738592157176897,51
+2022,special_teams,punt_epa,Baylor,-0.32309146994544613,31
+2022,special_teams,punt_ret_epa,Baylor,0.3163254367453711,42
 2022,offense,success,Boise State,0.4805194805194805,539
 2022,offense,explosive,Boise State,0.12430426716141002,539
 2022,offense,epa_rush,Boise State,0.03445636003563656,308
@@ -405,6 +470,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Boise State,4.76,25
 2022,special_teams,punt,Boise State,41.266666666666666,30
 2022,special_teams,punt_ret,Boise State,41.266666666666666,45
+2022,special_teams,fg_epa,Boise State,0.4241325855255127,19
+2022,special_teams,ko_epa,Boise State,0.03597794506284926,45
+2022,special_teams,ko_ret_epa,Boise State,0.2822964358329773,25
+2022,special_teams,punt_epa,Boise State,0.09682311515013377,30
+2022,special_teams,punt_ret_epa,Boise State,-0.010171752505832249,45
 2022,offense,success,Boston College,0.3706896551724138,580
 2022,offense,explosive,Boston College,0.09482758620689655,580
 2022,offense,epa_rush,Boston College,-0.11609297781617317,214
@@ -434,6 +504,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Boston College,0.30612244897959184,49
 2022,special_teams,punt,Boston College,40.57142857142857,56
 2022,special_teams,punt_ret,Boston College,39.95652173913044,46
+2022,special_teams,fg_epa,Boston College,-0.9953168447201068,13
+2022,special_teams,ko_epa,Boston College,-0.33738351861635846,36
+2022,special_teams,ko_ret_epa,Boston College,0.0013225869256622937,49
+2022,special_teams,punt_epa,Boston College,-0.09496154835713762,56
+2022,special_teams,punt_ret_epa,Boston College,0.027973308835340584,46
 2022,offense,success,Bowling Green,0.42197452229299365,628
 2022,offense,explosive,Bowling Green,0.11624203821656051,628
 2022,offense,epa_rush,Bowling Green,-0.20221928168558387,287
@@ -463,6 +538,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Bowling Green,4.519230769230769,52
 2022,special_teams,punt,Bowling Green,34.72,50
 2022,special_teams,punt_ret,Bowling Green,29.25,36
+2022,special_teams,fg_epa,Bowling Green,-0.20239867766698202,12
+2022,special_teams,ko_epa,Bowling Green,-0.6962558423600546,41
+2022,special_teams,ko_ret_epa,Bowling Green,0.31979175828970396,52
+2022,special_teams,punt_epa,Bowling Green,-0.48330326557159425,50
+2022,special_teams,punt_ret_epa,Bowling Green,0.9525026049878862,36
 2022,offense,success,Buffalo,0.437403400309119,647
 2022,offense,explosive,Buffalo,0.09119010819165378,647
 2022,offense,epa_rush,Buffalo,0.022549420289345035,329
@@ -492,6 +572,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Buffalo,2.5641025641025643,39
 2022,special_teams,punt,Buffalo,35.07142857142857,28
 2022,special_teams,punt_ret,Buffalo,31.857142857142858,28
+2022,special_teams,fg_epa,Buffalo,1.1267863379584417,18
+2022,special_teams,ko_epa,Buffalo,-0.5079973400855551,49
+2022,special_teams,ko_ret_epa,Buffalo,0.17886914809544882,39
+2022,special_teams,punt_epa,Buffalo,-0.4540680210505213,28
+2022,special_teams,punt_ret_epa,Buffalo,0.7059461112533297,28
 2022,offense,success,California,0.4114114114114114,666
 2022,offense,explosive,California,0.1066066066066066,666
 2022,offense,epa_rush,California,0.024087971860567343,246
@@ -521,6 +606,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,California,-0.6346153846153846,52
 2022,special_teams,punt,California,40.32692307692308,52
 2022,special_teams,punt_ret,California,37.11904761904762,42
+2022,special_teams,fg_epa,California,-0.5834782794117928,16
+2022,special_teams,ko_epa,California,-0.11534957753287421,45
+2022,special_teams,ko_ret_epa,California,-0.0741088195489003,52
+2022,special_teams,punt_epa,California,-0.0336257997327126,52
+2022,special_teams,punt_ret_epa,California,0.42738557181188036,42
 2022,offense,success,Central Michigan,0.4222539229671897,701
 2022,offense,explosive,Central Michigan,0.11269614835948645,701
 2022,offense,epa_rush,Central Michigan,0.0598333048897639,323
@@ -550,6 +640,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Central Michigan,3.549019607843137,51
 2022,special_teams,punt,Central Michigan,37.513513513513516,37
 2022,special_teams,punt_ret,Central Michigan,36.627450980392155,51
+2022,special_teams,fg_epa,Central Michigan,-1.0060725395496075,13
+2022,special_teams,ko_epa,Central Michigan,-0.3641044646501541,48
+2022,special_teams,ko_ret_epa,Central Michigan,0.25909074381286024,51
+2022,special_teams,punt_epa,Central Michigan,-0.3715650825887113,37
+2022,special_teams,punt_ret_epa,Central Michigan,0.2565045514527489,51
 2022,offense,success,Charlotte,0.481089258698941,661
 2022,offense,explosive,Charlotte,0.13767019667170954,661
 2022,offense,epa_rush,Charlotte,0.05443891011005305,278
@@ -579,6 +674,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Charlotte,4.32258064516129,62
 2022,special_teams,punt,Charlotte,36.241379310344826,29
 2022,special_teams,punt_ret,Charlotte,35.541666666666664,24
+2022,special_teams,fg_epa,Charlotte,-1.8697651227315266,3
+2022,special_teams,ko_epa,Charlotte,-0.2781038612127304,40
+2022,special_teams,ko_ret_epa,Charlotte,0.28960281898898466,62
+2022,special_teams,punt_epa,Charlotte,-0.2874961978402631,29
+2022,special_teams,punt_ret_epa,Charlotte,0.6234440871824821,24
 2022,offense,success,Cincinnati,0.42473118279569894,558
 2022,offense,explosive,Cincinnati,0.1111111111111111,558
 2022,offense,epa_rush,Cincinnati,-0.05397183956637198,236
@@ -608,6 +708,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Cincinnati,0.4444444444444444,36
 2022,special_teams,punt,Cincinnati,46.44736842105263,38
 2022,special_teams,punt_ret,Cincinnati,36.54347826086956,46
+2022,special_teams,fg_epa,Cincinnati,0.08989873197343615,18
+2022,special_teams,ko_epa,Cincinnati,0.001529089376038196,51
+2022,special_teams,ko_ret_epa,Cincinnati,0.027687531378534105,36
+2022,special_teams,punt_epa,Cincinnati,0.3461401635094693,38
+2022,special_teams,punt_ret_epa,Cincinnati,0.3201523659669835,46
 2022,offense,success,Clemson,0.48675034867503486,717
 2022,offense,explosive,Clemson,0.14783821478382148,717
 2022,offense,epa_rush,Clemson,0.09220382004795614,376
@@ -637,6 +742,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Clemson,4.975,40
 2022,special_teams,punt,Clemson,37.54761904761905,42
 2022,special_teams,punt_ret,Clemson,37.59183673469388,49
+2022,special_teams,fg_epa,Clemson,0.6043497059080336,18
+2022,special_teams,ko_epa,Clemson,0.012888502266447423,59
+2022,special_teams,ko_ret_epa,Clemson,0.35495791882276534,40
+2022,special_teams,punt_epa,Clemson,-0.39083238407259896,42
+2022,special_teams,punt_ret_epa,Clemson,0.21664337479338355,49
 2022,offense,success,Coastal Carolina,0.5065573770491804,610
 2022,offense,explosive,Coastal Carolina,0.16885245901639345,610
 2022,offense,epa_rush,Coastal Carolina,-0.05971791997401301,345
@@ -666,6 +776,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Coastal Carolina,-0.25,52
 2022,special_teams,punt,Coastal Carolina,33.2962962962963,27
 2022,special_teams,punt_ret,Coastal Carolina,35.96296296296296,27
+2022,special_teams,fg_epa,Coastal Carolina,-0.3885198506441983,11
+2022,special_teams,ko_epa,Coastal Carolina,-0.023223808351552713,53
+2022,special_teams,ko_ret_epa,Coastal Carolina,-0.05645125416608957,52
+2022,special_teams,punt_epa,Coastal Carolina,-0.5345488610091033,27
+2022,special_teams,punt_ret_epa,Coastal Carolina,0.22715349936926807,27
 2022,offense,success,Colorado,0.42280701754385963,570
 2022,offense,explosive,Colorado,0.11052631578947368,570
 2022,offense,epa_rush,Colorado,-0.055235109080109604,269
@@ -695,6 +810,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Colorado,2.6964285714285716,56
 2022,special_teams,punt,Colorado,30.475,40
 2022,special_teams,punt_ret,Colorado,36.57142857142857,21
+2022,special_teams,fg_epa,Colorado,0.42587001125017804,12
+2022,special_teams,ko_epa,Colorado,-0.4380409002304077,35
+2022,special_teams,ko_ret_epa,Colorado,0.16753715489591872,56
+2022,special_teams,punt_epa,Colorado,-0.8699642289429903,40
+2022,special_teams,punt_ret_epa,Colorado,0.22602656625566028,21
 2022,offense,success,Colorado State,0.35537190082644626,605
 2022,offense,explosive,Colorado State,0.11735537190082644,605
 2022,offense,epa_rush,Colorado State,-0.10629992942111807,279
@@ -724,6 +844,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Colorado State,0.32142857142857145,56
 2022,special_teams,punt,Colorado State,36.9622641509434,53
 2022,special_teams,punt_ret,Colorado State,37.578947368421055,38
+2022,special_teams,fg_epa,Colorado State,-0.3648931154837975,13
+2022,special_teams,ko_epa,Colorado State,0.01852080598473549,32
+2022,special_teams,ko_ret_epa,Colorado State,0.009664710078920637,56
+2022,special_teams,punt_epa,Colorado State,-0.2908920555744531,53
+2022,special_teams,punt_ret_epa,Colorado State,0.1430228293726319,38
 2022,offense,success,Connecticut,0.4157973174366617,671
 2022,offense,explosive,Connecticut,0.12816691505216096,671
 2022,offense,epa_rush,Connecticut,0.07904611948790466,425
@@ -753,6 +878,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Connecticut,-1.1864406779661016,59
 2022,special_teams,punt,Connecticut,37.479166666666664,48
 2022,special_teams,punt_ret,Connecticut,37.34285714285714,35
+2022,special_teams,fg_epa,Connecticut,0.2628885606924693,12
+2022,special_teams,ko_epa,Connecticut,-0.3067753128707409,48
+2022,special_teams,ko_ret_epa,Connecticut,-0.10936034230862633,59
+2022,special_teams,punt_epa,Connecticut,-0.2932695063451926,48
+2022,special_teams,punt_ret_epa,Connecticut,0.2767961774553571,35
 2022,offense,success,Duke,0.47297297297297297,666
 2022,offense,explosive,Duke,0.13063063063063063,666
 2022,offense,epa_rush,Duke,0.13179692163266865,343
@@ -782,6 +912,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Duke,2.725,40
 2022,special_teams,punt,Duke,37.42424242424242,33
 2022,special_teams,punt_ret,Duke,33.282051282051285,39
+2022,special_teams,fg_epa,Duke,-0.6823126454102365,19
+2022,special_teams,ko_epa,Duke,-0.14007738758535945,51
+2022,special_teams,ko_ret_epa,Duke,0.18919630944728852,40
+2022,special_teams,punt_epa,Duke,-0.36525593743179785,33
+2022,special_teams,punt_ret_epa,Duke,0.672130459967332,39
 2022,offense,success,East Carolina,0.4772727272727273,572
 2022,offense,explosive,East Carolina,0.1590909090909091,572
 2022,offense,epa_rush,East Carolina,0.10502085203751264,267
@@ -811,6 +946,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,East Carolina,1.2285714285714286,35
 2022,special_teams,punt,East Carolina,38.083333333333336,24
 2022,special_teams,punt_ret,East Carolina,39.6875,32
+2022,special_teams,fg_epa,East Carolina,-0.7108173529307048,15
+2022,special_teams,ko_epa,East Carolina,-0.008190848997661046,42
+2022,special_teams,ko_ret_epa,East Carolina,0.07083665132522583,35
+2022,special_teams,punt_epa,East Carolina,-0.3065941420694192,24
+2022,special_teams,punt_ret_epa,East Carolina,0.11523362807929516,32
 2022,offense,success,Eastern Michigan,0.4887459807073955,622
 2022,offense,explosive,Eastern Michigan,0.09967845659163987,622
 2022,offense,epa_rush,Eastern Michigan,0.08157342544058487,322
@@ -840,6 +980,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Eastern Michigan,7.2,50
 2022,special_teams,punt,Eastern Michigan,35.96,25
 2022,special_teams,punt_ret,Eastern Michigan,39.36666666666667,30
+2022,special_teams,fg_epa,Eastern Michigan,0.4445082876417372,9
+2022,special_teams,ko_epa,Eastern Michigan,-0.2950133124987284,45
+2022,special_teams,ko_ret_epa,Eastern Michigan,0.5173620200157165,50
+2022,special_teams,punt_epa,Eastern Michigan,-0.27848493605852126,25
+2022,special_teams,punt_ret_epa,Eastern Michigan,0.07901648084322611,30
 2022,offense,success,Florida,0.45492957746478874,710
 2022,offense,explosive,Florida,0.16338028169014085,710
 2022,offense,epa_rush,Florida,0.19219837652475766,379
@@ -869,6 +1014,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Florida,0.29310344827586204,58
 2022,special_teams,punt,Florida,42.111111111111114,27
 2022,special_teams,punt_ret,Florida,36.94444444444444,36
+2022,special_teams,fg_epa,Florida,-0.47562241554260254,19
+2022,special_teams,ko_epa,Florida,-0.05157293331238531,62
+2022,special_teams,ko_ret_epa,Florida,-0.00877937366222513,58
+2022,special_teams,punt_epa,Florida,0.13213899455688619,27
+2022,special_teams,punt_ret_epa,Florida,0.07847542646858427,36
 2022,offense,success,Florida Atlantic,0.49756888168557534,617
 2022,offense,explosive,Florida Atlantic,0.13776337115072934,617
 2022,offense,epa_rush,Florida Atlantic,0.046725391312085626,343
@@ -898,6 +1048,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Florida Atlantic,12.64102564102564,39
 2022,special_teams,punt,Florida Atlantic,27.583333333333332,24
 2022,special_teams,punt_ret,Florida Atlantic,25.62962962962963,27
+2022,special_teams,fg_epa,Florida Atlantic,-0.657885366015964,9
+2022,special_teams,ko_epa,Florida Atlantic,-0.5325700470379421,35
+2022,special_teams,ko_ret_epa,Florida Atlantic,0.8181900427891657,39
+2022,special_teams,punt_epa,Florida Atlantic,-0.9260481658081213,24
+2022,special_teams,punt_ret_epa,Florida Atlantic,1.0947789792661313,27
 2022,offense,success,Florida International,0.4140302613480055,727
 2022,offense,explosive,Florida International,0.07702888583218707,727
 2022,offense,epa_rush,Florida International,-0.10234895278763313,305
@@ -927,6 +1082,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Florida International,2.0625,64
 2022,special_teams,punt,Florida International,35.15686274509804,51
 2022,special_teams,punt_ret,Florida International,35.57692307692308,26
+2022,special_teams,fg_epa,Florida International,-0.3173508644104004,9
+2022,special_teams,ko_epa,Florida International,-0.3701039981096983,32
+2022,special_teams,ko_ret_epa,Florida International,0.11631403584033251,64
+2022,special_teams,punt_epa,Florida International,-0.3828556338946025,51
+2022,special_teams,punt_ret_epa,Florida International,0.43140726479200214,26
 2022,offense,success,Florida State,0.5231788079470199,755
 2022,offense,explosive,Florida State,0.17483443708609273,755
 2022,offense,epa_rush,Florida State,0.13429875663263485,412
@@ -956,6 +1116,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Florida State,-0.375,40
 2022,special_teams,punt,Florida State,37.84,25
 2022,special_teams,punt_ret,Florida State,39.44642857142857,56
+2022,special_teams,fg_epa,Florida State,-0.7027577956517538,15
+2022,special_teams,ko_epa,Florida State,0.01364242604800633,70
+2022,special_teams,ko_ret_epa,Florida State,-0.05835843086242676,40
+2022,special_teams,punt_epa,Florida State,-0.028541316986083986,25
+2022,special_teams,punt_ret_epa,Florida State,0.17322960083505937,56
 2022,offense,success,Fresno State,0.5246153846153846,650
 2022,offense,explosive,Fresno State,0.10307692307692308,650
 2022,offense,epa_rush,Fresno State,0.06869461801169255,295
@@ -985,6 +1150,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Fresno State,3.5681818181818183,44
 2022,special_teams,punt,Fresno State,37.827586206896555,29
 2022,special_teams,punt_ret,Fresno State,39.25714285714286,35
+2022,special_teams,fg_epa,Fresno State,-0.23378664538973853,21
+2022,special_teams,ko_epa,Fresno State,-0.1361260392449119,55
+2022,special_teams,ko_ret_epa,Fresno State,0.2387274761091579,44
+2022,special_teams,punt_epa,Fresno State,-0.3538685441017151,29
+2022,special_teams,punt_ret_epa,Fresno State,0.12006614804267883,35
 2022,offense,success,Georgia,0.5766016713091922,718
 2022,offense,explosive,Georgia,0.14345403899721448,718
 2022,offense,epa_rush,Georgia,0.09311306564862173,349
@@ -1014,6 +1184,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Georgia,3.0555555555555554,36
 2022,special_teams,punt,Georgia,41.666666666666664,24
 2022,special_teams,punt_ret,Georgia,37.44230769230769,52
+2022,special_teams,fg_epa,Georgia,0.39025415778160094,20
+2022,special_teams,ko_epa,Georgia,0.019137207004759047,72
+2022,special_teams,ko_ret_epa,Georgia,0.20879987047778237,36
+2022,special_teams,punt_epa,Georgia,-0.12496620416641235,24
+2022,special_teams,punt_ret_epa,Georgia,0.2788111584690901,52
 2022,offense,success,Georgia Southern,0.4857142857142857,700
 2022,offense,explosive,Georgia Southern,0.10428571428571429,700
 2022,offense,epa_rush,Georgia Southern,0.08085107121274816,269
@@ -1043,6 +1218,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Georgia Southern,-0.24528301886792453,53
 2022,special_teams,punt,Georgia Southern,35.03333333333333,30
 2022,special_teams,punt_ret,Georgia Southern,36.28125,32
+2022,special_teams,fg_epa,Georgia Southern,-0.37507490813732147,16
+2022,special_teams,ko_epa,Georgia Southern,-0.10235915058537533,57
+2022,special_teams,ko_ret_epa,Georgia Southern,-0.031970244533610796,53
+2022,special_teams,punt_epa,Georgia Southern,-0.4291885934770107,30
+2022,special_teams,punt_ret_epa,Georgia Southern,0.45237881131470203,32
 2022,offense,success,Georgia State,0.4630177514792899,676
 2022,offense,explosive,Georgia State,0.13757396449704143,676
 2022,offense,epa_rush,Georgia State,0.034244633423270096,424
@@ -1072,6 +1252,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Georgia State,1.3404255319148937,47
 2022,special_teams,punt,Georgia State,40.96774193548387,31
 2022,special_teams,punt_ret,Georgia State,36.75,36
+2022,special_teams,fg_epa,Georgia State,0.0021597279442681205,9
+2022,special_teams,ko_epa,Georgia State,-0.21632716390821669,45
+2022,special_teams,ko_ret_epa,Georgia State,0.09242097367631628,47
+2022,special_teams,punt_epa,Georgia State,-0.09561388963653196,31
+2022,special_teams,punt_ret_epa,Georgia State,0.3404825799581077,36
 2022,offense,success,Georgia Tech,0.3733133433283358,667
 2022,offense,explosive,Georgia Tech,0.13793103448275862,667
 2022,offense,epa_rush,Georgia Tech,0.021237405017339908,306
@@ -1101,6 +1286,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Georgia Tech,2.150943396226415,53
 2022,special_teams,punt,Georgia Tech,32.388888888888886,54
 2022,special_teams,punt_ret,Georgia Tech,36.875,32
+2022,special_teams,fg_epa,Georgia Tech,-0.10895833041932848,18
+2022,special_teams,ko_epa,Georgia Tech,-0.260762044877717,33
+2022,special_teams,ko_ret_epa,Georgia Tech,0.17139679868266267,53
+2022,special_teams,punt_epa,Georgia Tech,-0.7053307806728063,54
+2022,special_teams,punt_ret_epa,Georgia Tech,0.18196546495892107,32
 2022,offense,success,Hawai'i,0.4340369393139842,758
 2022,offense,explosive,Hawai'i,0.10422163588390501,758
 2022,offense,epa_rush,Hawai'i,0.19973908382651642,321
@@ -1130,6 +1320,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Hawai'i,-0.8985507246376812,69
 2022,special_teams,punt,Hawai'i,36.244897959183675,49
 2022,special_teams,punt_ret,Hawai'i,37.42424242424242,33
+2022,special_teams,fg_epa,Hawai'i,-0.05531627684831619,16
+2022,special_teams,ko_epa,Hawai'i,-0.21185057213965883,47
+2022,special_teams,ko_ret_epa,Hawai'i,-0.10878667624100395,69
+2022,special_teams,punt_epa,Hawai'i,-0.28684595348883646,49
+2022,special_teams,punt_ret_epa,Hawai'i,0.38648517881378985,33
 2022,offense,success,Houston,0.5209840810419681,691
 2022,offense,explosive,Houston,0.12590448625180897,691
 2022,offense,epa_rush,Houston,0.12292999947448455,293
@@ -1159,6 +1354,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Houston,3.566666666666667,60
 2022,special_teams,punt,Houston,40.55555555555556,27
 2022,special_teams,punt_ret,Houston,39.72727272727273,22
+2022,special_teams,fg_epa,Houston,-0.6811295429865519,15
+2022,special_teams,ko_epa,Houston,-0.10357414267279885,55
+2022,special_teams,ko_ret_epa,Houston,0.26778447230656943,60
+2022,special_teams,punt_epa,Houston,-0.12138801923504582,27
+2022,special_teams,punt_ret_epa,Houston,0.01611311462792483,22
 2022,offense,success,Illinois,0.4641975308641975,810
 2022,offense,explosive,Illinois,0.10987654320987654,810
 2022,offense,epa_rush,Illinois,-0.05717990984772219,456
@@ -1188,6 +1388,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Illinois,2.642857142857143,42
 2022,special_teams,punt,Illinois,36.08,50
 2022,special_teams,punt_ret,Illinois,39.03125,64
+2022,special_teams,fg_epa,Illinois,0.1518251354044134,22
+2022,special_teams,ko_epa,Illinois,-0.0728376390678542,56
+2022,special_teams,ko_ret_epa,Illinois,0.17012161584127516,42
+2022,special_teams,punt_epa,Illinois,-0.42765379071235654,50
+2022,special_teams,punt_ret_epa,Illinois,0.22477400553179905,64
 2022,offense,success,Indiana,0.39470365699873894,793
 2022,offense,explosive,Indiana,0.09331651954602774,793
 2022,offense,epa_rush,Indiana,-0.008133178077845584,318
@@ -1217,6 +1422,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Indiana,0.8382352941176471,68
 2022,special_teams,punt,Indiana,39.76119402985075,67
 2022,special_teams,punt_ret,Indiana,39.5,56
+2022,special_teams,fg_epa,Indiana,0.16501970852122588,17
+2022,special_teams,ko_epa,Indiana,-0.12964051143795835,51
+2022,special_teams,ko_ret_epa,Indiana,0.03472227033446817,68
+2022,special_teams,punt_epa,Indiana,-0.14378875783130304,67
+2022,special_teams,punt_ret_epa,Indiana,0.20946912094950676,56
 2022,offense,success,Iowa,0.38898163606010017,599
 2022,offense,explosive,Iowa,0.08013355592654424,599
 2022,offense,epa_rush,Iowa,-0.1821434209874004,298
@@ -1246,6 +1456,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Iowa,0.4411764705882353,34
 2022,special_teams,punt,Iowa,39.45614035087719,57
 2022,special_teams,punt_ret,Iowa,36.37931034482759,58
+2022,special_teams,fg_epa,Iowa,0.22691205475065443,18
+2022,special_teams,ko_epa,Iowa,-0.032091293224068576,43
+2022,special_teams,ko_ret_epa,Iowa,0.030469445621266085,34
+2022,special_teams,punt_epa,Iowa,-0.0599820007357681,57
+2022,special_teams,punt_ret_epa,Iowa,0.3143395996042367,58
 2022,offense,success,Iowa State,0.42704149933065594,747
 2022,offense,explosive,Iowa State,0.0856760374832664,747
 2022,offense,epa_rush,Iowa State,-0.14801812031263628,299
@@ -1275,6 +1490,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Iowa State,-0.2857142857142857,35
 2022,special_teams,punt,Iowa State,39.7,30
 2022,special_teams,punt_ret,Iowa State,36.56410256410256,39
+2022,special_teams,fg_epa,Iowa State,-0.5248542759153578,18
+2022,special_teams,ko_epa,Iowa State,0.11934028466542562,45
+2022,special_teams,ko_ret_epa,Iowa State,-0.04125523056302752,35
+2022,special_teams,punt_epa,Iowa State,-0.2315187305212021,30
+2022,special_teams,punt_ret_epa,Iowa State,0.3859432599483392,39
 2022,offense,success,James Madison,0.4827586206896552,667
 2022,offense,explosive,James Madison,0.14842578710644677,667
 2022,offense,epa_rush,James Madison,-0.06772144918483092,380
@@ -1304,6 +1524,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,James Madison,6.266666666666667,45
 2022,special_teams,punt,James Madison,38.638888888888886,36
 2022,special_teams,punt_ret,James Madison,37.35849056603774,53
+2022,special_teams,fg_epa,James Madison,-0.6231173191751752,14
+2022,special_teams,ko_epa,James Madison,-0.010194810728232065,48
+2022,special_teams,ko_ret_epa,James Madison,0.42844341860877144,45
+2022,special_teams,punt_epa,James Madison,-0.2249426378144158,36
+2022,special_teams,punt_ret_epa,James Madison,0.2874173169147293,53
 2022,offense,success,Kansas,0.49348534201954397,614
 2022,offense,explosive,Kansas,0.17263843648208468,614
 2022,offense,epa_rush,Kansas,0.09515316885442976,343
@@ -1333,6 +1558,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Kansas,12.345454545454546,55
 2022,special_teams,punt,Kansas,25.130434782608695,23
 2022,special_teams,punt_ret,Kansas,37.48,25
+2022,special_teams,fg_epa,Kansas,-1.328785581248147,14
+2022,special_teams,ko_epa,Kansas,-0.6264389609468395,58
+2022,special_teams,ko_ret_epa,Kansas,0.8270260767503218,55
+2022,special_teams,punt_epa,Kansas,-1.1230396874572919,23
+2022,special_teams,punt_ret_epa,Kansas,0.30323755264282226,25
 2022,offense,success,Kansas State,0.46476761619190404,667
 2022,offense,explosive,Kansas State,0.1424287856071964,667
 2022,offense,epa_rush,Kansas State,0.038632520835555656,381
@@ -1362,6 +1592,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Kansas State,2.972972972972973,37
 2022,special_teams,punt,Kansas State,39.25714285714286,35
 2022,special_teams,punt_ret,Kansas State,37.25,40
+2022,special_teams,fg_epa,Kansas State,-0.4107769915932103,19
+2022,special_teams,ko_epa,Kansas State,-0.06176544871984744,51
+2022,special_teams,ko_ret_epa,Kansas State,0.19953786682438207,37
+2022,special_teams,punt_epa,Kansas State,-0.27919180052621023,35
+2022,special_teams,punt_ret_epa,Kansas State,0.21015146300196647,40
 2022,offense,success,Kent State,0.4907801418439716,705
 2022,offense,explosive,Kent State,0.15602836879432624,705
 2022,offense,epa_rush,Kent State,0.10116221807739338,417
@@ -1391,6 +1626,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Kent State,6.596153846153846,52
 2022,special_teams,punt,Kent State,35.51724137931034,29
 2022,special_teams,punt_ret,Kent State,29.91176470588235,34
+2022,special_teams,fg_epa,Kent State,-0.34508752822875977,23
+2022,special_teams,ko_epa,Kent State,-0.50831673704848,49
+2022,special_teams,ko_ret_epa,Kent State,0.4398781152871939,52
+2022,special_teams,punt_epa,Kent State,-0.3762565368208392,29
+2022,special_teams,punt_ret_epa,Kent State,0.832060179727919,34
 2022,offense,success,Kentucky,0.4419713831478537,629
 2022,offense,explosive,Kentucky,0.12559618441971382,629
 2022,offense,epa_rush,Kentucky,-0.03609252183220378,325
@@ -1420,6 +1660,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Kentucky,3.2051282051282053,39
 2022,special_teams,punt,Kentucky,36.885714285714286,35
 2022,special_teams,punt_ret,Kentucky,38.642857142857146,42
+2022,special_teams,fg_epa,Kentucky,-0.5417804404308921,19
+2022,special_teams,ko_epa,Kentucky,-0.30267962165500806,46
+2022,special_teams,ko_ret_epa,Kentucky,0.19564156501721114,39
+2022,special_teams,punt_epa,Kentucky,-0.14892484630857195,35
+2022,special_teams,punt_ret_epa,Kentucky,0.046778161965665366,42
 2022,offense,success,LSU,0.525,720
 2022,offense,explosive,LSU,0.12638888888888888,720
 2022,offense,epa_rush,LSU,0.1062836835337024,356
@@ -1449,6 +1694,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,LSU,3.7291666666666665,48
 2022,special_teams,punt,LSU,39.5,32
 2022,special_teams,punt_ret,LSU,38.857142857142854,35
+2022,special_teams,fg_epa,LSU,-0.1033856760371815,11
+2022,special_teams,ko_epa,LSU,-0.1124054205417633,50
+2022,special_teams,ko_ret_epa,LSU,0.23560692990819612,48
+2022,special_teams,punt_epa,LSU,-0.04584951000288129,32
+2022,special_teams,punt_ret_epa,LSU,0.22449908554553985,35
 2022,offense,success,Liberty,0.4296774193548387,775
 2022,offense,explosive,Liberty,0.1406451612903226,775
 2022,offense,epa_rush,Liberty,0.013700605943485343,399
@@ -1478,6 +1728,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Liberty,1.7045454545454546,44
 2022,special_teams,punt,Liberty,39.45945945945946,37
 2022,special_teams,punt_ret,Liberty,38.95744680851064,47
+2022,special_teams,fg_epa,Liberty,-0.6139179203245375,18
+2022,special_teams,ko_epa,Liberty,-0.06158360093832016,56
+2022,special_teams,ko_ret_epa,Liberty,0.11620132354172794,44
+2022,special_teams,punt_epa,Liberty,-0.08824980943589597,37
+2022,special_teams,punt_ret_epa,Liberty,0.15058491394874898,47
 2022,offense,success,Louisiana,0.42706964520367935,761
 2022,offense,explosive,Louisiana,0.11826544021024968,761
 2022,offense,epa_rush,Louisiana,-0.03294372601823135,361
@@ -1507,6 +1762,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Louisiana,2.0425531914893615,47
 2022,special_teams,punt,Louisiana,39.46341463414634,41
 2022,special_teams,punt_ret,Louisiana,36.78846153846154,52
+2022,special_teams,fg_epa,Louisiana,-0.09818450429222801,22
+2022,special_teams,ko_epa,Louisiana,-0.21897724108262495,55
+2022,special_teams,ko_ret_epa,Louisiana,0.13119458644948107,47
+2022,special_teams,punt_epa,Louisiana,-0.2086104212737665,41
+2022,special_teams,punt_ret_epa,Louisiana,0.3718917928636074,52
 2022,offense,success,Louisiana Monroe,0.4444444444444444,612
 2022,offense,explosive,Louisiana Monroe,0.1111111111111111,612
 2022,offense,epa_rush,Louisiana Monroe,-0.020826304711084806,313
@@ -1536,6 +1796,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Louisiana Monroe,-0.7910447761194029,67
 2022,special_teams,punt,Louisiana Monroe,35.270833333333336,48
 2022,special_teams,punt_ret,Louisiana Monroe,33.064516129032256,31
+2022,special_teams,fg_epa,Louisiana Monroe,0.5466210047403971,9
+2022,special_teams,ko_epa,Louisiana Monroe,-0.49325592035338994,42
+2022,special_teams,ko_ret_epa,Louisiana Monroe,-0.1139037555723048,67
+2022,special_teams,punt_epa,Louisiana Monroe,-0.5215939519306024,48
+2022,special_teams,punt_ret_epa,Louisiana Monroe,0.5506881571585133,31
 2022,offense,success,Louisiana Tech,0.42795389048991356,694
 2022,offense,explosive,Louisiana Tech,0.1138328530259366,694
 2022,offense,epa_rush,Louisiana Tech,-0.14531376307162663,305
@@ -1565,6 +1830,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Louisiana Tech,1.3970588235294117,68
 2022,special_teams,punt,Louisiana Tech,34.5,30
 2022,special_teams,punt_ret,Louisiana Tech,34.34375,32
+2022,special_teams,fg_epa,Louisiana Tech,-0.27495256195897644,23
+2022,special_teams,ko_epa,Louisiana Tech,0.0317107892036438,50
+2022,special_teams,ko_ret_epa,Louisiana Tech,0.08276637950364281,68
+2022,special_teams,punt_epa,Louisiana Tech,-0.6325506955385208,30
+2022,special_teams,punt_ret_epa,Louisiana Tech,0.5082590454258025,32
 2022,offense,success,Louisville,0.4481751824817518,685
 2022,offense,explosive,Louisville,0.14014598540145987,685
 2022,offense,epa_rush,Louisville,-0.06054714328610697,374
@@ -1594,6 +1864,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Louisville,-0.36363636363636365,44
 2022,special_teams,punt,Louisville,40.5,40
 2022,special_teams,punt_ret,Louisville,40.41304347826087,46
+2022,special_teams,fg_epa,Louisville,0.4025813551510082,17
+2022,special_teams,ko_epa,Louisville,0.022349311004985464,55
+2022,special_teams,ko_ret_epa,Louisville,-0.034641469066793266,44
+2022,special_teams,punt_epa,Louisville,-0.1260926157236099,40
+2022,special_teams,punt_ret_epa,Louisville,0.21234606497961542,46
 2022,offense,success,Marshall,0.40588235294117647,510
 2022,offense,explosive,Marshall,0.10196078431372549,510
 2022,offense,epa_rush,Marshall,-0.10711791312627485,310
@@ -1623,6 +1898,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Marshall,2.423076923076923,26
 2022,special_teams,punt,Marshall,35.673469387755105,49
 2022,special_teams,punt_ret,Marshall,36.28888888888889,45
+2022,special_teams,fg_epa,Marshall,-0.7850174687125466,11
+2022,special_teams,ko_epa,Marshall,0.005833784054065573,29
+2022,special_teams,ko_ret_epa,Marshall,0.1783519135071681,26
+2022,special_teams,punt_epa,Marshall,-0.3616731990965045,49
+2022,special_teams,punt_ret_epa,Marshall,0.24150571127732595,45
 2022,offense,success,Maryland,0.4546925566343042,618
 2022,offense,explosive,Maryland,0.08576051779935275,618
 2022,offense,epa_rush,Maryland,0.0334303782469382,299
@@ -1652,6 +1932,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Maryland,0.02127659574468085,47
 2022,special_teams,punt,Maryland,42.18604651162791,43
 2022,special_teams,punt_ret,Maryland,39.60526315789474,38
+2022,special_teams,fg_epa,Maryland,0.2743372599283854,15
+2022,special_teams,ko_epa,Maryland,-0.24826658679091412,46
+2022,special_teams,ko_ret_epa,Maryland,-0.01775187888043992,47
+2022,special_teams,punt_epa,Maryland,0.011286145032838334,43
+2022,special_teams,punt_ret_epa,Maryland,0.09421328886559135,38
 2022,offense,success,Memphis,0.47368421052631576,722
 2022,offense,explosive,Memphis,0.10803324099722991,722
 2022,offense,epa_rush,Memphis,-0.025958800581038298,341
@@ -1681,6 +1966,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Memphis,2.019607843137255,51
 2022,special_teams,punt,Memphis,42.810810810810814,37
 2022,special_teams,punt_ret,Memphis,38.41304347826087,46
+2022,special_teams,fg_epa,Memphis,0.6834823787212372,20
+2022,special_teams,ko_epa,Memphis,-0.048372063480439736,61
+2022,special_teams,ko_ret_epa,Memphis,0.13824122092303107,51
+2022,special_teams,punt_epa,Memphis,0.12615767000494776,37
+2022,special_teams,punt_ret_epa,Memphis,0.4075563030074472,46
 2022,offense,success,Miami,0.5028490028490028,702
 2022,offense,explosive,Miami,0.11253561253561253,702
 2022,offense,epa_rush,Miami,-0.01994020087498148,328
@@ -1710,6 +2000,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Miami,4.0,44
 2022,special_teams,punt,Miami,42.34285714285714,35
 2022,special_teams,punt_ret,Miami,39.022222222222226,45
+2022,special_teams,fg_epa,Miami,0.2314302921295166,18
+2022,special_teams,ko_epa,Miami,-0.14120212197303772,48
+2022,special_teams,ko_ret_epa,Miami,0.2578333589163693,44
+2022,special_teams,punt_epa,Miami,0.20209416363920485,35
+2022,special_teams,punt_ret_epa,Miami,0.21449029313193427,45
 2022,offense,success,Miami (OH),0.39574468085106385,470
 2022,offense,explosive,Miami (OH),0.12127659574468085,470
 2022,offense,epa_rush,Miami (OH),-0.06397190878412636,251
@@ -1739,6 +2034,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Miami (OH),10.135135135135135,37
 2022,special_teams,punt,Miami (OH),36.59090909090909,44
 2022,special_teams,punt_ret,Miami (OH),28.142857142857142,35
+2022,special_teams,fg_epa,Miami (OH),0.29520583152770996,16
+2022,special_teams,ko_epa,Miami (OH),-0.2777397797025483,29
+2022,special_teams,ko_ret_epa,Miami (OH),0.6733176450471621,37
+2022,special_teams,punt_epa,Miami (OH),-0.4119173792952841,44
+2022,special_teams,punt_ret_epa,Miami (OH),0.931310613666262,35
 2022,offense,success,Michigan,0.5576923076923077,780
 2022,offense,explosive,Michigan,0.1423076923076923,780
 2022,offense,epa_rush,Michigan,0.14543349005829634,475
@@ -1768,6 +2068,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Michigan,4.942857142857143,35
 2022,special_teams,punt,Michigan,41.733333333333334,30
 2022,special_teams,punt_ret,Michigan,37.932203389830505,59
+2022,special_teams,fg_epa,Michigan,0.3251601020495097,30
+2022,special_teams,ko_epa,Michigan,0.0391445187961354,85
+2022,special_teams,ko_ret_epa,Michigan,0.29727534907204767,35
+2022,special_teams,punt_epa,Michigan,-0.004127338280280431,30
+2022,special_teams,punt_ret_epa,Michigan,0.2436174677085068,59
 2022,offense,success,Michigan State,0.44886363636363635,704
 2022,offense,explosive,Michigan State,0.1278409090909091,704
 2022,offense,epa_rush,Michigan State,-0.19301396369922466,324
@@ -1797,6 +2102,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Michigan State,2.1016949152542375,59
 2022,special_teams,punt,Michigan State,45.21212121212121,33
 2022,special_teams,punt_ret,Michigan State,29.676470588235293,34
+2022,special_teams,fg_epa,Michigan State,-1.3651194897564976,11
+2022,special_teams,ko_epa,Michigan State,-0.06997182311081304,41
+2022,special_teams,ko_ret_epa,Michigan State,0.14318704403052895,59
+2022,special_teams,punt_epa,Michigan State,0.37557806548747147,33
+2022,special_teams,punt_ret_epa,Michigan State,0.8684067993479616,34
 2022,offense,success,Middle Tennessee,0.40709219858156026,705
 2022,offense,explosive,Middle Tennessee,0.08936170212765958,705
 2022,offense,epa_rush,Middle Tennessee,-0.10909618506894425,316
@@ -1826,6 +2136,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Middle Tennessee,1.6538461538461537,52
 2022,special_teams,punt,Middle Tennessee,38.27272727272727,55
 2022,special_teams,punt_ret,Middle Tennessee,38.142857142857146,42
+2022,special_teams,fg_epa,Middle Tennessee,0.5655926942825318,10
+2022,special_teams,ko_epa,Middle Tennessee,-0.2669958484416105,49
+2022,special_teams,ko_ret_epa,Middle Tennessee,0.12593949528840873,52
+2022,special_teams,punt_epa,Middle Tennessee,-0.1587938899343664,55
+2022,special_teams,punt_ret_epa,Middle Tennessee,0.27320455937158494,42
 2022,offense,success,Minnesota,0.5383458646616541,665
 2022,offense,explosive,Minnesota,0.14586466165413534,665
 2022,offense,epa_rush,Minnesota,0.12706411976176796,437
@@ -1855,6 +2170,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Minnesota,-0.2,35
 2022,special_teams,punt,Minnesota,38.0,33
 2022,special_teams,punt_ret,Minnesota,40.16279069767442,43
+2022,special_teams,fg_epa,Minnesota,0.8957846164703369,12
+2022,special_teams,ko_epa,Minnesota,-0.10858820044264501,49
+2022,special_teams,ko_ret_epa,Minnesota,-0.05237099954060146,35
+2022,special_teams,punt_epa,Minnesota,-0.17918286630601593,33
+2022,special_teams,punt_ret_epa,Minnesota,0.22263816934685374,43
 2022,offense,success,Mississippi State,0.4878048780487805,779
 2022,offense,explosive,Mississippi State,0.08729139922978177,779
 2022,offense,epa_rush,Mississippi State,0.007717402263770023,213
@@ -1884,6 +2204,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Mississippi State,4.555555555555555,54
 2022,special_teams,punt,Mississippi State,36.86486486486486,37
 2022,special_teams,punt_ret,Mississippi State,38.56521739130435,46
+2022,special_teams,fg_epa,Mississippi State,-0.2920633213860648,14
+2022,special_teams,ko_epa,Mississippi State,-0.0024967432022094727,65
+2022,special_teams,ko_ret_epa,Mississippi State,0.3372693525420295,54
+2022,special_teams,punt_epa,Mississippi State,-0.2533511511377386,37
+2022,special_teams,punt_ret_epa,Mississippi State,0.3307839703300725,46
 2022,offense,success,Missouri,0.43050847457627117,590
 2022,offense,explosive,Missouri,0.11016949152542373,590
 2022,offense,epa_rush,Missouri,-0.031230813025985037,314
@@ -1913,6 +2238,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Missouri,-0.39473684210526316,38
 2022,special_teams,punt,Missouri,38.604651162790695,43
 2022,special_teams,punt_ret,Missouri,39.108108108108105,37
+2022,special_teams,fg_epa,Missouri,0.5182767545475679,17
+2022,special_teams,ko_epa,Missouri,-0.05939429998397827,40
+2022,special_teams,ko_ret_epa,Missouri,-0.03524788743571231,38
+2022,special_teams,punt_epa,Missouri,-0.2274068157340205,43
+2022,special_teams,punt_ret_epa,Missouri,0.12590354640741605,37
 2022,offense,success,NC State,0.45492957746478874,710
 2022,offense,explosive,NC State,0.1056338028169014,710
 2022,offense,epa_rush,NC State,-0.03576690897061677,347
@@ -1942,6 +2272,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,NC State,2.054054054054054,37
 2022,special_teams,punt,NC State,38.853658536585364,41
 2022,special_teams,punt_ret,NC State,39.716981132075475,53
+2022,special_teams,fg_epa,NC State,1.1127758784727617,22
+2022,special_teams,ko_epa,NC State,0.10775927075168543,57
+2022,special_teams,ko_ret_epa,NC State,0.15236910452713837,37
+2022,special_teams,punt_epa,NC State,-0.2230296832759206,41
+2022,special_teams,punt_ret_epa,NC State,0.2660755880598752,53
 2022,offense,success,Navy,0.4173354735152488,623
 2022,offense,explosive,Navy,0.12359550561797752,623
 2022,offense,epa_rush,Navy,0.015679672572044025,503
@@ -1971,6 +2306,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Navy,2.347826086956522,46
 2022,special_teams,punt,Navy,39.69444444444444,36
 2022,special_teams,punt_ret,Navy,39.3125,32
+2022,special_teams,fg_epa,Navy,-1.031587975365775,14
+2022,special_teams,ko_epa,Navy,-0.1928106405233082,38
+2022,special_teams,ko_ret_epa,Navy,0.15073962444844452,46
+2022,special_teams,punt_epa,Navy,-0.17457316236363518,36
+2022,special_teams,punt_ret_epa,Navy,0.10439010011032224,32
 2022,offense,success,Nebraska,0.43831640058055155,689
 2022,offense,explosive,Nebraska,0.12772133526850507,689
 2022,offense,epa_rush,Nebraska,0.027901932796805883,352
@@ -2000,6 +2340,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Nebraska,-0.532258064516129,62
 2022,special_teams,punt,Nebraska,39.333333333333336,63
 2022,special_teams,punt_ret,Nebraska,37.90196078431372,51
+2022,special_teams,fg_epa,Nebraska,-0.16236857934431595,11
+2022,special_teams,ko_epa,Nebraska,-0.021505861232678097,48
+2022,special_teams,ko_ret_epa,Nebraska,-0.048160075179992184,62
+2022,special_teams,punt_epa,Nebraska,-0.20279023411964614,63
+2022,special_teams,punt_ret_epa,Nebraska,0.1778988399926354,51
 2022,offense,success,Nevada,0.3795379537953795,606
 2022,offense,explosive,Nevada,0.10231023102310231,606
 2022,offense,epa_rush,Nevada,0.02441257737110467,288
@@ -2029,6 +2374,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Nevada,-0.1724137931034483,58
 2022,special_teams,punt,Nevada,36.645833333333336,48
 2022,special_teams,punt_ret,Nevada,37.32258064516129,31
+2022,special_teams,fg_epa,Nevada,-0.2845852008232704,13
+2022,special_teams,ko_epa,Nevada,0.08053738755338333,34
+2022,special_teams,ko_ret_epa,Nevada,-0.04452677636310972,58
+2022,special_teams,punt_epa,Nevada,-0.2636272576637566,48
+2022,special_teams,punt_ret_epa,Nevada,0.22896623899859767,31
 2022,offense,success,New Mexico,0.3588516746411483,627
 2022,offense,explosive,New Mexico,0.11164274322169059,627
 2022,offense,epa_rush,New Mexico,-0.10998297737378174,365
@@ -2058,6 +2408,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,New Mexico,2.327272727272727,55
 2022,special_teams,punt,New Mexico,39.563380281690144,71
 2022,special_teams,punt_ret,New Mexico,37.53333333333333,45
+2022,special_teams,fg_epa,New Mexico,-0.3881965816020966,20
+2022,special_teams,ko_epa,New Mexico,-0.01060345002583095,35
+2022,special_teams,ko_ret_epa,New Mexico,0.1175621509552002,55
+2022,special_teams,punt_epa,New Mexico,-0.20330254922450428,71
+2022,special_teams,punt_ret_epa,New Mexico,0.29045186671945783,45
 2022,offense,success,New Mexico State,0.36771300448430494,446
 2022,offense,explosive,New Mexico State,0.1031390134529148,446
 2022,offense,epa_rush,New Mexico State,-0.07743473300142086,252
@@ -2087,6 +2442,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,New Mexico State,0.2,40
 2022,special_teams,punt,New Mexico State,38.58064516129032,31
 2022,special_teams,punt_ret,New Mexico State,37.035714285714285,28
+2022,special_teams,fg_epa,New Mexico State,-1.0041983485221864,10
+2022,special_teams,ko_epa,New Mexico State,-0.050365790724754333,24
+2022,special_teams,ko_ret_epa,New Mexico State,-0.01007966250181198,40
+2022,special_teams,punt_epa,New Mexico State,-0.15114865187675722,31
+2022,special_teams,punt_ret_epa,New Mexico State,0.3888120119060789,28
 2022,offense,success,North Carolina,0.5129604365620737,733
 2022,offense,explosive,North Carolina,0.15552523874488403,733
 2022,offense,epa_rush,North Carolina,0.05656338991234061,337
@@ -2116,6 +2476,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,North Carolina,3.1320754716981134,53
 2022,special_teams,punt,North Carolina,40.51851851851852,27
 2022,special_teams,punt_ret,North Carolina,37.0,33
+2022,special_teams,fg_epa,North Carolina,0.4062627228823575,11
+2022,special_teams,ko_epa,North Carolina,-0.1384356475588101,67
+2022,special_teams,ko_ret_epa,North Carolina,0.22938320321856803,53
+2022,special_teams,punt_epa,North Carolina,-0.02173187169763777,27
+2022,special_teams,punt_ret_epa,North Carolina,0.40807862399202405,33
 2022,offense,success,North Texas,0.46006389776357826,626
 2022,offense,explosive,North Texas,0.15654952076677317,626
 2022,offense,epa_rush,North Texas,0.03749719823882189,334
@@ -2145,6 +2510,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,North Texas,1.4339622641509433,53
 2022,special_teams,punt,North Texas,39.03225806451613,31
 2022,special_teams,punt_ret,North Texas,44.25,36
+2022,special_teams,fg_epa,North Texas,0.28793069294520784,14
+2022,special_teams,ko_epa,North Texas,-0.07181104591914586,56
+2022,special_teams,ko_ret_epa,North Texas,0.10966045564075685,53
+2022,special_teams,punt_epa,North Texas,-0.27528911684789964,31
+2022,special_teams,punt_ret_epa,North Texas,-0.14258898049592972,36
 2022,offense,success,Northern Illinois,0.46629213483146065,712
 2022,offense,explosive,Northern Illinois,0.11095505617977527,712
 2022,offense,epa_rush,Northern Illinois,0.07954232311943059,420
@@ -2174,6 +2544,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Northern Illinois,2.838235294117647,68
 2022,special_teams,punt,Northern Illinois,35.39473684210526,38
 2022,special_teams,punt_ret,Northern Illinois,42.310344827586206,29
+2022,special_teams,fg_epa,Northern Illinois,0.27965766853756374,18
+2022,special_teams,ko_epa,Northern Illinois,-0.29843023727680074,58
+2022,special_teams,ko_ret_epa,Northern Illinois,0.18452524700585535,68
+2022,special_teams,punt_epa,Northern Illinois,-0.5606634797234284,38
+2022,special_teams,punt_ret_epa,Northern Illinois,-0.17595927365894976,29
 2022,offense,success,Northwestern,0.40269277845777235,817
 2022,offense,explosive,Northwestern,0.07711138310893513,817
 2022,offense,epa_rush,Northwestern,-0.16839787345216942,410
@@ -2203,6 +2578,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Northwestern,2.6226415094339623,53
 2022,special_teams,punt,Northwestern,35.28,50
 2022,special_teams,punt_ret,Northwestern,38.38297872340426,47
+2022,special_teams,fg_epa,Northwestern,-0.661614735921224,9
+2022,special_teams,ko_epa,Northwestern,0.26703677062065373,31
+2022,special_teams,ko_ret_epa,Northwestern,0.20200831710167652,53
+2022,special_teams,punt_epa,Northwestern,-0.3174703687429428,50
+2022,special_teams,punt_ret_epa,Northwestern,0.2599345305340087,47
 2022,offense,success,Notre Dame,0.5058997050147492,678
 2022,offense,explosive,Notre Dame,0.13274336283185842,678
 2022,offense,epa_rush,Notre Dame,-0.05192442494555008,409
@@ -2232,6 +2612,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Notre Dame,4.409090909090909,44
 2022,special_teams,punt,Notre Dame,40.7,40
 2022,special_teams,punt_ret,Notre Dame,32.945454545454545,55
+2022,special_teams,fg_epa,Notre Dame,-0.46717009544372556,15
+2022,special_teams,ko_epa,Notre Dame,-0.036846148746984976,54
+2022,special_teams,ko_ret_epa,Notre Dame,0.3388813557949933,44
+2022,special_teams,punt_epa,Notre Dame,-0.016569011285901068,40
+2022,special_teams,punt_ret_epa,Notre Dame,0.6879965034398166,55
 2022,offense,success,Ohio,0.46987951807228917,664
 2022,offense,explosive,Ohio,0.14006024096385541,664
 2022,offense,epa_rush,Ohio,-0.0612741672506324,316
@@ -2261,6 +2646,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Ohio,-0.4074074074074074,54
 2022,special_teams,punt,Ohio,34.794117647058826,34
 2022,special_teams,punt_ret,Ohio,39.88235294117647,17
+2022,special_teams,fg_epa,Ohio,0.15693063735961915,20
+2022,special_teams,ko_epa,Ohio,0.0108219115964828,62
+2022,special_teams,ko_ret_epa,Ohio,-0.06460066305266486,54
+2022,special_teams,punt_epa,Ohio,-0.45224057795370326,34
+2022,special_teams,punt_ret_epa,Ohio,0.06382602803847369,17
 2022,offense,success,Ohio State,0.5621212121212121,660
 2022,offense,explosive,Ohio State,0.1696969696969697,660
 2022,offense,epa_rush,Ohio State,0.127229675404902,356
@@ -2290,6 +2680,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Ohio State,1.5757575757575757,33
 2022,special_teams,punt,Ohio State,41.388888888888886,36
 2022,special_teams,punt_ret,Ohio State,40.540983606557376,61
+2022,special_teams,fg_epa,Ohio State,0.28359703584150836,11
+2022,special_teams,ko_epa,Ohio State,-0.061725074731850925,79
+2022,special_teams,ko_ret_epa,Ohio State,0.11021381616592407,33
+2022,special_teams,punt_epa,Ohio State,-0.07925861473712656,36
+2022,special_teams,punt_ret_epa,Ohio State,0.207654599039281,61
 2022,offense,success,Oklahoma,0.492040520984081,691
 2022,offense,explosive,Oklahoma,0.14037626628075253,691
 2022,offense,epa_rush,Oklahoma,0.04873972050865008,383
@@ -2319,6 +2714,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Oklahoma,12.137254901960784,51
 2022,special_teams,punt,Oklahoma,37.8421052631579,38
 2022,special_teams,punt_ret,Oklahoma,33.32432432432432,37
+2022,special_teams,fg_epa,Oklahoma,-0.024291833241780598,12
+2022,special_teams,ko_epa,Oklahoma,-0.6849460852146149,50
+2022,special_teams,ko_ret_epa,Oklahoma,0.8166446218303606,51
+2022,special_teams,punt_epa,Oklahoma,-0.2554763210447211,38
+2022,special_teams,punt_ret_epa,Oklahoma,0.46247151775940043,37
 2022,offense,success,Oklahoma State,0.4489528795811518,764
 2022,offense,explosive,Oklahoma State,0.1099476439790576,764
 2022,offense,epa_rush,Oklahoma State,-0.07251650927668542,361
@@ -2348,6 +2748,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Oklahoma State,4.311475409836065,61
 2022,special_teams,punt,Oklahoma State,36.689655172413794,58
 2022,special_teams,punt_ret,Oklahoma State,39.30909090909091,55
+2022,special_teams,fg_epa,Oklahoma State,0.8115311794810824,18
+2022,special_teams,ko_epa,Oklahoma State,0.06423699382751707,63
+2022,special_teams,ko_ret_epa,Oklahoma State,0.2939978202835458,61
+2022,special_teams,punt_epa,Oklahoma State,-0.3142121109212267,58
+2022,special_teams,punt_ret_epa,Oklahoma State,0.17211251705884933,55
 2022,offense,success,Old Dominion,0.3612040133779264,598
 2022,offense,explosive,Old Dominion,0.11371237458193979,598
 2022,offense,epa_rush,Old Dominion,-0.08175823061673614,227
@@ -2377,6 +2782,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Old Dominion,1.9259259259259258,54
 2022,special_teams,punt,Old Dominion,40.45283018867924,53
 2022,special_teams,punt_ret,Old Dominion,36.05882352941177,34
+2022,special_teams,fg_epa,Old Dominion,-0.27735539999875153,11
+2022,special_teams,ko_epa,Old Dominion,0.012440894544124604,40
+2022,special_teams,ko_ret_epa,Old Dominion,0.12394412248222916,54
+2022,special_teams,punt_epa,Old Dominion,-0.04902298481396909,53
+2022,special_teams,punt_ret_epa,Old Dominion,0.29659077086869406,34
 2022,offense,success,Ole Miss,0.504,750
 2022,offense,explosive,Ole Miss,0.17066666666666666,750
 2022,offense,epa_rush,Ole Miss,0.11642544874674537,466
@@ -2406,6 +2816,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Ole Miss,4.0,48
 2022,special_teams,punt,Ole Miss,40.0,30
 2022,special_teams,punt_ret,Ole Miss,39.609756097560975,41
+2022,special_teams,fg_epa,Ole Miss,0.9203755963932384,11
+2022,special_teams,ko_epa,Ole Miss,-0.14757330375805236,57
+2022,special_teams,ko_ret_epa,Ole Miss,0.25307608147462207,48
+2022,special_teams,punt_epa,Ole Miss,0.019066623598337173,30
+2022,special_teams,punt_ret_epa,Ole Miss,0.026315423046670307,41
 2022,offense,success,Oregon,0.5872801082543978,739
 2022,offense,explosive,Oregon,0.17861975642760486,739
 2022,offense,epa_rush,Oregon,0.2589785890877096,411
@@ -2435,6 +2850,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Oregon,3.0714285714285716,56
 2022,special_teams,punt,Oregon,36.666666666666664,21
 2022,special_teams,punt_ret,Oregon,38.125,24
+2022,special_teams,fg_epa,Oregon,0.5600588755174116,11
+2022,special_teams,ko_epa,Oregon,-0.23994151812333328,65
+2022,special_teams,ko_ret_epa,Oregon,0.17929874573435103,56
+2022,special_teams,punt_epa,Oregon,-0.2920959669919241,21
+2022,special_teams,punt_ret_epa,Oregon,0.33208123594522476,24
 2022,offense,success,Oregon State,0.4984709480122324,654
 2022,offense,explosive,Oregon State,0.13149847094801223,654
 2022,offense,epa_rush,Oregon State,0.08270656660489369,383
@@ -2464,6 +2884,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Oregon State,3.217391304347826,46
 2022,special_teams,punt,Oregon State,42.51724137931034,29
 2022,special_teams,punt_ret,Oregon State,34.0,43
+2022,special_teams,fg_epa,Oregon State,-1.0679267009099325,15
+2022,special_teams,ko_epa,Oregon State,-0.154189415019134,58
+2022,special_teams,ko_ret_epa,Oregon State,0.16395210701486337,46
+2022,special_teams,punt_epa,Oregon State,0.15125511278366222,29
+2022,special_teams,punt_ret_epa,Oregon State,0.536123896060988,43
 2022,offense,success,Penn State,0.453781512605042,714
 2022,offense,explosive,Penn State,0.13445378151260504,714
 2022,offense,epa_rush,Penn State,-0.043186787738844094,363
@@ -2493,6 +2918,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Penn State,0.4772727272727273,44
 2022,special_teams,punt,Penn State,40.81578947368421,38
 2022,special_teams,punt_ret,Penn State,40.38461538461539,52
+2022,special_teams,fg_epa,Penn State,0.3277724725859506,14
+2022,special_teams,ko_epa,Penn State,0.004911493870519822,62
+2022,special_teams,ko_ret_epa,Penn State,0.014875726266340776,44
+2022,special_teams,punt_epa,Penn State,-0.0447937548160553,38
+2022,special_teams,punt_ret_epa,Penn State,0.151086314366414,52
 2022,offense,success,Pittsburgh,0.46153846153846156,754
 2022,offense,explosive,Pittsburgh,0.1206896551724138,754
 2022,offense,epa_rush,Pittsburgh,0.03339417803989104,419
@@ -2522,6 +2952,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Pittsburgh,0.09433962264150944,53
 2022,special_teams,punt,Pittsburgh,35.18181818181818,44
 2022,special_teams,punt_ret,Pittsburgh,38.839285714285715,56
+2022,special_teams,fg_epa,Pittsburgh,0.27288241762863963,19
+2022,special_teams,ko_epa,Pittsburgh,0.03965489883891872,61
+2022,special_teams,ko_ret_epa,Pittsburgh,-0.018753217076355556,53
+2022,special_teams,punt_epa,Pittsburgh,-0.41610289771448483,44
+2022,special_teams,punt_ret_epa,Pittsburgh,0.18513059722525732,56
 2022,offense,success,Purdue,0.4786666666666667,750
 2022,offense,explosive,Purdue,0.092,750
 2022,offense,epa_rush,Purdue,-0.06541042195232283,330
@@ -2551,6 +2986,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Purdue,0.574468085106383,47
 2022,special_teams,punt,Purdue,36.84615384615385,39
 2022,special_teams,punt_ret,Purdue,36.528301886792455,53
+2022,special_teams,fg_epa,Purdue,-0.3689330741763115,16
+2022,special_teams,ko_epa,Purdue,-0.08196223735809326,50
+2022,special_teams,ko_ret_epa,Purdue,0.02492520530173119,47
+2022,special_teams,punt_epa,Purdue,-0.38201454816720426,39
+2022,special_teams,punt_ret_epa,Purdue,0.2548502953547352,53
 2022,offense,success,Rice,0.4696969696969697,660
 2022,offense,explosive,Rice,0.10606060606060606,660
 2022,offense,epa_rush,Rice,0.03557453904090918,319
@@ -2580,6 +3020,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Rice,3.238095238095238,63
 2022,special_teams,punt,Rice,37.61290322580645,31
 2022,special_teams,punt_ret,Rice,33.642857142857146,28
+2022,special_teams,fg_epa,Rice,0.06643640995025635,13
+2022,special_teams,ko_epa,Rice,-0.3326964718954904,42
+2022,special_teams,ko_ret_epa,Rice,0.1894079285954672,63
+2022,special_teams,punt_epa,Rice,-0.21488680474219785,31
+2022,special_teams,punt_ret_epa,Rice,0.45132968361888615,28
 2022,offense,success,Rutgers,0.42992125984251967,635
 2022,offense,explosive,Rutgers,0.09921259842519685,635
 2022,offense,epa_rush,Rutgers,-0.07161445064623195,346
@@ -2609,6 +3054,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Rutgers,3.173076923076923,52
 2022,special_teams,punt,Rutgers,43.57142857142857,49
 2022,special_teams,punt_ret,Rutgers,36.93181818181818,44
+2022,special_teams,fg_epa,Rutgers,-0.16303545981645584,16
+2022,special_teams,ko_epa,Rutgers,-0.5674152135848999,35
+2022,special_teams,ko_ret_epa,Rutgers,0.22439457705387703,52
+2022,special_teams,punt_epa,Rutgers,0.16778775015655828,49
+2022,special_teams,punt_ret_epa,Rutgers,0.2773488275706768,44
 2022,offense,success,SMU,0.47437425506555425,839
 2022,offense,explosive,SMU,0.13587604290822408,839
 2022,offense,epa_rush,SMU,0.03934725810351449,387
@@ -2638,6 +3088,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,SMU,2.8857142857142857,70
 2022,special_teams,punt,SMU,40.62068965517241,29
 2022,special_teams,punt_ret,SMU,43.51162790697674,43
+2022,special_teams,fg_epa,SMU,-0.084738528027254,17
+2022,special_teams,ko_epa,SMU,-0.3070635919769605,72
+2022,special_teams,ko_ret_epa,SMU,0.1924969358103616,70
+2022,special_teams,punt_epa,SMU,-0.036790131494916715,29
+2022,special_teams,punt_ret_epa,SMU,-0.19512954874094143,43
 2022,offense,success,San Diego State,0.43260188087774293,638
 2022,offense,explosive,San Diego State,0.11598746081504702,638
 2022,offense,epa_rush,San Diego State,-0.10041716314338187,363
@@ -2667,6 +3122,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,San Diego State,5.102564102564102,39
 2022,special_teams,punt,San Diego State,39.25,44
 2022,special_teams,punt_ret,San Diego State,36.659574468085104,47
+2022,special_teams,fg_epa,San Diego State,0.14933736885295196,17
+2022,special_teams,ko_epa,San Diego State,0.0025468977789084115,48
+2022,special_teams,ko_ret_epa,San Diego State,0.3776612679163615,39
+2022,special_teams,punt_epa,San Diego State,-0.12841757386922836,44
+2022,special_teams,punt_ret_epa,San Diego State,0.2821218052760084,47
 2022,offense,success,San José State,0.45884413309982486,571
 2022,offense,explosive,San José State,0.1190893169877408,571
 2022,offense,epa_rush,San José State,0.0476396368030175,213
@@ -2696,6 +3156,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,San José State,-0.09090909090909091,33
 2022,special_teams,punt,San José State,37.18181818181818,33
 2022,special_teams,punt_ret,San José State,39.475,40
+2022,special_teams,fg_epa,San José State,-0.4985987288611276,14
+2022,special_teams,ko_epa,San José State,-0.20206256575054593,45
+2022,special_teams,ko_ret_epa,San José State,-0.06627011479753436,33
+2022,special_teams,punt_epa,San José State,-0.38730714628190704,33
+2022,special_teams,punt_ret_epa,San José State,0.12961690053343772,40
 2022,offense,success,South Alabama,0.46122448979591835,735
 2022,offense,explosive,South Alabama,0.11020408163265306,735
 2022,offense,epa_rush,South Alabama,0.016129450211519857,377
@@ -2725,6 +3190,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,South Alabama,3.769230769230769,39
 2022,special_teams,punt,South Alabama,38.51111111111111,45
 2022,special_teams,punt_ret,South Alabama,39.23529411764706,51
+2022,special_teams,fg_epa,South Alabama,0.8430490578923907,14
+2022,special_teams,ko_epa,South Alabama,-0.1429374599065937,61
+2022,special_teams,ko_ret_epa,South Alabama,0.24421015763894105,39
+2022,special_teams,punt_epa,South Alabama,-0.12912709580527412,45
+2022,special_teams,punt_ret_epa,South Alabama,0.1502949287201844,51
 2022,offense,success,South Carolina,0.4602649006622517,604
 2022,offense,explosive,South Carolina,0.13245033112582782,604
 2022,offense,epa_rush,South Carolina,0.04448616585836179,292
@@ -2754,6 +3224,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,South Carolina,3.723404255319149,47
 2022,special_teams,punt,South Carolina,41.088235294117645,34
 2022,special_teams,punt_ret,South Carolina,37.71875,32
+2022,special_teams,fg_epa,South Carolina,1.0480196343527899,9
+2022,special_teams,ko_epa,South Carolina,-0.0934365672885247,53
+2022,special_teams,ko_ret_epa,South Carolina,0.2599674057453237,47
+2022,special_teams,punt_epa,South Carolina,0.03924876889761757,34
+2022,special_teams,punt_ret_epa,South Carolina,0.30053668934851885,32
 2022,offense,success,South Florida,0.4521193092621664,637
 2022,offense,explosive,South Florida,0.13971742543171115,637
 2022,offense,epa_rush,South Florida,0.17695186264702736,349
@@ -2783,6 +3258,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,South Florida,3.1285714285714286,70
 2022,special_teams,punt,South Florida,36.15625,32
 2022,special_teams,punt_ret,South Florida,36.76470588235294,17
+2022,special_teams,fg_epa,South Florida,-0.539663960536321,12
+2022,special_teams,ko_epa,South Florida,-0.2181498900703762,46
+2022,special_teams,ko_ret_epa,South Florida,0.21807471939495632,70
+2022,special_teams,punt_epa,South Florida,-0.48873316729441285,32
+2022,special_teams,punt_ret_epa,South Florida,0.41037430570406075,17
 2022,offense,success,Southern Mississippi,0.39436619718309857,639
 2022,offense,explosive,Southern Mississippi,0.11424100156494522,639
 2022,offense,epa_rush,Southern Mississippi,-0.14378552538135198,333
@@ -2812,6 +3292,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Southern Mississippi,-0.2608695652173913,46
 2022,special_teams,punt,Southern Mississippi,39.526315789473685,57
 2022,special_teams,punt_ret,Southern Mississippi,34.08510638297872,47
+2022,special_teams,fg_epa,Southern Mississippi,0.5160771693502154,14
+2022,special_teams,ko_epa,Southern Mississippi,-0.0488901686668396,50
+2022,special_teams,ko_ret_epa,Southern Mississippi,-0.05489519497622614,46
+2022,special_teams,punt_epa,Southern Mississippi,-0.01522903314285111,57
+2022,special_teams,punt_ret_epa,Southern Mississippi,0.5186531277413063,47
 2022,offense,success,Stanford,0.4363905325443787,676
 2022,offense,explosive,Stanford,0.10207100591715976,676
 2022,offense,epa_rush,Stanford,-0.044210218129649495,286
@@ -2841,6 +3326,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Stanford,0.01694915254237288,59
 2022,special_teams,punt,Stanford,38.977777777777774,45
 2022,special_teams,punt_ret,Stanford,39.31578947368421,38
+2022,special_teams,fg_epa,Stanford,1.5458332470485143,14
+2022,special_teams,ko_epa,Stanford,0.017497580498456955,48
+2022,special_teams,ko_ret_epa,Stanford,-0.027764479992753367,59
+2022,special_teams,punt_epa,Stanford,-0.20721582108073763,45
+2022,special_teams,punt_ret_epa,Stanford,0.07364382281115181,38
 2022,offense,success,Syracuse,0.4847328244274809,524
 2022,offense,explosive,Syracuse,0.12786259541984732,524
 2022,offense,epa_rush,Syracuse,-0.007603098454463505,270
@@ -2870,6 +3360,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Syracuse,6.828571428571428,35
 2022,special_teams,punt,Syracuse,35.39393939393939,33
 2022,special_teams,punt_ret,Syracuse,38.114285714285714,35
+2022,special_teams,fg_epa,Syracuse,0.4707220021416159,17
+2022,special_teams,ko_epa,Syracuse,-0.2709576821327209,50
+2022,special_teams,ko_ret_epa,Syracuse,0.4579104559762137,35
+2022,special_teams,punt_epa,Syracuse,-0.5784941189216845,33
+2022,special_teams,punt_ret_epa,Syracuse,0.20254692052091872,35
 2022,offense,success,TCU,0.48143236074270557,754
 2022,offense,explosive,TCU,0.16047745358090185,754
 2022,offense,epa_rush,TCU,0.09183815241520016,395
@@ -2899,6 +3394,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,TCU,6.9818181818181815,55
 2022,special_teams,punt,TCU,36.883720930232556,43
 2022,special_teams,punt_ret,TCU,37.61363636363637,44
+2022,special_teams,fg_epa,TCU,0.5797737496239799,14
+2022,special_teams,ko_epa,TCU,-0.2769086589551952,73
+2022,special_teams,ko_ret_epa,TCU,0.49447281035509977,55
+2022,special_teams,punt_epa,TCU,-0.23336077152296555,43
+2022,special_teams,punt_ret_epa,TCU,0.24611971391872925,44
 2022,offense,success,Temple,0.39087947882736157,614
 2022,offense,explosive,Temple,0.08306188925081433,614
 2022,offense,epa_rush,Temple,-0.3137572023277862,267
@@ -2928,6 +3428,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Temple,1.46,50
 2022,special_teams,punt,Temple,41.0,38
 2022,special_teams,punt_ret,Temple,37.588235294117645,34
+2022,special_teams,fg_epa,Temple,-0.010408937931060791,12
+2022,special_teams,ko_epa,Temple,-0.18681224616798195,37
+2022,special_teams,ko_ret_epa,Temple,0.05556638479232788,50
+2022,special_teams,punt_epa,Temple,-0.19982797221133583,38
+2022,special_teams,punt_ret_epa,Temple,0.21997495828305974,34
 2022,offense,success,Tennessee,0.5641711229946524,748
 2022,offense,explosive,Tennessee,0.14171122994652408,748
 2022,offense,epa_rush,Tennessee,0.11025360836501046,403
@@ -2957,6 +3462,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Tennessee,0.8409090909090909,44
 2022,special_teams,punt,Tennessee,36.21739130434783,23
 2022,special_teams,punt_ret,Tennessee,37.21951219512195,41
+2022,special_teams,fg_epa,Tennessee,0.2659247186448839,18
+2022,special_teams,ko_epa,Tennessee,-0.04808354297199765,74
+2022,special_teams,ko_ret_epa,Tennessee,0.040322791446339,44
+2022,special_teams,punt_epa,Tennessee,-0.31722563116446784,23
+2022,special_teams,punt_ret_epa,Tennessee,0.28913181802121607,41
 2022,offense,success,Texas,0.49834983498349833,606
 2022,offense,explosive,Texas,0.14521452145214522,606
 2022,offense,epa_rush,Texas,-0.008821273965842934,298
@@ -2986,6 +3496,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Texas,2.642857142857143,42
 2022,special_teams,punt,Texas,39.82857142857143,35
 2022,special_teams,punt_ret,Texas,36.416666666666664,48
+2022,special_teams,fg_epa,Texas,-0.06646510801817242,19
+2022,special_teams,ko_epa,Texas,0.2126776366903071,57
+2022,special_teams,ko_ret_epa,Texas,0.20091352150553748,42
+2022,special_teams,punt_epa,Texas,-0.016520517213003977,35
+2022,special_teams,punt_ret_epa,Texas,0.34485508874058723,48
 2022,offense,success,Texas A&M,0.4341534008683068,691
 2022,offense,explosive,Texas A&M,0.1287988422575977,691
 2022,offense,epa_rush,Texas A&M,0.014733526299604692,292
@@ -3015,6 +3530,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Texas A&M,1.2040816326530612,49
 2022,special_teams,punt,Texas A&M,40.72222222222222,54
 2022,special_teams,punt_ret,Texas A&M,38.23076923076923,52
+2022,special_teams,fg_epa,Texas A&M,-0.25918227120449666,19
+2022,special_teams,ko_epa,Texas A&M,-0.1277139000594616,48
+2022,special_teams,ko_ret_epa,Texas A&M,0.08254745541786661,49
+2022,special_teams,punt_epa,Texas A&M,-0.018287730713685352,54
+2022,special_teams,punt_ret_epa,Texas A&M,0.1730193401185366,52
 2022,offense,success,Texas State,0.4208754208754209,594
 2022,offense,explosive,Texas State,0.08080808080808081,594
 2022,offense,epa_rush,Texas State,-0.050969170278913296,257
@@ -3044,6 +3564,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Texas State,1.5,42
 2022,special_teams,punt,Texas State,39.03921568627451,51
 2022,special_teams,punt_ret,Texas State,38.808510638297875,47
+2022,special_teams,fg_epa,Texas State,0.4213649233182271,12
+2022,special_teams,ko_epa,Texas State,-0.13190851183164687,42
+2022,special_teams,ko_ret_epa,Texas State,0.11075075893175035,42
+2022,special_teams,punt_epa,Texas State,-0.24241818122419656,51
+2022,special_teams,punt_ret_epa,Texas State,0.1319844719577343,47
 2022,offense,success,Texas Tech,0.44588235294117645,850
 2022,offense,explosive,Texas Tech,0.11529411764705882,850
 2022,offense,epa_rush,Texas Tech,0.12300753794757328,359
@@ -3073,6 +3598,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Texas Tech,1.3448275862068966,58
 2022,special_teams,punt,Texas Tech,40.29032258064516,31
 2022,special_teams,punt_ret,Texas Tech,37.30232558139535,43
+2022,special_teams,fg_epa,Texas Tech,0.2653365448901528,19
+2022,special_teams,ko_epa,Texas Tech,-0.18965419773328102,59
+2022,special_teams,ko_ret_epa,Texas Tech,0.05659513021337575,58
+2022,special_teams,punt_epa,Texas Tech,-0.04877351272490717,31
+2022,special_teams,punt_ret_epa,Texas Tech,0.36381746031517204,43
 2022,offense,success,Toledo,0.46511627906976744,688
 2022,offense,explosive,Toledo,0.14098837209302326,688
 2022,offense,epa_rush,Toledo,0.02415441441704852,380
@@ -3102,6 +3632,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Toledo,4.857142857142857,49
 2022,special_teams,punt,Toledo,37.24390243902439,41
 2022,special_teams,punt_ret,Toledo,32.867924528301884,53
+2022,special_teams,fg_epa,Toledo,-0.04913172551563808,14
+2022,special_teams,ko_epa,Toledo,-0.22572930795805796,56
+2022,special_teams,ko_ret_epa,Toledo,0.3106301974277107,49
+2022,special_teams,punt_epa,Toledo,-0.34299240461209923,41
+2022,special_teams,punt_ret_epa,Toledo,0.6152453880827382,53
 2022,offense,success,Troy,0.4372163388804841,661
 2022,offense,explosive,Troy,0.1059001512859304,661
 2022,offense,epa_rush,Troy,-0.09068041322144255,289
@@ -3131,6 +3666,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Troy,1.303030303030303,33
 2022,special_teams,punt,Troy,40.19512195121951,41
 2022,special_teams,punt_ret,Troy,40.745098039215684,51
+2022,special_teams,fg_epa,Troy,0.3948750836508615,14
+2022,special_teams,ko_epa,Troy,-0.007078442134355244,38
+2022,special_teams,ko_ret_epa,Troy,0.0855491974137046,33
+2022,special_teams,punt_epa,Troy,-0.0591606748540227,41
+2022,special_teams,punt_ret_epa,Troy,-0.012444238452350391,51
 2022,offense,success,Tulane,0.5,692
 2022,offense,explosive,Tulane,0.1430635838150289,692
 2022,offense,epa_rush,Tulane,0.04787416848927851,382
@@ -3160,6 +3700,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Tulane,4.666666666666667,39
 2022,special_teams,punt,Tulane,37.23529411764706,34
 2022,special_teams,punt_ret,Tulane,36.80952380952381,42
+2022,special_teams,fg_epa,Tulane,-0.5128860218184335,14
+2022,special_teams,ko_epa,Tulane,0.007439616716132974,53
+2022,special_teams,ko_ret_epa,Tulane,0.3501013547946245,39
+2022,special_teams,punt_epa,Tulane,-0.271678205798654,34
+2022,special_teams,punt_ret_epa,Tulane,0.40700540798051016,42
 2022,offense,success,Tulsa,0.48429319371727747,764
 2022,offense,explosive,Tulsa,0.12958115183246074,764
 2022,offense,epa_rush,Tulsa,0.088070637440636,353
@@ -3189,6 +3734,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Tulsa,1.121212121212121,66
 2022,special_teams,punt,Tulsa,39.92,50
 2022,special_teams,punt_ret,Tulsa,41.04,50
+2022,special_teams,fg_epa,Tulsa,-0.05444141891267565,18
+2022,special_teams,ko_epa,Tulsa,-0.335549671202898,64
+2022,special_teams,ko_ret_epa,Tulsa,0.04408428705099857,66
+2022,special_teams,punt_epa,Tulsa,0.04142194718122482,50
+2022,special_teams,punt_ret_epa,Tulsa,0.15008497923612596,50
 2022,offense,success,UAB,0.4982638888888889,576
 2022,offense,explosive,UAB,0.1597222222222222,576
 2022,offense,epa_rush,UAB,0.1468488658093586,357
@@ -3218,6 +3768,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,UAB,2.967741935483871,31
 2022,special_teams,punt,UAB,33.421052631578945,19
 2022,special_teams,punt_ret,UAB,39.84375,32
+2022,special_teams,fg_epa,UAB,-0.2242134383746556,14
+2022,special_teams,ko_epa,UAB,-0.17387046791472524,53
+2022,special_teams,ko_ret_epa,UAB,0.18465973100354593,31
+2022,special_teams,punt_epa,UAB,-0.550629951451954,19
+2022,special_teams,punt_ret_epa,UAB,0.05651095928624272,32
 2022,offense,success,UCF,0.5176630434782609,736
 2022,offense,explosive,UCF,0.13451086956521738,736
 2022,offense,epa_rush,UCF,0.14105763503184793,409
@@ -3247,6 +3802,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,UCF,1.2380952380952381,42
 2022,special_teams,punt,UCF,37.705882352941174,34
 2022,special_teams,punt_ret,UCF,35.44736842105263,38
+2022,special_teams,fg_epa,UCF,0.5201905710356576,14
+2022,special_teams,ko_epa,UCF,-0.3166234020916921,53
+2022,special_teams,ko_ret_epa,UCF,0.06353602097147987,42
+2022,special_teams,punt_epa,UCF,-0.22439126275918064,34
+2022,special_teams,punt_ret_epa,UCF,0.5032841531853927,38
 2022,offense,success,UCLA,0.5569620253164557,711
 2022,offense,explosive,UCLA,0.16877637130801687,711
 2022,offense,epa_rush,UCLA,0.15757792707216678,371
@@ -3276,6 +3836,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,UCLA,3.981132075471698,53
 2022,special_teams,punt,UCLA,41.13333333333333,15
 2022,special_teams,punt_ret,UCLA,37.36363636363637,33
+2022,special_teams,fg_epa,UCLA,-0.22138849426718318,17
+2022,special_teams,ko_epa,UCLA,-0.10173443797975779,64
+2022,special_teams,ko_ret_epa,UCLA,0.25997670416562063,53
+2022,special_teams,punt_epa,UCLA,-0.09205329418182373,15
+2022,special_teams,punt_ret_epa,UCLA,0.23845193309314322,33
 2022,offense,success,UMass,0.36,675
 2022,offense,explosive,UMass,0.08888888888888889,675
 2022,offense,epa_rush,UMass,-0.11179923600798453,414
@@ -3305,6 +3870,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,UMass,1.0217391304347827,46
 2022,special_teams,punt,UMass,32.2037037037037,54
 2022,special_teams,punt_ret,UMass,36.583333333333336,36
+2022,special_teams,fg_epa,UMass,-0.34563030916101795,17
+2022,special_teams,ko_epa,UMass,-0.3066030417169843,35
+2022,special_teams,ko_ret_epa,UMass,0.07103913763295049,46
+2022,special_teams,punt_epa,UMass,-0.6937721829723429,54
+2022,special_teams,punt_ret_epa,UMass,0.3493139346440633,36
 2022,offense,success,UNLV,0.44842105263157894,475
 2022,offense,explosive,UNLV,0.11157894736842106,475
 2022,offense,epa_rush,UNLV,0.14419456023020746,232
@@ -3334,6 +3904,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,UNLV,8.146341463414634,41
 2022,special_teams,punt,UNLV,34.189189189189186,37
 2022,special_teams,punt_ret,UNLV,37.166666666666664,24
+2022,special_teams,fg_epa,UNLV,1.41975736618042,9
+2022,special_teams,ko_epa,UNLV,-0.8039520575154212,31
+2022,special_teams,ko_ret_epa,UNLV,0.5228073262586826,41
+2022,special_teams,punt_epa,UNLV,-0.5181845760828739,37
+2022,special_teams,punt_ret_epa,UNLV,0.279856671889623,24
 2022,offense,success,USC,0.5675675675675675,703
 2022,offense,explosive,USC,0.17496443812233287,703
 2022,offense,epa_rush,USC,0.22813158235594178,323
@@ -3363,6 +3938,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,USC,3.5,48
 2022,special_teams,punt,USC,35.74074074074074,27
 2022,special_teams,punt_ret,USC,37.91428571428571,35
+2022,special_teams,fg_epa,USC,-0.2945273399353027,15
+2022,special_teams,ko_epa,USC,-0.0796825773474099,69
+2022,special_teams,ko_ret_epa,USC,0.20411318416396776,48
+2022,special_teams,punt_epa,USC,-0.16287669429072626,27
+2022,special_teams,punt_ret_epa,USC,0.22573380598000117,35
 2022,offense,success,UT San Antonio,0.5186206896551724,725
 2022,offense,explosive,UT San Antonio,0.1406896551724138,725
 2022,offense,epa_rush,UT San Antonio,0.11524631462969996,358
@@ -3392,6 +3972,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,UT San Antonio,6.125,40
 2022,special_teams,punt,UT San Antonio,41.833333333333336,24
 2022,special_teams,punt_ret,UT San Antonio,35.390243902439025,41
+2022,special_teams,fg_epa,UT San Antonio,0.14245718055301243,18
+2022,special_teams,ko_epa,UT San Antonio,-0.19011336467305168,61
+2022,special_teams,ko_ret_epa,UT San Antonio,0.3924817323684692,40
+2022,special_teams,punt_epa,UT San Antonio,-0.08826949447393417,24
+2022,special_teams,punt_ret_epa,UT San Antonio,0.3782014425207929,41
 2022,offense,success,UTEP,0.44525547445255476,685
 2022,offense,explosive,UTEP,0.10656934306569343,685
 2022,offense,epa_rush,UTEP,0.015817232689829964,326
@@ -3421,6 +4006,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,UTEP,0.24489795918367346,49
 2022,special_teams,punt,UTEP,37.41935483870968,31
 2022,special_teams,punt_ret,UTEP,35.628571428571426,35
+2022,special_teams,fg_epa,UTEP,1.001822244553339,21
+2022,special_teams,ko_epa,UTEP,-0.233318825562795,42
+2022,special_teams,ko_ret_epa,UTEP,-0.007827492392792994,49
+2022,special_teams,punt_epa,UTEP,-0.39983196027817264,31
+2022,special_teams,punt_ret_epa,UTEP,0.35931157980646405,35
 2022,offense,success,Utah,0.5445255474452555,685
 2022,offense,explosive,Utah,0.13284671532846715,685
 2022,offense,epa_rush,Utah,0.0738832333868534,378
@@ -3450,6 +4040,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Utah,2.9210526315789473,38
 2022,special_teams,punt,Utah,36.54545454545455,22
 2022,special_teams,punt_ret,Utah,39.6,35
+2022,special_teams,fg_epa,Utah,-0.5873034265306261,9
+2022,special_teams,ko_epa,Utah,-0.16916268638202123,56
+2022,special_teams,ko_ret_epa,Utah,0.2195005824691371,38
+2022,special_teams,punt_epa,Utah,-0.2223040180450136,22
+2022,special_teams,punt_ret_epa,Utah,0.22436264668192182,35
 2022,offense,success,Utah State,0.403125,640
 2022,offense,explosive,Utah State,0.090625,640
 2022,offense,epa_rush,Utah State,-0.09149891062044231,363
@@ -3479,6 +4074,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Utah State,1.607843137254902,51
 2022,special_teams,punt,Utah State,38.42553191489362,47
 2022,special_teams,punt_ret,Utah State,37.3421052631579,38
+2022,special_teams,fg_epa,Utah State,-0.19757761160532633,15
+2022,special_teams,ko_epa,Utah State,-0.02037291119738323,41
+2022,special_teams,ko_ret_epa,Utah State,0.11236046342288747,51
+2022,special_teams,punt_epa,Utah State,-0.15187606469113776,47
+2022,special_teams,punt_ret_epa,Utah State,0.3067658469080925,38
 2022,offense,success,Vanderbilt,0.43884892086330934,695
 2022,offense,explosive,Vanderbilt,0.10647482014388489,695
 2022,offense,epa_rush,Vanderbilt,-0.0098823376451423,377
@@ -3508,6 +4108,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Vanderbilt,0.8840579710144928,69
 2022,special_teams,punt,Vanderbilt,40.58695652173913,46
 2022,special_teams,punt_ret,Vanderbilt,39.4054054054054,37
+2022,special_teams,fg_epa,Vanderbilt,-0.566202933138067,11
+2022,special_teams,ko_epa,Vanderbilt,-0.00209305983669353,53
+2022,special_teams,ko_ret_epa,Vanderbilt,0.05146614451339279,69
+2022,special_teams,punt_epa,Vanderbilt,-0.06555136098809865,46
+2022,special_teams,punt_ret_epa,Vanderbilt,0.2854848278535379,37
 2022,offense,success,Virginia,0.44025157232704404,636
 2022,offense,explosive,Virginia,0.11949685534591195,636
 2022,offense,epa_rush,Virginia,0.00020034983513791114,282
@@ -3537,6 +4142,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Virginia,5.0,46
 2022,special_teams,punt,Virginia,33.471698113207545,53
 2022,special_teams,punt_ret,Virginia,37.372549019607845,51
+2022,special_teams,fg_epa,Virginia,-0.7312438090642294,18
+2022,special_teams,ko_epa,Virginia,-0.17282269217751242,33
+2022,special_teams,ko_ret_epa,Virginia,0.30361960245215375,46
+2022,special_teams,punt_epa,Virginia,-0.6635333599065835,53
+2022,special_teams,punt_ret_epa,Virginia,0.2885337775828792,51
 2022,offense,success,Virginia Tech,0.41350210970464135,711
 2022,offense,explosive,Virginia Tech,0.10548523206751055,711
 2022,offense,epa_rush,Virginia Tech,-0.05520755311669843,339
@@ -3566,6 +4176,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Virginia Tech,2.5660377358490565,53
 2022,special_teams,punt,Virginia Tech,38.61904761904762,63
 2022,special_teams,punt_ret,Virginia Tech,37.425925925925924,54
+2022,special_teams,fg_epa,Virginia Tech,0.1366263429323832,12
+2022,special_teams,ko_epa,Virginia Tech,-0.17766193256658666,34
+2022,special_teams,ko_ret_epa,Virginia Tech,0.1414910802301371,53
+2022,special_teams,punt_epa,Virginia Tech,-0.23711369056550283,63
+2022,special_teams,punt_ret_epa,Virginia Tech,0.39812326100137496,54
 2022,offense,success,Wake Forest,0.4854111405835544,754
 2022,offense,explosive,Wake Forest,0.1246684350132626,754
 2022,offense,epa_rush,Wake Forest,-0.10515131852428192,358
@@ -3595,6 +4210,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Wake Forest,2.2115384615384617,52
 2022,special_teams,punt,Wake Forest,41.303030303030305,33
 2022,special_teams,punt_ret,Wake Forest,37.0,43
+2022,special_teams,fg_epa,Wake Forest,0.18024115761121115,12
+2022,special_teams,ko_epa,Wake Forest,-0.05248650952951232,67
+2022,special_teams,ko_ret_epa,Wake Forest,0.17479081451892853,52
+2022,special_teams,punt_epa,Wake Forest,-0.069455779411576,33
+2022,special_teams,punt_ret_epa,Wake Forest,0.35611612367075546,43
 2022,offense,success,Washington,0.5513513513513514,740
 2022,offense,explosive,Washington,0.11891891891891893,740
 2022,offense,epa_rush,Washington,0.11696336420404463,295
@@ -3624,6 +4244,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Washington,2.7058823529411766,51
 2022,special_teams,punt,Washington,34.78947368421053,19
 2022,special_teams,punt_ret,Washington,42.241379310344826,29
+2022,special_teams,fg_epa,Washington,0.42341439162983613,17
+2022,special_teams,ko_epa,Washington,-0.032191964102462986,71
+2022,special_teams,ko_ret_epa,Washington,0.17670573440252565,51
+2022,special_teams,punt_epa,Washington,-0.5897212185357746,19
+2022,special_teams,punt_ret_epa,Washington,-0.12499173807686773,29
 2022,offense,success,Washington State,0.46153846153846156,585
 2022,offense,explosive,Washington State,0.12307692307692308,585
 2022,offense,epa_rush,Washington State,0.08344661830183238,208
@@ -3653,6 +4278,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Washington State,1.2820512820512822,39
 2022,special_teams,punt,Washington State,39.30769230769231,39
 2022,special_teams,punt_ret,Washington State,38.0,44
+2022,special_teams,fg_epa,Washington State,-0.08677180608113606,9
+2022,special_teams,ko_epa,Washington State,-0.13385054469108582,44
+2022,special_teams,ko_ret_epa,Washington State,0.07003736343139257,39
+2022,special_teams,punt_epa,Washington State,-0.03923345949405279,39
+2022,special_teams,punt_ret_epa,Washington State,0.22040849094363776,44
 2022,offense,success,West Virginia,0.4806924101198402,751
 2022,offense,explosive,West Virginia,0.11584553928095873,751
 2022,offense,epa_rush,West Virginia,0.03388743769924219,353
@@ -3682,6 +4312,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,West Virginia,3.4035087719298245,57
 2022,special_teams,punt,West Virginia,41.666666666666664,30
 2022,special_teams,punt_ret,West Virginia,31.794117647058822,34
+2022,special_teams,fg_epa,West Virginia,0.5233954741404607,13
+2022,special_teams,ko_epa,West Virginia,-0.47371882625988554,56
+2022,special_teams,ko_ret_epa,West Virginia,0.2176415104615061,57
+2022,special_teams,punt_epa,West Virginia,0.14677566885948182,30
+2022,special_teams,punt_ret_epa,West Virginia,0.6324174364700037,34
 2022,offense,success,Western Kentucky,0.4949640287769784,695
 2022,offense,explosive,Western Kentucky,0.1510791366906475,695
 2022,offense,epa_rush,Western Kentucky,-0.04040550253807126,280
@@ -3711,6 +4346,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Western Kentucky,3.230769230769231,39
 2022,special_teams,punt,Western Kentucky,41.827586206896555,29
 2022,special_teams,punt_ret,Western Kentucky,40.357142857142854,42
+2022,special_teams,fg_epa,Western Kentucky,0.21286725997924805,14
+2022,special_teams,ko_epa,Western Kentucky,-0.004948540590703487,64
+2022,special_teams,ko_ret_epa,Western Kentucky,0.22167906088706774,39
+2022,special_teams,punt_epa,Western Kentucky,-0.00037965075723056133,29
+2022,special_teams,punt_ret_epa,Western Kentucky,0.06070233579902422,42
 2022,offense,success,Western Michigan,0.39162929745889385,669
 2022,offense,explosive,Western Michigan,0.10762331838565023,669
 2022,offense,epa_rush,Western Michigan,-0.05813286633922535,341
@@ -3740,6 +4380,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Western Michigan,1.88,50
 2022,special_teams,punt,Western Michigan,38.68181818181818,44
 2022,special_teams,punt_ret,Western Michigan,36.486486486486484,37
+2022,special_teams,fg_epa,Western Michigan,-0.5004085021860459,17
+2022,special_teams,ko_epa,Western Michigan,-0.4164524979369585,43
+2022,special_teams,ko_ret_epa,Western Michigan,0.11834298968315124,50
+2022,special_teams,punt_epa,Western Michigan,-0.2971869558095932,44
+2022,special_teams,punt_ret_epa,Western Michigan,0.22684349441850507,37
 2022,offense,success,Wisconsin,0.4727272727272727,605
 2022,offense,explosive,Wisconsin,0.11239669421487604,605
 2022,offense,epa_rush,Wisconsin,0.07286675737749172,350
@@ -3769,6 +4414,11 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Wisconsin,3.3333333333333335,39
 2022,special_teams,punt,Wisconsin,36.785714285714285,42
 2022,special_teams,punt_ret,Wisconsin,40.35294117647059,51
+2022,special_teams,fg_epa,Wisconsin,-0.31721293926239014,11
+2022,special_teams,ko_epa,Wisconsin,0.057242625526019504,56
+2022,special_teams,ko_ret_epa,Wisconsin,0.2472810026926872,39
+2022,special_teams,punt_epa,Wisconsin,-0.2736741535010792,42
+2022,special_teams,punt_ret_epa,Wisconsin,0.09654597149175756,51
 2022,offense,success,Wyoming,0.4320785597381342,611
 2022,offense,explosive,Wyoming,0.1276595744680851,611
 2022,offense,epa_rush,Wyoming,0.03645672522891682,366
@@ -3798,3 +4448,8 @@ season,unit,metric,team,value,n
 2022,special_teams,ko_ret,Wyoming,4.659574468085107,47
 2022,special_teams,punt,Wyoming,38.829787234042556,47
 2022,special_teams,punt_ret,Wyoming,40.68292682926829,41
+2022,special_teams,fg_epa,Wyoming,0.37346537004817615,22
+2022,special_teams,ko_epa,Wyoming,-0.04007363446215366,47
+2022,special_teams,ko_ret_epa,Wyoming,0.31960604419099525,47
+2022,special_teams,punt_epa,Wyoming,-0.21752848143273212,47
+2022,special_teams,punt_ret_epa,Wyoming,0.08790594175821398,41

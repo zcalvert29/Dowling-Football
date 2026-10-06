@@ -224,15 +224,16 @@ def team_profiles():
 
 def scouting_report():
     page_header("Scouting Report", show_definitions=False)
-    st.subheader("Team profiles")
-    profiles.render_profiles_page(df, _week_games(), opponent)
-    st.divider()
     qol.notes_box("opponent", opponent, opponent)
     html = ins.build_report_html(df, df_any_down, opponent, " · ".join(active_filter_chips()),
                                  notes=qol.latest_note("opponent", opponent), df_games=_week_games())
     st.download_button("Download printable report", html, file_name=f"{opponent}_scouting_report.html",
                        mime="text/html", type="primary")
     st.caption("Opens in any browser; use Print → Save as PDF for the binder.")
+    st.divider()
+    st.subheader("Team profiles")
+    profiles.render_profiles_page(df, _week_games(), opponent)
+    st.divider()
     v.render_dd_tendencies(df_any_down, opponent, "Down & distance tendencies")
     c1, c2 = st.columns(2)
     with c1:

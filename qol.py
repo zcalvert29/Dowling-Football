@@ -334,8 +334,12 @@ def render_home(df: pd.DataFrame, opponents: list[str], pages: dict) -> None:
 # ---------------------------------------------------------------------------
 # Play finder
 # ---------------------------------------------------------------------------
+ST_PLAY_TYPES = {"KO", "KO Rec", "Punt", "Punt Rec", "Fake Punt", "FG", "FG Block", "Extra Pt.", "Extra Pt. Block",
+                 "2 Pt.", "2 Pt. Block", "2 Pt. Defend"}
+
+
 def render_play_finder(df: pd.DataFrame) -> None:
-    st.caption("Filter every play by any combination of tags. Use PLAY # to pull the clip in Hudl.")
+    st.caption("Filter every play by any combination of tags. Picking a situation leaves out special teams plays.")
     c = st.columns(4)
     teams = sorted(df["offense"].dropna().unique(), key=lambda t: (t != TEAM, t))
     offense = c[0].multiselect("Offense", teams, key="pf_off")
@@ -348,7 +352,7 @@ def render_play_finder(df: pd.DataFrame) -> None:
     base = df[df["offense"].isin(offense)] if offense else df
     form = c[1].multiselect("Formation", sorted(base["OFF FORM"].dropna().astype(str).unique()), key="pf_form")
     call = c[2].text_input("Play call contains", key="pf_call")
-    result = c[3].text_input("Result contains", key="pf_result")
+    result_col = c[3]  # filled in below, once the other filters are applied, so it only lists results that exist
     c = st.columns(4)
     hash_ = c[0].multiselect("Hash", sorted(df["HASH"].dropna().unique()), key="pf_hash")
     situation = c[1].selectbox("Situation", list(ins.SITUATIONS), key="pf_sit")
@@ -362,13 +366,19 @@ def render_play_finder(df: pd.DataFrame) -> None:
             d = d[d[col].astype(str).isin([str(s) for s in sel])] if col == "OFF FORM" else d[d[col].isin(sel)]
     if call:
         d = d[d["OFF PLAY"].astype(str).str.contains(call, case=False, na=False)]
-    if result:
-        d = d[d["RESULT"].astype(str).str.contains(result, case=False, na=False)]
     d = ins.apply_situation(d, situation)
+    if situation != "All plays":
+        d = d[~d["PLAY TYPE"].isin(ST_PLAY_TYPES)]
     if explosive:
         d = d[pd.to_numeric(d["explosive_play"], errors="coerce") == 1]
     if negative:
         d = d[d["GN/LS"] < 0]
+    picked = st.session_state.get("pf_result_sel", [])
+    options = sorted(set(d["RESULT"].dropna().astype(str)) | set(picked))
+    result = result_col.multiselect("Result", options, key="pf_result_sel",
+                                    help="Only results that show up with the other filters are listed.")
+    if result:
+        d = d[d["RESULT"].astype(str).isin(result)]
 
     rp = v.run_pass(d)
     m = st.columns(5)
@@ -377,10 +387,13 @@ def render_play_finder(df: pd.DataFrame) -> None:
     m[2].metric("EPA / play", f"{rp['epa'].mean():+.2f}" if len(rp) else "–")
     m[3].metric("Success", f"{rp['success'].mean():.0%}" if len(rp) else "–")
     m[4].metric("Avg gain", f"{rp['GN/LS'].mean():.1f}" if len(rp) else "–")
-    cols = ["game_id", "PLAY #", "QTR", "DN", "DIST", "YARD LN", "HASH", "offense", "PLAY TYPE", "OFF FORM",
+    cols = ["game_id", "QTR", "DN", "DIST", "YARD LN", "HASH", "offense", "PLAY TYPE", "OFF FORM",
             "OFF PLAY", "PLAY DIR", "RESULT", "GN/LS", "epa"]
     t = d[[c for c in cols if c in d]].copy()
-    t["game_id"] = t["game_id"].map(lambda g: ins.game_label(df, g))
+    succ = pd.to_numeric(d["success"], errors="coerce")
+    t["Success"] = np.select([succ == 1, succ == 0], ["Yes", "No"], default="")
+    mine = ins.dowling_game_ids(df)
+    t["game_id"] = t["game_id"].map(lambda g: ins.game_label(df, g) if g in mine else ins.scout_game_label(df, g))
     t = t.rename(columns={"game_id": "Game", "offense": "Offense", "epa": "EPA"})
     for c_ in ("DN", "DIST", "QTR"):
         t[c_] = t[c_].astype("Int64")
