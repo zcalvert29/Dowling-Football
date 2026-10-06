@@ -121,6 +121,7 @@ METRICS = {
     "Plays": lambda g: g["PLAY #"].count(),
     "Pass Rate": lambda g: g["PASS"].mean(),
     "Rush Rate": lambda g: g["RUSH"].mean(),
+    "Run Rate": lambda g: g["RUSH"].mean(),
     "Avg Yards Gained": lambda g: g["GN/LS"].mean(),
     "Success Rate": lambda g: g["success"].mean(),
     "EPA per Play": lambda g: g["epa"].mean(),
@@ -136,7 +137,7 @@ FORMATS = {
     "3rd Down Conversions": "{:,.0f}",
     "Avg Yards Gained": "{:.1f}",
     "EPA per Play": "{:.2f}",
-    **{m: PCT for m in ["Pass Rate", "Rush Rate", "Success Rate", "Explosive Rate",
+    **{m: PCT for m in ["Pass Rate", "Rush Rate", "Run Rate", "Success Rate", "Explosive Rate",
                         "3rd Down Conversion Rate", "4th Down Conversion Rate"]},
 }
 
@@ -176,6 +177,7 @@ METRIC_HELP = {
     "Plays": "Number of plays in this row.",
     "Pass Rate": "Share of plays that were passes.",
     "Rush Rate": "Share of plays that were runs.",
+    "Run Rate": "Share of plays that were runs.",
     "Avg Yards Gained": "Average yards gained per play.",
     "Success Rate": "Share of plays that stayed on schedule: 40% of the yards needed on 1st down, "
                     "70% on 2nd, a first down on 3rd/4th.",
@@ -993,6 +995,65 @@ def render_d_rush_vs_box(df):
     return _men_in_box(df, "Run", "defense", "DCHS D Rush Metrics vs Men in the Box", good_high=False)
 
 
+# Defensive call tags. A blank FRONT MOVEMENT or BLITZ means none happened on that play, but only in games where
+# the defense was charted at all; games with none of these tags (not charted yet) are left out of the tables.
+DEF_CALL_COLS = ("DEF FRONT", "FRONT MOVEMENT", "BLITZ")
+D_CALL_MEASURES = ["Avg Yards Gained", "Success Rate", "EPA per Play", "Plays"]
+
+
+def _charted_d_games(df: pd.DataFrame) -> set:
+    """Games where Dowling's defensive calls were tagged on at least one play."""
+    d = df[df["defense"] == TEAM]
+    cols = [c for c in DEF_CALL_COLS if c in d.columns]
+    if not cols:
+        return set()
+    return set(d.loc[d[cols].notna().any(axis=1), "game_id"].dropna())
+
+
+def d_call_table(df: pd.DataFrame, play_type: str, col: str, none_row: bool = False) -> pd.DataFrame:
+    """DCHS D results on run or pass plays by one tag (DEF FRONT, FRONT MOVEMENT, BLITZ, BACKFIELD).
+
+    none_row=True turns a blank tag into a "None" row (no movement / no blitz), using only charted games.
+    """
+    base = run_pass(df[df["defense"] == TEAM], [play_type])
+    if col not in base.columns:
+        return crosstab(base.iloc[0:0].assign(**{col: None}), col, D_CALL_MEASURES)
+    if none_row:
+        d = base[base["game_id"].isin(_charted_d_games(df))].copy()
+        d[col] = d[col].astype("object").where(d[col].notna(), "None")
+    else:
+        d = base[base[col].notna()]
+    return crosstab(d, col, D_CALL_MEASURES, sort_by_count=True)
+
+
+def _render_d_call(df, play_type, col, label, title, none_row=False):
+    t = d_call_table(df, play_type, col, none_row=none_row)
+    show_table(title, t, good_high=False)
+    base = run_pass(df[df["defense"] == TEAM], [play_type])
+    if col not in base.columns:
+        st.caption(f"The data doesn't have a {col} column yet.")
+    elif none_row:
+        skipped = base.loc[~base["game_id"].isin(_charted_d_games(df)), "game_id"].nunique()
+        note = f"None = no {label} on the play."
+        if skipped:
+            note += (f" {skipped} game{'s' if skipped != 1 else ''} with no defensive calls tagged "
+                     f"{'are' if skipped != 1 else 'is'} left out.")
+        st.caption(note)
+    else:
+        tag_note(base, col, label)
+    return t
+
+
+def render_d_call_tables(df, play_type: str) -> None:
+    """DEF FRONT, FRONT MOVEMENT, BLITZ and opponent BACKFIELD tables for DCHS D run or pass plays."""
+    kind = "Rush" if play_type == "Run" else "Pass"
+    _render_d_call(df, play_type, "DEF FRONT", "defensive front", f"DCHS D {kind} Metrics vs Def Front")
+    _render_d_call(df, play_type, "FRONT MOVEMENT", "front movement", f"DCHS D {kind} Metrics vs Front Movement",
+                   none_row=True)
+    _render_d_call(df, play_type, "BLITZ", "blitz", f"DCHS D {kind} Metrics vs Blitz", none_row=True)
+    _render_d_call(df, play_type, "BACKFIELD", "backfield", f"DCHS D {kind} Metrics vs Opponent Backfield")
+
+
 def d_coverage_table(df):
     d = downs(run_pass(df[df["defense"] == TEAM], ["Pass"]))
     d = keep(d[d["Distance"].notna()], "d_pass_coverage", "COVERAGE")
@@ -1047,6 +1108,26 @@ def render_opp_tendencies(df, opponent):
     t = crosstab(d, ["DN", "Distance"], ["Pass Rate", "Rush Rate", "Plays"])
     show_table(f"{opponent} Offensive Tendencies", t, good_high=False)
     return t
+
+
+OPP_LOOK_MEASURES = ["Run Rate", "Pass Rate", "Success Rate", "EPA per Play", "Plays"]
+
+
+def opp_look_table(df, team, col):
+    """Opponent run/pass plays by OFF FORM or BACKFIELD: what they call from each look, and how it goes."""
+    d = run_pass(df[df["offense"] == team])
+    if col not in d.columns:
+        return crosstab(d.iloc[0:0].assign(**{col: None}), col, OPP_LOOK_MEASURES)
+    return crosstab(d[d[col].notna()], col, OPP_LOOK_MEASURES, sort_by_count=True)
+
+
+def render_opp_look_tendencies(df, opponent):
+    """Formation and backfield tendency tables (Scout Opposing Offense > Tendencies)."""
+    base = run_pass(df[df["offense"] == opponent])
+    for col, label, title in [("OFF FORM", "formation", "Formation"), ("BACKFIELD", "backfield", "Backfield")]:
+        show_table(f"{opponent} {title} Tendencies", opp_look_table(df, opponent, col), good_high=False)
+        if col in base.columns:
+            tag_note(base, col, label)
 
 
 def render_opp_3rd_downs(df, opponent):

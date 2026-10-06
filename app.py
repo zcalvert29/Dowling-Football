@@ -163,6 +163,7 @@ def dchs_d_run_game():
     page_header("DCHS D Run Game")
     v.render_run_gaps(df, "defense", v.TEAM, "DCHS D Run Gaps", good_high=False)
     v.render_d_rush_vs_box(df)
+    v.render_d_call_tables(df, "Run")
     v.render_d_run_game_detail(df)
 
 
@@ -174,6 +175,7 @@ def dchs_d_pass_game():
     v.render_d_pass_coverage(df, table=cov)
     v.render_usage_scatter(cov, "DCHS coverages: EPA vs success allowed", good_high=False, noun="Coverage")
     ins.render_coverage_by_formation(df)
+    v.render_d_call_tables(df, "Pass")
     v.render_d_pass_game_detail(df)
 
 
@@ -186,6 +188,7 @@ def scout_opposing_offense():
     with tendencies:
         v.render_dd_tendencies(df_any_down, opponent, f"{opponent} down & distance tendencies")
         v.render_opp_tendencies(df, opponent)
+        v.render_opp_look_tendencies(df, opponent)
         v.render_opp_3rd_downs(df_any_down, opponent)
         v.render_opp_4th_downs(df_any_down, opponent)
         ins.render_down_calls(df_any_down, opponent, 3)
