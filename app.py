@@ -54,7 +54,9 @@ DEFINITIONS = """
 
 **Colors on Dowling offense tables:** green = clearly above the table's average. Red is only for results that are bad on their own: negative EPA, under 4.5 yards per play, or under a 40% success rate. Anything in between is left uncolored.
 
-**Colors on defense and scouting tables:** green is good for Dowling and red is bad, compared to the table's average, so green = the opponent's offense did worse. (The scouting run-gap chart is the exception: it's colored from the scouted team's side, green = positive EPA for them.)
+**Colors on DCHS defense tables:** green is good for Dowling and red is bad, compared to the table's average, so green = the opponent's offense did worse.
+
+**Colors when scouting an opponent's offense:** from their side, with the same rules as Dowling's offense tables: green = it works for them, red = it doesn't.
 
 Gray rows have fewer than 10 plays, so treat them as small samples. Hover a column name for its definition.
 """
@@ -204,16 +206,17 @@ def scout_opposing_offense():
     with field_pos:
         bd.render_field_position(df, _week_games(), opponent, f"{opponent} offense by field position")
     with run_game:
-        # Colored from the scouted team's side: green = positive EPA for them, red = negative.
-        v.render_run_gaps(df, "offense", opponent, f"{opponent} O Run Gaps", good_high=True,
+        # Everything on this page is colored from the scouted team's side (v.SCOUT_GOOD_HIGH).
+        v.render_run_gaps(df, "offense", opponent, f"{opponent} O Run Gaps", good_high=v.SCOUT_GOOD_HIGH,
                           hide_below=v.SCOUT_MIN_SAMPLE)
         v.render_opp_play_calls(df, opponent, "Run")
     with pass_game:
-        v.render_pass_zones(df, "offense", opponent, f"{opponent} O Pass Zones", key="pz_opp_o", good_high=False,
+        v.render_pass_zones(df, "offense", opponent, f"{opponent} O Pass Zones", key="pz_opp_o",
+                            good_high=v.SCOUT_GOOD_HIGH,
                             min_att=v.SCOUT_MIN_SAMPLE)
         v.render_opp_play_calls(df, opponent, "Pass")
     with red_zone:
-        bd.render_red_zone(df, _week_games(), opponent, "offense", f"{opponent} offense", good_high=False,
+        bd.render_red_zone(df, _week_games(), opponent, "offense", f"{opponent} offense", good_high=v.SCOUT_GOOD_HIGH,
                            key="rz_opp")
 
 
@@ -244,11 +247,13 @@ def scouting_report():
     v.render_dd_tendencies(df_any_down, opponent, "Down & distance tendencies")
     c1, c2 = st.columns(2)
     with c1:
-        v.render_run_gaps(df, "offense", opponent, "Run game by gap", good_high=False)
+        v.render_run_gaps(df, "offense", opponent, "Run game by gap", good_high=v.SCOUT_GOOD_HIGH,
+                          hide_below=v.SCOUT_MIN_SAMPLE)
     with c2:
-        v.render_pass_zones(df, "offense", opponent, "Where they throw", key="pz_report", good_high=False)
+        v.render_pass_zones(df, "offense", opponent, "Where they throw", key="pz_report", good_high=v.SCOUT_GOOD_HIGH,
+                            min_att=v.SCOUT_MIN_SAMPLE)
     forms = v.opp_formations_table(df, opponent)
-    v.show_table("Formations", forms, good_high=False)
+    v.show_table("Formations", forms, good_high=v.SCOUT_GOOD_HIGH)
     c1, c2 = st.columns(2)
     with c1:
         v.render_opp_play_calls(df, opponent, "Run")

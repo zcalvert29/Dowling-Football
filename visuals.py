@@ -151,6 +151,9 @@ PLAY_RESULT_MEASURES = ["Avg Yards Gained", "Success Rate", "EPA per Play", "Exp
 # ---------------------------------------------------------------------------
 # Scouting graphs leave off anything with fewer plays than this (tables still list them).
 SCOUT_MIN_SAMPLE = 5
+# Scouting views of an opponent's offense are colored from THEIR side (green = good for the team being
+# scouted), using the same rules as Dowling's offense tables. Dowling's own defense pages stay Dowling's view.
+SCOUT_GOOD_HIGH = True
 # Set from the app's sidebar. Tables hide rows with fewer plays than this.
 MIN_PLAYS = 1
 # Rows with fewer plays than this are grayed out (and lose their colors).
@@ -714,7 +717,7 @@ def _pass_zone_html(stats: pd.DataFrame, overall: dict, metric: str, good_high: 
         for bg, _ in (_ZONE_STOPS if col == "share" else _GOOD_BAD_STOPS)
     )
     low_txt, high_txt = (f"Below {ref_label}", f"Above {ref_label}") if col == "share" else \
-        ("Worse for Dowling", "Better for Dowling")
+        ("Worse for the offense", "Better for the offense") if good_high else ("Worse for Dowling", "Better for Dowling")
     return (
         f'<div style="max-width:820px;font-family:inherit;color:{ink}">'
         f'<div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:12px">{kpi_html}</div>'
@@ -1145,7 +1148,7 @@ def render_d_vs_formation(df, table=None):
 def render_opp_tendencies(df, opponent):
     d = downs(run_pass(df[df["offense"] == opponent]))
     t = crosstab(d, ["DN", "Distance"], ["Pass Rate", "Rush Rate", "Plays"])
-    show_table(f"{opponent} Offensive Tendencies", t, good_high=False)
+    show_table(f"{opponent} Offensive Tendencies", t, good_high=SCOUT_GOOD_HIGH)
     return t
 
 
@@ -1164,7 +1167,7 @@ def render_opp_look_tendencies(df, opponent):
     """Formation and backfield tendency tables (Scout Opposing Offense > Tendencies)."""
     base = run_pass(df[df["offense"] == opponent])
     for col, label, title in [("OFF FORM", "formation", "Formation"), ("BACKFIELD", "backfield", "Backfield")]:
-        show_table(f"{opponent} {title} Tendencies", opp_look_table(df, opponent, col), good_high=False)
+        show_table(f"{opponent} {title} Tendencies", opp_look_table(df, opponent, col), good_high=SCOUT_GOOD_HIGH)
         if col in base.columns:
             tag_note(base, col, label)
 
@@ -1172,14 +1175,14 @@ def render_opp_look_tendencies(df, opponent):
 def render_opp_3rd_downs(df, opponent):
     d = downs(run_pass(df[df["offense"] == opponent]), [3])
     t = crosstab(d, "Distance", ["Pass Rate", "Rush Rate", "3rd Down Conversion Rate", "3rd Down Conversions", "Plays"])
-    show_table(f"{opponent} Offense 3rd Downs", t, good_high=False, gray_low_n=False)
+    show_table(f"{opponent} Offense 3rd Downs", t, good_high=SCOUT_GOOD_HIGH, gray_low_n=False)
     return t
 
 
 def render_opp_4th_downs(df, opponent):
     d = downs(run_pass(df[df["offense"] == opponent]), [4])
     t = crosstab(d, "Distance", ["Pass Rate", "Rush Rate", "4th Down Conversion Rate", "Plays"])
-    show_table(f"{opponent} Offense 4th Downs", t, good_high=False, gray_low_n=False)
+    show_table(f"{opponent} Offense 4th Downs", t, good_high=SCOUT_GOOD_HIGH, gray_low_n=False)
     return t
 
 
@@ -1200,10 +1203,10 @@ def render_opp_play_calls(df, team, play_type, chart: bool = True):
         st.info(f"None of {team}'s {kind.lower()} plays here have an OFF PLAY tag yet." if len(base)
                 else "No plays match the current filters.")
         return t
-    show_table(f"{team} {kind} Plays", t, good_high=False)
+    show_table(f"{team} {kind} Plays", t, good_high=SCOUT_GOOD_HIGH)
     tag_note(base, "OFF PLAY", "play call")
     if chart:
-        render_usage_scatter(t, f"{team} {kind.lower()} plays: EPA vs success", good_high=False,
+        render_usage_scatter(t, f"{team} {kind.lower()} plays: EPA vs success", good_high=SCOUT_GOOD_HIGH,
                              noun=f"{kind} play", min_plays=SCOUT_MIN_SAMPLE)
     return t
 

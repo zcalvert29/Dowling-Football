@@ -487,7 +487,8 @@ GLOSSARY = """
 
 ### Colors
 - **Dowling offense tables:** green = clearly above the table's average. Red only for negative EPA, under 4.5 yards per play, or under 40% success. Anything in between is uncolored.
-- **Defense and scouting tables:** green is good for Dowling, red is bad, compared to the table's average.
+- **DCHS defense tables:** green is good for Dowling, red is bad, compared to the table's average.
+- **Scouting an opponent's offense** (Scout Opposing Offense, Scouting Report): colored from their side with the offense rules, so green = it works for them, red = it doesn't.
 - **Gray rows** have fewer than 10 plays: small samples.
 
 ### Team Profiles (radar charts)

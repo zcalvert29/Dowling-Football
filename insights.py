@@ -517,7 +517,7 @@ def render_self_scout(df: pd.DataFrame, df_any_down: pd.DataFrame, min_plays: in
 # ---------------------------------------------------------------------------
 def render_best_plays(df: pd.DataFrame, team: str, n: int = 10) -> None:
     rp = v.run_pass(df[df["offense"] == team])
-    show_plays(f"{team} best {n} plays (most likely to come back)", rp.nlargest(n, "epa"), good_high=False)
+    show_plays(f"{team} best {n} plays (most likely to come back)", rp.nlargest(n, "epa"), good_high=v.SCOUT_GOOD_HIGH)
 
 
 CONVERTED_COL = {3: "THIRD_DOWN_CONVERTED", 4: "FOURTH_DOWN_CONVERTED"}
@@ -769,10 +769,12 @@ def build_report_html(df: pd.DataFrame, df_any_down: pd.DataFrame, opponent: str
     dd = v.dd_tendency_html(df_any_down, opponent, ink)
     if dd:
         sections.append(f'<div class="block"><h2>Down and distance tendencies</h2>{dd}</div>')
-    gaps = v.run_gaps_html(df, "offense", opponent, good_high=False, ink=ink)
+    gaps = v.run_gaps_html(df, "offense", opponent, good_high=v.SCOUT_GOOD_HIGH, ink=ink,
+                           hide_below=v.SCOUT_MIN_SAMPLE)
     if gaps:
         sections.append(f'<div class="block"><h2>Run game by gap</h2>{gaps}</div>')
-    zones = v.pass_zones_html(df, "offense", opponent, "Share of throws", good_high=False, ink=ink)
+    zones = v.pass_zones_html(df, "offense", opponent, "Share of throws", good_high=v.SCOUT_GOOD_HIGH, ink=ink,
+                              min_att=v.SCOUT_MIN_SAMPLE)
     if zones:
         sections.append(f'<div class="block"><h2>Where they throw</h2>{zones}</div>')
     forms = v.opp_formations_table(df, opponent)
