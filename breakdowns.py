@@ -168,7 +168,8 @@ def _tree_takeaways(t: pd.DataFrame, top: int = 3) -> list[str]:
     return out
 
 
-def render_tendency_tree(df: pd.DataFrame, team: str, title: str, side: str = "offense", key: str = "tree") -> None:
+def render_tendency_tree(df: pd.DataFrame, team: str, title: str, side: str = "offense", key: str = "tree",
+                         min_form_plays: int = 4) -> None:
     st.markdown(f"**{title}**")
     d = _team_plays(df, team, side)
     if len(d) < 5:
@@ -179,8 +180,8 @@ def render_tendency_tree(df: pd.DataFrame, team: str, title: str, side: str = "o
     depth_label = st.segmented_control("Show down to", options, default="Direction", key=f"{key}_depth") \
         if len(options) > 1 else "Direction"
     depth = 4 if depth_label == "Play" else 3
-    t = tendency_tree_frame(d, depth=depth)
-    fold = max(4, int(np.ceil(0.03 * len(d))))
+    fold = max(min_form_plays, int(np.ceil(0.03 * len(d))))
+    t = tendency_tree_frame(d, depth=depth, min_form_plays=fold)
     lines = _tree_takeaways(t)
     if lines:
         st.html('<div style="font-size:14px;line-height:1.7">' + "<br>".join(
@@ -455,6 +456,7 @@ RZ_RESULTS = [("Touchdown", "#1D9E75"), ("FG Made", "#E8B923"), ("FG Missed", "#
 
 # Red zone tables: no explosive rate (not what matters this close to the goal), and small samples aren't grayed
 # out since nearly every red zone row is a small sample.
+RZ_COLOR_MIN_PLAYS = 5  # red zone rows smaller than this keep their numbers but get no green/red
 RZ_MEASURES = [m for m in v.PLAY_RESULT_MEASURES if m != "Explosive Rate"]
 
 
@@ -510,14 +512,23 @@ def render_red_zone(df: pd.DataFrame, df_games: pd.DataFrame, team: str, side: s
            "TD on the play": "{:.0%}"}
     st.dataframe(zt.style.format(fmt), width="stretch")
     forms = v.crosstab(rz, "OFF FORM", RZ_MEASURES, sort_by_count=True)
-    v.show_table("Formations inside the 20", forms, good_high=good_high, gray_low_n=False)
+    v.show_table("Formations inside the 20", forms, good_high=good_high, gray_low_n=False,
+                 color_min_plays=RZ_COLOR_MIN_PLAYS)
     # Full width, not side by side: half-width tables cut off the Plays column.
-    by_call = rz["OFF PLAY"].notna().mean() >= 0.5
+    # Dowling's own offense: runs by RUN SCHEME, passes as one "Pass" row (until pass calls are tagged in more
+    # detail). Everyone else: OFF PLAY, when it's tagged on at least half the snaps.
+    by_scheme = team == v.TEAM and side == "offense" and "RUN SCHEME" in rz.columns
+    by_call = by_scheme or rz["OFF PLAY"].notna().mean() >= 0.5
+    if by_scheme:
+        rz = rz.assign(**{"RUN SCHEME / PASS": np.where(
+            rz["PLAY TYPE"] == "Pass", "Pass", rz["RUN SCHEME"].astype("object").where(rz["RUN SCHEME"].notna(),
+                                                                                       "Run (no scheme tag)"))})
+    call_col = "RUN SCHEME / PASS" if by_scheme else "OFF PLAY"
     for where, lo, hi in (("between the 11 and 20 yard line", 11, 20), ("inside the 10 yard line", 1, 10)):
         band = rz[rz["YARDLINE_100"].between(lo, hi)]
         if by_call:
             title = f"Play calls {where}"
-            t = v.crosstab(band, "OFF PLAY", RZ_MEASURES, sort_by_count=True)
+            t = v.crosstab(band, call_col, RZ_MEASURES, sort_by_count=True)
         else:
             title = f"Run/pass by direction {where}"
             dirs = band.assign(Direction=band["PLAY TYPE"].astype(str) + " " +
@@ -527,8 +538,8 @@ def render_red_zone(df: pd.DataFrame, df_games: pd.DataFrame, team: str, side: s
             st.markdown(f"**{title}**")
             st.info("No plays here with the current filters.")
         else:
-            v.show_table(title, t, good_high=good_high, gray_low_n=False)
-    st.caption("Trips use whole drives from the selected weeks; the zone, formation and call tables follow every "
+            v.show_table(title, t, good_high=good_high, gray_low_n=False, color_min_plays=RZ_COLOR_MIN_PLAYS)
+    st.caption(f"Rows with fewer than {RZ_COLOR_MIN_PLAYS} plays aren't colored. Trips use whole drives from the selected weeks; the zone, formation and call tables follow every "
                "sidebar filter. TD on the play = share of snaps that scored right there.")
 
 

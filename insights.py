@@ -42,7 +42,36 @@ SITUATIONS = {
     "3rd & short (1-3 yds)": lambda d: (d["DN"] == 3) & (d["DIST"] <= 3),
     "Short yardage (3rd/4th & 1-2)": lambda d: d["DN"].isin([3, 4]) & (d["DIST"] <= 2),
     "Long yardage (2nd/3rd & 8+)": lambda d: d["DN"].isin([2, 3]) & (d["DIST"] >= 8),
+    # Needs the "neutral" column from add_game_state() (app.py adds it when the data loads).
+    "Neutral": lambda d: d["neutral"] if "neutral" in d else pd.Series(True, index=d.index),
 }
+NEUTRAL_MARGIN = 7          # score within this many points at the snap...
+NEUTRAL_LATE_SECONDS = 120  # ...and not inside the last 2 minutes of the 2nd or 4th quarter (estimated clock)
+
+
+def add_game_state(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Adds, for every scrimmage snap: pre_snap_margin (offense minus defense, score at the snap), est_q_seconds
+    (estimated high school seconds left in the quarter, the same estimate the win probability and 4th-down
+    pages use), and neutral (True when the margin is within NEUTRAL_MARGIN and it isn't the last 2 minutes of
+    a half or overtime). Kicks, tries, and snaps that can't be placed get neutral = False.
+    """
+    out = df.copy()
+    out["pre_snap_margin"] = np.nan
+    out["est_q_seconds"] = np.nan
+    out["neutral"] = False
+    d = _scrimmage(df[df["game_id"].notna() & df["QTR"].notna()])
+    if d.empty:
+        return out
+    d = _estimate_clock(d)
+    margin = d["pre_off_score"] - d["pre_def_score"]
+    q = d["QTR"].astype(int)
+    late = q.isin([2, 4]) & (d["q_seconds"] <= NEUTRAL_LATE_SECONDS)
+    out.loc[d.index, "pre_snap_margin"] = margin
+    out.loc[d.index, "est_q_seconds"] = d["q_seconds"]
+    out.loc[d.index, "neutral"] = (margin.abs() <= NEUTRAL_MARGIN) & q.between(1, 4) & ~late
+    out["neutral"] = out["neutral"].astype(bool)
+    return out
 
 
 def apply_situation(df: pd.DataFrame, name: str) -> pd.DataFrame:
@@ -686,13 +715,16 @@ def render_coverage_by_formation(df: pd.DataFrame, top_n: int = 10) -> None:
     covs = d["COVERAGE"].value_counts().head(8).index
     d = d[d["OFF FORM"].isin(forms) & d["COVERAGE"].isin(covs)]
     t = pd.crosstab(d["OFF FORM"], d["COVERAGE"], normalize="index").reindex(index=forms, columns=covs)
-    t.insert(0, "Plays", d["OFF FORM"].value_counts().reindex(forms))
-    t.insert(1, "EPA per Play", d.groupby("OFF FORM")["epa"].mean().reindex(forms))
+    t.insert(0, "EPA per Play", d.groupby("OFF FORM")["epa"].mean().reindex(forms))
+    t["Plays"] = d["OFF FORM"].value_counts().reindex(forms)
 
     def epa_color(col):  # the opponent's EPA: positive is bad for Dowling
         return ["" if pd.isna(x) else BAD_CSS if x >= 0.10 else GOOD_CSS if x <= -0.10 else "" for x in col]
 
-    sty = (t.style.format({c: "{:.1%}" for c in covs}, na_rep="–").format({"EPA per Play": "{:+.2f}"}, na_rep="–")
+    # One format call: a second .format() call resets every column it isn't given back to the raw number,
+    # which is what showed coverage shares as 0.257143 instead of 25.7%.
+    sty = (t.style.format({**{c: "{:.1%}" for c in covs}, "EPA per Play": "{:+.2f}", "Plays": "{:,.0f}"},
+                          na_rep="–")
            .background_gradient(cmap="Blues", subset=list(covs), vmin=0, vmax=1)
            .apply(epa_color, subset=["EPA per Play"]))
     st.dataframe(sty, width="stretch")
@@ -877,6 +909,7 @@ def _estimate_clock(d: pd.DataFrame) -> pd.DataFrame:
     d["seconds_remaining"] = [fd.model_seconds_remaining(q, s) for q, s in zip(d["QTR"], secs_in_q)]
     d["half_seconds"] = [fd.half_seconds_from_game(s) for s in d["seconds_remaining"]]
     d["clock"] = [f"Q{int(qq)} {int(s // 60)}:{int(s % 60):02d}" for qq, s in zip(d["QTR"], secs_in_q)]
+    d["q_seconds"] = secs_in_q  # high school clock: estimated seconds left in the quarter
     return d.drop(columns=["_i", "_n"])
 
 

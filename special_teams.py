@@ -238,44 +238,63 @@ def render_kick_logs(df: pd.DataFrame, ev: pd.DataFrame) -> None:
                      width="stretch", hide_index=True)
 
 
-def render_st_epa(df: pd.DataFrame) -> None:
+@st.cache_data(show_spinner=False)
+def _kick_tables(df: pd.DataFrame) -> dict:
+    import profiles
+    return profiles.standardize_hudl(df, TEAM)
+
+
+def render_st_epa(df: pd.DataFrame, df_all_games: pd.DataFrame | None = None) -> None:
     """
-    Dowling's special teams EPA by unit, all from Dowling's point of view. In the data, a punt's "offense" is the
-    punting team and a kickoff's "offense" is the receiving team, with EPA from that team's side; return units
-    use it as is when Dowling is that team, or flipped when Dowling is the one defending the kick.
+    Dowling's special teams EPA by unit, from Dowling's point of view, with the high school average next to it.
+
+    Kicks are priced exactly like the Team Profiles special teams axes (profiles.add_st_epa): one neutral
+    context (tie game, middle of a half), a kickoff against the touchback, a punt from the punter's 4th-down
+    expected points to the receiver's first snap, a field goal against the expected points before the kick.
+    The HS average is the same number over every kick in our film (df_all_games: Dowling games and scout film),
+    which is also the middle ring of the profile's special teams radar, so the two pages always agree.
+    PATs and 2-point tries aren't on the radar; they use the play-by-play EPA.
     """
+    import profiles
+
     st.markdown("**Special teams EPA by unit**")
-    k = df[df["epa"].notna()]
-    ours, theirs = k["offense"] == TEAM, (k["offense"] != TEAM) & (k["defense"] == TEAM)
+    df_all_games = df if df_all_games is None else df_all_games
+    ours_t, all_t = _kick_tables(df), _kick_tables(df_all_games)
+    hs = profiles.hs_special_teams_averages(all_t)
+    k, f = ours_t["kicks"], ours_t["fgs"]
+    is_k = lambda kind, who: k[(k["kind"] == kind) & (k[who] == TEAM)]["epa"].dropna()
+    tries = lambda d: d[d["PLAY TYPE"].isin(XPS | TWO_PTS) & d["epa"].notna()]
+    our_tries = tries(df)[tries(df)["offense"] == TEAM]["epa"]
     units = [
-        ("Punts", k[k["PLAY TYPE"].isin(PUNTS) & ours], 1),
-        ("Punt returns", k[k["PLAY TYPE"].isin(PUNTS) & theirs], -1),
-        ("Kickoffs", k[k["PLAY TYPE"].isin(KICKOFFS) & theirs], -1),
-        ("Kickoff returns", k[k["PLAY TYPE"].isin(KICKOFFS) & ours], 1),
-        ("Field goals", k[k["PLAY TYPE"].isin(FGS) & ours], 1),
-        ("PATs and 2-point tries", k[k["PLAY TYPE"].isin(XPS | TWO_PTS) & ours], 1),
+        ("Punts", is_k("punt", "kicker"), hs["punt_epa"]),
+        ("Punt returns", -is_k("punt", "receiver"), hs["punt_ret_epa"]),
+        ("Kickoffs", is_k("ko", "kicker"), hs["ko_epa"]),
+        ("Kickoff returns", -is_k("ko", "receiver"), hs["ko_ret_epa"]),
+        ("Field goals", f.loc[f["kicker"] == TEAM, "epa"].dropna(), hs["fg_epa"]),
+        ("PATs and 2-point tries", our_tries, tries(df_all_games)["epa"].mean()),
     ]
-    rows = []
-    for name, s_, sign in units:
-        e = sign * s_["epa"]
-        rows.append({"Unit": name, "Plays": len(s_), "Total EPA": e.sum(), "EPA per play": e.mean() if len(s_) else np.nan})
+    rows = [{"Unit": name, "Plays": len(e), "EPA per play": e.mean() if len(e) else np.nan, "HS average": avg,
+             "vs HS average": (e.mean() - avg) if len(e) and pd.notna(avg) else np.nan}
+            for name, e, avg in units]
     t = pd.DataFrame(rows).set_index("Unit")
 
     def color(col):
-        return ["" if pd.isna(x) else "background-color:#E1F5EE;color:#085041" if x > 0.05 else
-                "background-color:#FCEBEB;color:#791F1F" if x < -0.05 else "" for x in col]
+        return ["" if pd.isna(x) else "background-color:#E1F5EE;color:#085041" if x >= 0.10 else
+                "background-color:#FCEBEB;color:#791F1F" if x <= -0.10 else "" for x in col]
 
-    st.dataframe(t.style.format({"Total EPA": "{:+.1f}", "EPA per play": "{:+.2f}"}, na_rep="–")
-                 .apply(color, subset=["EPA per play"]), width="stretch")
-    st.caption("EPA from Dowling's point of view, so above 0 is good for Dowling on every row. A punt starts from a "
-               "4th-down situation with very low expected points, so a normal punt scores as positive, and a "
-               "normal punt return scores slightly negative. A kickoff touchback scores about −0.3 for the return team "
-               "(+0.3 for the kicking team), so a kickoff return is only adding value if it beats that, and kickoff "
-               "coverage is doing its job when it's at or above it.")
+    st.dataframe(t.style.format({"EPA per play": "{:+.2f}", "HS average": "{:+.2f}", "vs HS average": "{:+.2f}"},
+                                na_rep="–").apply(color, subset=["vs HS average"]), width="stretch")
+    st.caption("EPA from Dowling's point of view. Read the vs HS average column: the raw number on its own "
+               "isn't centered on zero. Punts start from a 4th-down spot, so the average high school punt prices "
+               "out negative for the punting team and positive for the return team; kickoffs are measured against "
+               "a touchback. HS average = every kick in our film (Dowling games and scout film), priced the same "
+               "way. These are the same numbers the Team Profiles special teams radar uses.")
 
 
 def render_special_teams_page(df_games: pd.DataFrame) -> None:
-    # Only games Dowling played: scout film of other teams' kicks doesn't say anything about Dowling's units.
+    # Only games Dowling played: scout film of other teams' kicks doesn't say anything about Dowling's units
+    # (it's still the baseline for the special teams EPA table's HS average).
+    all_games = df_games
     df_games = ins.dowling_only(df_games)
     if df_games.empty:
         st.info("No Dowling games in the selected weeks.")
@@ -287,7 +306,7 @@ def render_special_teams_page(df_games: pd.DataFrame) -> None:
     with c1:
         render_fg_range(df_games)
     with c2:
-        render_st_epa(df_games)
+        render_st_epa(df_games, all_games)
     render_punt_map(ev)
     render_kick_logs(df_games, ev)
     st.caption("KICK YARDS is blank in the data, so net punts and starts come from the punt spot and the receiving "

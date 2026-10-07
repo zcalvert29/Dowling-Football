@@ -149,6 +149,8 @@ PLAY_RESULT_MEASURES = ["Avg Yards Gained", "Success Rate", "EPA per Play", "Exp
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+# Scouting graphs leave off anything with fewer plays than this (tables still list them).
+SCOUT_MIN_SAMPLE = 5
 # Set from the app's sidebar. Tables hide rows with fewer plays than this.
 MIN_PLAYS = 1
 # Rows with fewer plays than this are grayed out (and lose their colors).
@@ -165,12 +167,11 @@ COLOR_THRESHOLDS = {
     "4th Down Conversion Rate": 0.10,
 }
 GOOD_STYLE = "background-color:#E1F5EE;color:#085041"
-OK_STYLE = "background-color:#FAEEDA;color:#633806"
 BAD_STYLE = "background-color:#FCEBEB;color:#791F1F"
 
-# Offense tables only use red for results that are bad on their own terms;
-# anything else short of green is yellow ("fine, not great").
-OFFENSE_RED_BELOW = {"EPA per Play": 0.0, "Avg Yards Gained": 4.5}
+# Offense tables only use red for results that are bad on their own terms (no yellow: anything short of green
+# that isn't below one of these lines is left uncolored).
+OFFENSE_RED_BELOW = {"EPA per Play": 0.0, "Avg Yards Gained": 4.5, "Success Rate": 0.40}
 LOW_N_STYLE = "color:#9A9890;background-color:transparent"
 
 METRIC_HELP = {
@@ -222,37 +223,38 @@ def crosstab(df: pd.DataFrame, rows, measures, sort_by_count: bool = False) -> p
     return out
 
 
-def style_table(table: pd.DataFrame, good_high: bool = True, overall: dict | None = None, gray_low_n: bool = True):
+def style_table(table: pd.DataFrame, good_high: bool = True, overall: dict | None = None, gray_low_n: bool = True,
+                color_min_plays: int = 0):
     """
     Format a crosstab and color cells green (good for Dowling) or red (bad
     for Dowling) when they're clearly above/below the table's overall
     average. good_high=False flips the colors, for tables where a high
     number is the opponent's offense doing well (defense/scouting pages).
-    Rows with fewer than LOW_N_ROWS plays are grayed out.
+    Rows with fewer than LOW_N_ROWS plays are grayed out (gray_low_n), and
+    rows with fewer than color_min_plays plays are never colored.
     """
     overall = table.attrs.get("overall", {}) if overall is None else overall
     fmt = {c: FORMATS[c] for c in table.columns if c in FORMATS}
+    # Rows under color_min_plays keep their numbers but never get green/red.
+    few = ((table["Plays"] < color_min_plays).to_numpy() if color_min_plays and "Plays" in table.columns
+           else np.zeros(len(table), dtype=bool))
 
     def color_col(col):
         thr, ref = COLOR_THRESHOLDS.get(col.name), overall.get(col.name)
         if thr is None or ref is None or pd.isna(ref):
             return [""] * len(col)
         styles = []
-        for v in col:
-            if pd.isna(v):
+        for v, small in zip(col, few):
+            if pd.isna(v) or small:
                 styles.append("")
             elif good_high:
-                # Offense rule: green at/above the cutoff; red only for negative
-                # EPA or under 4.5 yards; everything else below green is yellow
-                # (for EPA/yards) or yellow only when clearly below average
-                # (success, explosive, conversion rates never go red).
+                # Offense rule: red for results that are bad on their own (negative EPA, under 4.5 yards,
+                # under 40% success); green at/above the cutoff; nothing in between.
                 floor = OFFENSE_RED_BELOW.get(col.name)
                 if floor is not None and v < floor:
                     styles.append(BAD_STYLE)
                 elif v >= ref + thr:
                     styles.append(GOOD_STYLE)
-                elif floor is not None or v <= ref - thr:
-                    styles.append(OK_STYLE)
                 else:
                     styles.append("")
             elif abs(v - ref) < thr:
@@ -271,7 +273,7 @@ def style_table(table: pd.DataFrame, good_high: bool = True, overall: dict | Non
 
 
 def show_table(title: str, table: pd.DataFrame, good_high: bool = True, caption: str | None = None,
-               gray_low_n: bool = True) -> None:
+               gray_low_n: bool = True, color_min_plays: int = 0) -> None:
     st.markdown(f"**{title}**")
     overall = table.attrs.get("overall", {})
     if "Plays" in table.columns and MIN_PLAYS > 1:
@@ -280,7 +282,8 @@ def show_table(title: str, table: pd.DataFrame, good_high: bool = True, caption:
         st.info("No plays match the current filters.")
         return
     config = {c: st.column_config.Column(help=METRIC_HELP[c]) for c in table.columns if c in METRIC_HELP}
-    st.dataframe(style_table(table, good_high, overall, gray_low_n), width="stretch", column_config=config)
+    st.dataframe(style_table(table, good_high, overall, gray_low_n, color_min_plays), width="stretch",
+                 column_config=config)
     if caption:
         st.caption(caption)
 
@@ -391,13 +394,14 @@ def render_usage_scatter(table: pd.DataFrame, title: str, good_high: bool = True
     avg_epa = overall.get("EPA per Play", data["EPA per Play"].mean())
     avg_sr = overall.get("Success Rate", data["Success Rate"].mean())
     if good_high:
-        # Same rule as the offense tables: green at/above the green line,
-        # red only for negative EPA, yellow in between.
+        # Same rule as the offense tables: red for negative EPA or under 40% success, green at/above the
+        # green line, gray (no call either way) in between.
         green_line = avg_epa + COLOR_THRESHOLDS["EPA per Play"]
-        cats = ["Green: above average", "Yellow: positive, below green", "Red: negative EPA"]
-        colors = ["#1D9E75", "#E8B923", "#E24B4A"]
-        data["vs_avg"] = np.select([data["EPA per Play"] >= max(green_line, 0), data["EPA per Play"] >= 0],
-                                   cats[:2], default=cats[2])
+        cats = ["Above average", "In between", "Negative EPA or under 40% success"]
+        colors = ["#1D9E75", "#B4B2A9", "#E24B4A"]
+        bad = (data["EPA per Play"] < OFFENSE_RED_BELOW["EPA per Play"]) | \
+              (data["Success Rate"] < OFFENSE_RED_BELOW["Success Rate"])
+        data["vs_avg"] = np.select([bad, data["EPA per Play"] >= green_line], [cats[2], cats[0]], default=cats[1])
     else:
         cats, colors = ["Good for Dowling", "Bad for Dowling"], ["#1D9E75", "#E24B4A"]
         data["vs_avg"] = np.where(data["EPA per Play"] < avg_epa, cats[0], cats[1])
@@ -652,7 +656,8 @@ def _fmt(fn, v) -> str:
 
 
 def _pass_zone_html(stats: pd.DataFrame, overall: dict, metric: str, good_high: bool = True,
-                    ink: str = "inherit") -> str:
+                    ink: str = "inherit", min_att: int = 0) -> str:
+    """min_att: zones with fewer throws than this show only their attempts and share (no rates, no color)."""
     short, col, fn = PASS_ZONE_METRICS[metric]
     ref = overall[col]
     ref_label = "even split" if col == "share" else "avg"
@@ -682,10 +687,13 @@ def _pass_zone_html(stats: pd.DataFrame, overall: dict, metric: str, good_high: 
             f'text-align:right;font-size:12px;padding-right:6px;{muted}">{label}<span>{share_of(zones)}</span></div>'
         )
         for z in zones:
-            row = stats.loc[z]
+            row = stats.loc[z].copy()
             att = int(row["att"])
-            bg, fg = _zone_color(stats, col, ref, row[col], good_high) if att else _EMPTY_ZONE
-            flag = " · low n" if 0 < att < LOW_N else ""
+            if 0 < att < min_att:  # too few throws: keep the count and share, drop the rates
+                row[[c for _, c, _ in PASS_ZONE_METRICS.values() if c != "share"]] = np.nan
+            hidden = 0 < att < min_att and col != "share"
+            bg, fg = _zone_color(stats, col, ref, row[col], good_high) if att and not hidden else _EMPTY_ZONE
+            flag = f" · under {min_att}" if 0 < att < min_att else " · low n" if 0 < att < LOW_N else ""
             others = "".join(
                 f"<span>{s} {_fmt(f, row[c])}</span>"
                 for m, (s, c, f) in PASS_ZONE_METRICS.items() if m != metric
@@ -730,17 +738,17 @@ def _zone_frame(df: pd.DataFrame, side: str, team: str) -> pd.DataFrame:
 
 
 def pass_zones_html(df: pd.DataFrame, side: str, team: str, metric: str = "Share of throws",
-                    good_high: bool = True, ink: str = "inherit") -> str:
+                    good_high: bool = True, ink: str = "inherit", min_att: int = 0) -> str:
     """HTML for the pass-zone heatmap ("" if no zone-tagged passes)."""
     d = _zone_frame(df, side, team)
     if d.empty:
         return ""
     stats, overall = _zone_stats(d)
-    return _pass_zone_html(stats, overall, metric, good_high, ink)
+    return _pass_zone_html(stats, overall, metric, good_high, ink, min_att)
 
 
 def render_pass_zones(df: pd.DataFrame, side: str, team: str, title: str, key: str,
-                      good_high: bool = True) -> None:
+                      good_high: bool = True, min_att: int = 0) -> None:
     """
     Pass-zone heatmap for passes where `side` ("offense" or "defense") == team.
     Only Pass plays with a PASS ZONE of 1-9 are included. good_high=False
@@ -754,7 +762,9 @@ def render_pass_zones(df: pd.DataFrame, side: str, team: str, title: str, key: s
         return
     metric = st.radio("Shade by", list(PASS_ZONE_METRICS), horizontal=True, key=key)
     stats, overall = _zone_stats(d)
-    st.html(_pass_zone_html(stats, overall, metric, good_high))
+    st.html(_pass_zone_html(stats, overall, metric, good_high, min_att=min_att))
+    if min_att:
+        st.caption(f"Zones with fewer than {min_att} throws only show their attempts and share of throws.")
     tag_note(run_pass(df[df[side] == team], ["Pass"]), "PASS ZONE", "pass zone")
 
 
@@ -783,8 +793,11 @@ _LOW_N = "#9A9890"     # lanes with only a few carries: shown, but not colored g
 GAP_MIN_CARRIES = 5
 
 
-def _run_gaps_svg(runs: pd.DataFrame, lanes: dict, ink: str, good_high: bool = True) -> str:
-    """`ink` = color for neutral text/lines (matches the Streamlit theme)."""
+def _run_gaps_svg(runs: pd.DataFrame, lanes: dict, ink: str, good_high: bool = True, hide_below: int = 0) -> str:
+    """
+    `ink` = color for neutral text/lines (matches the Streamlit theme). Lanes with fewer than hide_below
+    carries are drawn as empty dashed lanes with no EPA (the carry count stays).
+    """
     font = 'font-family="Source Sans Pro, Segoe UI, Helvetica, Arial, sans-serif"'
     num = f'{font} font-size="14" font-weight="600"'
     lab = f'{font} font-size="12" fill="{ink}" fill-opacity=".7"'
@@ -810,14 +823,15 @@ def _run_gaps_svg(runs: pd.DataFrame, lanes: dict, ink: str, good_high: bool = T
     max_n = max([n for _, n in lanes.values()] or [1])
     for d, g, bend_x, tip_x, name in _RUN_LANES:
         mean, n = lanes.get((d, g), (np.nan, 0))
-        if n == 0 or pd.isna(mean):
+        hidden = 0 < n < hide_below
+        if n == 0 or pd.isna(mean) or hidden:
             color = _NONE
         elif n < GAP_MIN_CARRIES:
             color = _LOW_N
         else:
             color = _POS if (mean >= 0) == good_high else _NEG
-        dash = ' stroke-dasharray="6 6"' if n == 0 else ""
-        width = 3 + 6 * n / max_n  # thicker arrow = run there more often
+        dash = ' stroke-dasharray="6 6"' if n == 0 or hidden else ""
+        width = 3 if hidden else 3 + 6 * n / max_n  # thicker arrow = run there more often
         parts.append(
             f'<path d="M340 308 L{bend_x} 275 L{tip_x} 110" fill="none" stroke="{color}" stroke-width="{width:.1f}" '
             f'stroke-linecap="round" stroke-linejoin="round"{dash}/>'
@@ -833,7 +847,7 @@ def _run_gaps_svg(runs: pd.DataFrame, lanes: dict, ink: str, good_high: bool = T
             f'<polygon points="{tip_x + 2 * ux:.1f},{110 + 2 * uy:.1f} {bx + px:.1f},{by + py:.1f} '
             f'{bx - px:.1f},{by - py:.1f}" fill="{color}"/>'
         )
-        value = "–" if n == 0 or pd.isna(mean) else f"{mean:+.2f}"
+        value = "–" if n == 0 or pd.isna(mean) or hidden else f"{mean:+.2f}"
         parts.append(f'<text x="{tip_x}" y="92" text-anchor="middle" fill="{color}" {num}>{value}</text>')
         parts.append(f'<text x="{tip_x}" y="390" text-anchor="middle" fill="{color}" {num}>{n}</text>'
                      f'<text x="{tip_x}" y="408" text-anchor="middle" {lab}>{name}</text>')
@@ -864,13 +878,15 @@ def _run_gap_lanes(df: pd.DataFrame, side: str, team: str):
     return runs, tagged, lanes
 
 
-def run_gaps_html(df: pd.DataFrame, side: str, team: str, good_high: bool = True, ink: str = "#31333F") -> str:
+def run_gaps_html(df: pd.DataFrame, side: str, team: str, good_high: bool = True, ink: str = "#31333F",
+                  hide_below: int = 0) -> str:
     """HTML (an embedded image) for the run-gap diagram ("" if no runs)."""
     runs, _, lanes = _run_gap_lanes(df, side, team)
-    return _run_gaps_svg(runs, lanes, ink, good_high) if not runs.empty else ""
+    return _run_gaps_svg(runs, lanes, ink, good_high, hide_below) if not runs.empty else ""
 
 
-def render_run_gaps(df: pd.DataFrame, side: str, team: str, title: str, good_high: bool = True) -> None:
+def render_run_gaps(df: pd.DataFrame, side: str, team: str, title: str, good_high: bool = True,
+                    hide_below: int = 0) -> None:
     """
     Run-gap diagram for runs where `side` ("offense" or "defense") == team.
     Top strip uses every Run play (penalties excluded); arrows use runs with
@@ -883,10 +899,15 @@ def render_run_gaps(df: pd.DataFrame, side: str, team: str, title: str, good_hig
     if runs.empty:
         st.info("No runs match the current filters.")
         return
-    st.html(_run_gaps_svg(runs, lanes, theme_ink(), good_high))
+    st.html(_run_gaps_svg(runs, lanes, theme_ink(), good_high, hide_below))
     untagged = len(runs) - len(tagged)
-    note = (f"Thicker arrows = more carries. Gray arrows have fewer than {GAP_MIN_CARRIES} carries, so they aren't "
-            f"colored good or bad.")
+    if hide_below:
+        note = f"Thicker arrows = more carries. Dashed lanes have fewer than {hide_below} carries, so no EPA is shown."
+        if team != TEAM:
+            note += f" Green = positive EPA (good for {team}), red = negative."
+    else:
+        note = (f"Thicker arrows = more carries. Gray arrows have fewer than {GAP_MIN_CARRIES} carries, so they "
+                f"aren't colored good or bad.")
     if untagged:
         missing_gap = int(runs["GAP"].isna().sum())
         missing_dir = int(runs["PLAY DIR"].isna().sum())
@@ -1010,14 +1031,22 @@ def _charted_d_games(df: pd.DataFrame) -> set:
     return set(d.loc[d[cols].notna().any(axis=1), "game_id"].dropna())
 
 
-def d_call_table(df: pd.DataFrame, play_type: str, col: str, none_row: bool = False) -> pd.DataFrame:
+def d_call_table(df: pd.DataFrame, play_type: str, col: str, none_row: bool = False,
+                 blitz_split: bool = False) -> pd.DataFrame:
     """DCHS D results on run or pass plays by one tag (DEF FRONT, FRONT MOVEMENT, BLITZ, BACKFIELD).
 
     none_row=True turns a blank tag into a "None" row (no movement / no blitz), using only charted games.
+    blitz_split=True collapses the tag to two rows, "Blitz" (any blitz tagged) and "No Blitz" (blank), also
+    using only charted games.
     """
     base = run_pass(df[df["defense"] == TEAM], [play_type])
     if col not in base.columns:
         return crosstab(base.iloc[0:0].assign(**{col: None}), col, D_CALL_MEASURES)
+    if blitz_split:
+        d = base[base["game_id"].isin(_charted_d_games(df))].copy()
+        d[col] = np.where(d[col].notna(), "Blitz", "No Blitz")
+        t = crosstab(d, col, D_CALL_MEASURES)
+        return t.reindex([r for r in ("Blitz", "No Blitz") if r in t.index]).__finalize__(t)
     if none_row:
         d = base[base["game_id"].isin(_charted_d_games(df))].copy()
         d[col] = d[col].astype("object").where(d[col].notna(), "None")
@@ -1026,15 +1055,17 @@ def d_call_table(df: pd.DataFrame, play_type: str, col: str, none_row: bool = Fa
     return crosstab(d, col, D_CALL_MEASURES, sort_by_count=True)
 
 
-def _render_d_call(df, play_type, col, label, title, none_row=False):
-    t = d_call_table(df, play_type, col, none_row=none_row)
-    show_table(title, t, good_high=False)
+def _render_d_call(df, play_type, col, label, title, none_row=False, blitz_split=False, gray_low_n=True):
+    t = d_call_table(df, play_type, col, none_row=none_row, blitz_split=blitz_split)
+    if blitz_split:
+        t.index.name = "BLITZ?"
+    show_table(title, t, good_high=False, gray_low_n=gray_low_n)
     base = run_pass(df[df["defense"] == TEAM], [play_type])
     if col not in base.columns:
         st.caption(f"The data doesn't have a {col} column yet.")
-    elif none_row:
+    elif none_row or blitz_split:
         skipped = base.loc[~base["game_id"].isin(_charted_d_games(df)), "game_id"].nunique()
-        note = f"None = no {label} on the play."
+        note = "No Blitz = no blitz tagged on the play." if blitz_split else f"None = no {label} on the play."
         if skipped:
             note += (f" {skipped} game{'s' if skipped != 1 else ''} with no defensive calls tagged "
                      f"{'are' if skipped != 1 else 'is'} left out.")
@@ -1045,13 +1076,21 @@ def _render_d_call(df, play_type, col, label, title, none_row=False):
 
 
 def render_d_call_tables(df, play_type: str) -> None:
-    """DEF FRONT, FRONT MOVEMENT, BLITZ and opponent BACKFIELD tables for DCHS D run or pass plays."""
+    """
+    DEF FRONT, FRONT MOVEMENT, Blitz vs No Blitz, BLITZ and opponent BACKFIELD tables for DCHS D run or pass
+    plays. No small-sample graying, except the run-side blitz-by-name table (most blitzes are only a few snaps).
+    """
     kind = "Rush" if play_type == "Run" else "Pass"
-    _render_d_call(df, play_type, "DEF FRONT", "defensive front", f"DCHS D {kind} Metrics vs Def Front")
-    _render_d_call(df, play_type, "FRONT MOVEMENT", "front movement", f"DCHS D {kind} Metrics vs Front Movement",
-                   none_row=True)
-    _render_d_call(df, play_type, "BLITZ", "blitz", f"DCHS D {kind} Metrics vs Blitz", none_row=True)
-    _render_d_call(df, play_type, "BACKFIELD", "backfield", f"DCHS D {kind} Metrics vs Opponent Backfield")
+    _render_d_call(df, play_type, "DEF FRONT", "defensive front", f"DCHS D {kind} Metrics with Def Front",
+                   gray_low_n=False)
+    _render_d_call(df, play_type, "FRONT MOVEMENT", "front movement", f"DCHS D {kind} Metrics with Front Movement",
+                   none_row=True, gray_low_n=False)
+    _render_d_call(df, play_type, "BLITZ", "blitz", f"DCHS D {kind} Metrics: Blitz vs No Blitz", blitz_split=True,
+                   gray_low_n=False)
+    _render_d_call(df, play_type, "BLITZ", "blitz", f"DCHS D {kind} Metrics with Blitz", none_row=True,
+                   gray_low_n=play_type == "Run")
+    _render_d_call(df, play_type, "BACKFIELD", "backfield", f"DCHS D {kind} Metrics with Opponent Backfield",
+                   gray_low_n=False)
 
 
 def d_coverage_table(df):
@@ -1063,7 +1102,7 @@ def d_coverage_table(df):
 
 def render_d_pass_coverage(df, table=None):
     t = d_coverage_table(df) if table is None else table
-    show_table("DCHS D Pass Coverage Stats", t, good_high=False)
+    show_table("DCHS D Pass Coverage Stats", t, good_high=False, gray_low_n=False)
     tag_note(run_pass(df[df["defense"] == TEAM], ["Pass"]), "COVERAGE", "coverage")
     return t
 
@@ -1165,7 +1204,7 @@ def render_opp_play_calls(df, team, play_type, chart: bool = True):
     tag_note(base, "OFF PLAY", "play call")
     if chart:
         render_usage_scatter(t, f"{team} {kind.lower()} plays: EPA vs success", good_high=False,
-                             noun=f"{kind} play")
+                             noun=f"{kind} play", min_plays=SCOUT_MIN_SAMPLE)
     return t
 
 

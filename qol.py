@@ -125,6 +125,14 @@ def validate_plays(df: pd.DataFrame) -> pd.DataFrame:
                     elif "offense" in g and (r["offense"] == TEAM) != ours:
                         add(r, f"{pt} is credited to {r['offense']} in the curated file. Rebuild with the current "
                                "curate_pbp.py, which credits tries after defensive touchdowns correctly")
+            # A missed field goal can't be followed by the kicking team kicking off (same half).
+            if pt in ("FG", "FG Block") and str(r["RESULT"]) == "No Good" and i + 1 < len(g) and "offense" in g:
+                nxt = g.loc[i + 1]
+                same_half = (r["QTR"] in (1, 2)) == (nxt["QTR"] in (1, 2))
+                if nxt["PLAY TYPE"] in ("KO", "KO Rec") and same_half:
+                    kicker = ins.other_team(g, nxt["offense"]) if nxt["offense"] in ins.game_teams(gid) else None
+                    if kicker == r["offense"]:
+                        add(r, "FG tagged No Good, but the kicking team kicks off next: it was probably good")
     return pd.DataFrame(issues, columns=["Game", "PLAY #", "QTR", "Issue"])
 
 
@@ -478,12 +486,12 @@ GLOSSARY = """
 - **Win probability (WP):** the chance of winning from a situation, from the same model the 4th Down Bot uses. "Points" of WP are percentage points.
 
 ### Colors
-- **Dowling offense tables:** green = clearly above the table's average. Red only for negative EPA or under 4.5 yards per play. Yellow = fine but short of green.
+- **Dowling offense tables:** green = clearly above the table's average. Red only for negative EPA, under 4.5 yards per play, or under 40% success. Anything in between is uncolored.
 - **Defense and scouting tables:** green is good for Dowling, red is bad, compared to the table's average.
 - **Gray rows** have fewer than 10 plays: small samples.
 
 ### Team Profiles (radar charts)
-Each axis is how far a number sits from the FBS median, in FBS standard deviations. The middle ring is the median; farther out is always better. Triangles are past ±3 SD; hollow points are small samples.
+Each axis is how far a number sits from the FBS median, in FBS standard deviations. The middle ring is the median; farther out is always better. Special teams axes are centered on the average kick in our own film instead (high school punts and kicks are shorter than college ones), using the same per-kick EPA as the Special Teams page. Triangles are past ±2 SD; hollow points are small samples.
 
 ### 4th downs
 - **Toss-up:** the best option beats the next one by under 1 point of win probability, so either call is fine.

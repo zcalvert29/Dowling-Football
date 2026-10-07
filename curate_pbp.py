@@ -114,6 +114,51 @@ def assign_offense_defense(team, opponent, plays):
     return df
 
 
+def fix_scoring_tags(plays, team, opponent):
+    """
+    Repair the two scoring mistakes the score columns can't survive, using what the next play proves.
+    Run AFTER assign_offense_defense (needs 'offense' on the tries and field goals).
+
+      * A run/pass that gained at least the yards to the goal line and is followed by its own team's
+        conversion try was a touchdown. If its RESULT has no "TD", ", TD" is added.
+      * A field goal tagged "No Good" whose next play, in the same half, is a kickoff by the kicking team
+        was good: after a miss the other team takes over at the spot, nobody kicks off.
+
+    Both need the next row to really be the next snap, so plays whose PLAY # appears more than once (an
+    export where clips share numbers and the order can't be trusted) are left alone.
+
+    Each repair is printed so the tag can also be fixed in Hudl. Returns a copy; the fixes are in RESULT, so
+    every later step (score, EPA, drives) picks them up.
+    """
+    df = plays.sort_values("PLAY #", kind="stable").reset_index(drop=True).copy()
+    result = df["RESULT"].astype("object")
+    tries = XP_TYPES | TWO_PT_TYPES
+    half = lambda q: 1 if q in (1, 2) else 2 if q in (3, 4) else q
+    dup = df["PLAY #"].duplicated(keep=False).to_numpy()
+    yard_ln = pd.to_numeric(df["YARD LN"], errors="coerce")
+    to_goal = np.where(yard_ln > 0, yard_ln, 100 + yard_ln)  # same convention as YARDLINE_100
+    gain = pd.to_numeric(df["GN/LS"], errors="coerce").to_numpy()
+    for i in range(len(df) - 1):
+        if dup[i] or dup[i + 1]:
+            continue
+        r, nxt = df.loc[i], df.loc[i + 1]
+        res = str(result[i]) if pd.notna(result[i]) else ""
+        if r["PLAY TYPE"] in ("Run", "Pass") and nxt["PLAY TYPE"] in tries and "TD" not in res \
+                and res != "Penalty" and nxt["offense"] == r["offense"] and gain[i] >= to_goal[i]:
+            result[i] = (res + ", " if res else "") + "TD"
+            print(f"FIXED PLAY # {r['PLAY #']}: {r['PLAY TYPE']} '{res}' is followed by a try, so it was a "
+                  f"touchdown -> '{result[i]}'. Fix the tag in Hudl too.")
+        if r["PLAY TYPE"] in FG_TYPES and res == "No Good" and nxt["PLAY TYPE"] in KICKOFF_TYPES \
+                and half(r["QTR"]) == half(nxt["QTR"]):
+            kicker = team if nxt["PLAY TYPE"] == "KO" else opponent
+            if kicker == r["offense"]:
+                result[i] = "Good"
+                print(f"FIXED PLAY # {r['PLAY #']}: FG tagged No Good, but {kicker} kicked off next, so it was "
+                      f"good -> 'Good'. Fix the tag in Hudl too.")
+    df["RESULT"] = result
+    return df
+
+
 def add_success_metrics(plays):
     """
     Add 'success' and 'explosive_play' columns to a plays DataFrame.
@@ -838,6 +883,7 @@ def add_dowling_offense_plays(plays: pd.DataFrame, offense_plays: pd.DataFrame) 
 
 def curate_play_by_play_data(plays: pd.DataFrame, team: str, opponent: str, date: str, week):
     plays = assign_offense_defense(team=team, opponent=opponent, plays=plays)
+    plays = fix_scoring_tags(plays=plays, team=team, opponent=opponent)
     plays = add_success_metrics(plays=plays)
     plays = add_score_columns(plays=plays, team=team, opponent=opponent)
     plays = calculate_ep_epa(df=plays)

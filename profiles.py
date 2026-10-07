@@ -3,7 +3,9 @@ profiles.py — team profile radar charts benchmarked against FBS.
 
 Every axis shows how far a team's number sits from the FBS median, in FBS
 standard deviations (team-to-team spread), oriented so farther out is always
-better for that unit. The middle ring is the FBS median.
+better for that unit. The middle ring is the FBS median, except on the special
+teams axes, which are centered on the average kick in our own film (see
+hs_centered_stats).
 
 The same metric code runs on two sources so the comparison is like-for-like:
 
@@ -379,8 +381,38 @@ def _fmt(kind: str, x: float) -> str:
     return {"pct": f"{x:.1%}", "epa": f"{x:+.2f}", "num": f"{x:.1f}", "yds": f"{x:+.1f} yds"}[kind]
 
 
+def hs_special_teams_averages(tables: dict) -> dict:
+    """
+    Per-kick averages over every kick in our film (all teams), with the same pricing as team_metrics:
+    {metric key: average}. A kick has a kicking side and a return side, so each return average is the
+    matching kicking average flipped.
+    """
+    kicks, fgs = tables["kicks"], tables["fgs"]
+    mean = lambda x: float(x.mean()) if len(x) and x.notna().any() else np.nan
+    ko, pu = kicks.loc[kicks["kind"] == "ko", "epa"], kicks.loc[kicks["kind"] == "punt", "epa"]
+    return {"fg_epa": mean(fgs["epa"]) if "epa" in fgs else np.nan, "ko_epa": mean(ko), "ko_ret_epa": -mean(ko),
+            "punt_epa": mean(pu), "punt_ret_epa": -mean(pu)}
+
+
+def hs_centered_stats(stats: dict, hs_avg: dict, unit: str = "special_teams") -> dict:
+    """
+    Benchmark stats for one unit re-centered on the high school average: the middle ring becomes the average
+    kick in our film, while the FBS team-to-team spread still sets how far one SD is. (FBS punts and kicks are
+    longer, so an FBS center makes every high school return unit look great and every kicking unit look bad.)
+    """
+    out = dict(stats)
+    for m in UNITS[unit]:
+        key = (unit, m.key)
+        if key in stats and pd.notna(hs_avg.get(m.key)):
+            out[key] = {**stats[key], "median": hs_avg[m.key], "values": None, "ref": "HS"}
+    return out
+
+
 def score_team(metrics: dict, stats: dict, unit: str) -> pd.DataFrame:
-    """One row per axis: raw value, FBS median, SD from median (better = positive), percentile."""
+    """
+    One row per axis: raw value, the reference median (FBS, or the high school average for re-centered axes),
+    SD from it (better = positive), percentile among FBS teams (blank for re-centered axes).
+    """
     rows = []
     for m in UNITS[unit]:
         value, n = metrics[unit].get(m.key, (np.nan, 0))
@@ -390,11 +422,11 @@ def score_team(metrics: dict, stats: dict, unit: str) -> pd.DataFrame:
         sign = 1 if m.higher_is_better else -1
         z = sign * (value - st_["median"]) / st_["std"] if pd.notna(value) and st_["std"] > 0 else np.nan
         vals = st_["values"]
-        pct = np.nan if pd.isna(value) else ((vals < value).mean() + 0.5 * (vals == value).mean())
+        pct = np.nan if pd.isna(value) or vals is None else ((vals < value).mean() + 0.5 * (vals == value).mean())
         pct = pct if m.higher_is_better or pd.isna(pct) else 1 - pct
         rows.append({
             "Metric": m.label, "key": m.key, "value": value, "Value": _fmt(m.fmt, value),
-            "FBS median": _fmt(m.fmt, st_["median"]), "SD vs median": z, "Better than": pct,
+            "Ref": st_.get("ref", "FBS"), "Median": _fmt(m.fmt, st_["median"]), "SD vs median": z, "Better than": pct,
             "n": int(n), "low_n": int(n) < m.min_n, "help": m.help,
         })
     return pd.DataFrame(rows)
@@ -448,7 +480,8 @@ def radar_html(title: str, subtitle: str, teams: list[tuple[str, pd.DataFrame]],
                      f'font-size="13" fill="{ink}">{_esc(labels[i])}</text>')
     for z in range(-int(Z_LIMIT) + 1, int(Z_LIMIT) + 1):           # ring labels on the top spoke
         x, y = pt(z, 0)
-        txt = "FBS median" if z == 0 else f"{z:+d} SD"
+        ref0 = teams[0][1]["Ref"].iat[0] if "Ref" in teams[0][1] and len(teams[0][1]) else "FBS"
+        txt = ("HS average" if ref0 == "HS" else "FBS median") if z == 0 else f"{z:+d} SD"
         parts.append(f'<text x="{x + 4:.1f}" y="{y - 3:.1f}" font-size="10" fill="#378ADD">{txt}</text>')
 
     for k, (name, t) in enumerate(teams):                            # team shapes
@@ -464,10 +497,11 @@ def radar_html(title: str, subtitle: str, teams: list[tuple[str, pd.DataFrame]],
             x, y = pt(-Z_LIMIT if pd.isna(z) else z, i)
             low = bool(r["low_n"]) if pd.notna(r["low_n"]) else True
             fill = "#ffffff" if low else color
-            ztxt = "–" if pd.isna(z) else f"{z:+.1f} SD vs FBS median" + (" (off the chart)" if abs(z) > Z_LIMIT else "")
+            ref = "HS average" if r.get("Ref") == "HS" else "FBS median"
+            ztxt = "–" if pd.isna(z) else f"{z:+.1f} SD vs {ref}" + (" (off the chart)" if abs(z) > Z_LIMIT else "")
             pct = "" if pd.isna(r["Better than"]) else f"Better than {r['Better than']:.0%} of FBS teams"
             nn = int(r["n"]) if pd.notna(r["n"]) else 0
-            tip = "|".join([f"{name} · {metric}", f"{r['Value']}  (FBS median {r['FBS median']})", ztxt, pct,
+            tip = "|".join([f"{name} · {metric}", f"{r['Value']}  ({ref} {r['Median']})", ztxt, pct,
                             f"{nn} plays/attempts" + (" · small sample" if low else "")])
             attrs = f'fill="{fill}" stroke="{color}" stroke-width="2" class="pt" data-tip="{_esc(tip)}"'
             if pd.notna(z) and abs(z) > Z_LIMIT:                     # pinned to the edge: triangle
@@ -529,7 +563,9 @@ def render_radar(title: str, subtitle: str, teams: list[tuple[str, pd.DataFrame]
     components.html(radar_html(title, subtitle, teams, ink, height, colors, width), height=height)
     with st.expander("See the numbers"):
         for name, t in teams:
-            shown = t[["Metric", "Value", "FBS median", "SD vs median", "Better than", "n"]].copy()
+            ref = "HS average" if (t["Ref"] == "HS").all() else "FBS median"
+            shown = t[["Metric", "Value", "Median", "SD vs median", "Better than", "n"]].rename(
+                columns={"Median": ref}).copy()
             shown["Sample"] = np.where(t["low_n"], "small", "")
             st.markdown(f"**{name}**")
 
@@ -563,6 +599,8 @@ def profile_charts(df_plays: pd.DataFrame, df_games: pd.DataFrame, opponent: str
     tables = {"plays": plays_tables["plays"], "drives": game_tables["drives"],
               "kicks": game_tables["kicks"], "fgs": game_tables["fgs"]}
     ours, theirs = team_metrics(tables, team), team_metrics(tables, opponent)
+    # Special teams are centered on the average kick in our own film, not FBS (see hs_centered_stats).
+    stats = hs_centered_stats(stats, hs_special_teams_averages(game_tables))
     games_of = lambda t: df_games.loc[(df_games["offense"] == t) | (df_games["defense"] == t), "game_id"].nunique()
     n_ours, n_theirs = games_of(team), games_of(opponent)
     plural = lambda n: f"{n} game{'' if n == 1 else 's'}"
@@ -620,7 +658,8 @@ def render_profiles_page(df_plays: pd.DataFrame, df_games: pd.DataFrame, opponen
                 render_radar(title, sub, [(name, frame)], height=520, colors=[color], width=620)
     st.caption(
         "Same definitions on both sides: our curated data for the team, cfbfastR play-by-play for FBS. "
-        "Kickoffs are measured from the touchback spot (HS 20, college 25) so the different rules don't decide the "
-        "axis. Punting and field goals still reflect real high school vs college differences (shorter punts, shorter "
-        "kicks), so read those two axes with that in mind."
+        "Special teams are the exception: their middle ring is the average kick across every team in our film "
+        "(the same per-kick EPA as the Special Teams page), because high school punts and kicks are shorter than "
+        "college ones and an FBS center made every return unit look elite and every kicking unit look bad. FBS "
+        "still sets how far one SD is on those axes."
     )

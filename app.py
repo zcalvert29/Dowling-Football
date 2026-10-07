@@ -52,9 +52,9 @@ DEFINITIONS = """
 
 **Explosive rate:** share of plays that are a run of 10+ yards or a pass of 20+ yards.
 
-**Colors on Dowling offense tables:** green = clearly above the table's average. Red is only for results that are bad on their own: negative EPA or under 4.5 yards per play. Anything else below green is yellow: positive EPA or 4.5+ yards that isn't at the green line yet, and success/explosive/conversion rates that are clearly below average.
+**Colors on Dowling offense tables:** green = clearly above the table's average. Red is only for results that are bad on their own: negative EPA, under 4.5 yards per play, or under a 40% success rate. Anything in between is left uncolored.
 
-**Colors on defense and scouting tables:** green is good for Dowling and red is bad, compared to the table's average, so green = the opponent's offense did worse.
+**Colors on defense and scouting tables:** green is good for Dowling and red is bad, compared to the table's average, so green = the opponent's offense did worse. (The scouting run-gap chart is the exception: it's colored from the scouted team's side, green = positive EPA for them.)
 
 Gray rows have fewer than 10 plays, so treat them as small samples. Hover a column name for its definition.
 """
@@ -95,7 +95,7 @@ def dchs_o_run_game():
     schemes = v.run_scheme_table(df)
     v.render_takeaways(schemes, "run scheme")
     v.render_run_scheme_detail(df, table=schemes)
-    v.render_usage_scatter(schemes, "DCHS run schemes: EPA vs success", noun="Run scheme")
+    v.render_usage_scatter(schemes, "DCHS run schemes: EPA vs success", noun="Run scheme", min_plays=10)
     v.render_rush_vs_box(df)
 
 
@@ -195,7 +195,8 @@ def scout_opposing_offense():
         ins.render_down_calls(df_any_down, opponent, 4)
         ins.render_best_plays(df, opponent)
     with tree:
-        bd.render_tendency_tree(df, opponent, f"{opponent} formation tree", key="tree_opp")
+        bd.render_tendency_tree(df, opponent, f"{opponent} formation tree", key="tree_opp",
+                                min_form_plays=v.SCOUT_MIN_SAMPLE)
     with field:
         bd.render_field_strength(df, opponent, f"{opponent} by hash and formation strength")
     with seq:
@@ -203,10 +204,13 @@ def scout_opposing_offense():
     with field_pos:
         bd.render_field_position(df, _week_games(), opponent, f"{opponent} offense by field position")
     with run_game:
-        v.render_run_gaps(df, "offense", opponent, f"{opponent} O Run Gaps", good_high=False)
+        # Colored from the scouted team's side: green = positive EPA for them, red = negative.
+        v.render_run_gaps(df, "offense", opponent, f"{opponent} O Run Gaps", good_high=True,
+                          hide_below=v.SCOUT_MIN_SAMPLE)
         v.render_opp_play_calls(df, opponent, "Run")
     with pass_game:
-        v.render_pass_zones(df, "offense", opponent, f"{opponent} O Pass Zones", key="pz_opp_o", good_high=False)
+        v.render_pass_zones(df, "offense", opponent, f"{opponent} O Pass Zones", key="pz_opp_o", good_high=False,
+                            min_att=v.SCOUT_MIN_SAMPLE)
         v.render_opp_play_calls(df, opponent, "Pass")
     with red_zone:
         bd.render_red_zone(df, _week_games(), opponent, "offense", f"{opponent} offense", good_high=False,
@@ -561,7 +565,7 @@ def _reset_filters():
     st.session_state["f_minplays"] = 1
 
 
-df_all = v.load_data(DATA_PATH)
+df_all = st.cache_data(ins.add_game_state, show_spinner=False)(v.load_data(DATA_PATH))
 st.sidebar.caption(ins.last_updated_text(df_all))
 OPPONENTS = sorted(o for o in df_all["offense"].dropna().unique() if o != v.TEAM)
 if st.session_state.get("f_opp") not in OPPONENTS:
@@ -582,6 +586,9 @@ if any(pg is p for group in FILTERED_PAGES.values() for p in group):
         sel_dist = dropdown_multiselect("Distance", v.DISTANCE_ORDER, key="f_dist")
         sel_weeks = dropdown_multiselect("Week", ALL_WEEKS, key="f_week", fmt=lambda w: f"Week {w}")
         situation = st.selectbox("Situation", SITUATION_NAMES, key="f_sit")
+        if situation == "Neutral":
+            st.caption(f"Score within {ins.NEUTRAL_MARGIN} at the snap, and not the last 2 minutes of either half "
+                       f"(estimated clock, same as the 4th-down page).")
         min_plays = st.slider("Hide table rows with fewer than … plays", 1, 15, key="f_minplays")
         # Opponent only matters on the Scouting section's pages
         if any(pg is p for p in FILTERED_PAGES["Scouting"]):
