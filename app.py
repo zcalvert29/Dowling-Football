@@ -25,6 +25,7 @@ import breakdowns as bd
 import insights as ins
 import profiles
 import qol
+import special_projects
 import special_teams
 import visuals as v
 
@@ -312,6 +313,11 @@ def season_drives_page():
     bd.render_season_drives(df_all)
 
 
+def special_projects_page():
+    page_header("Special Projects", show_definitions=False, show_filters=False)
+    special_projects.render_first_play_study(df_all)
+
+
 def win_prob_fourth_downs():
     page_header("Win Probability & 4th Downs", show_definitions=False, show_filters=False)
     gid, team = _game_picker(allow_all=True)
@@ -398,6 +404,9 @@ FILTERED_PAGES = {
     ],
 }
 OTHER_PAGES = {
+    "Special Projects": [
+        st.Page(special_projects_page, title="First Play of the Drive", url_path="special-projects"),
+    ],
     "Tools": [
         st.Page(play_finder, title="Play Finder", icon=":material/search:", url_path="play-finder"),
         st.Page(sideline_mode, title="Sideline Mode", icon=":material/smartphone:", url_path="sideline"),
