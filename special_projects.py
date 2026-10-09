@@ -36,21 +36,23 @@ def _drive_points(g: pd.DataFrame, team: str) -> pd.Series:
     return pts[offense == team]
 
 
-def first_play_drives(df_games: pd.DataFrame, team: str = v.TEAM) -> pd.DataFrame:
+def first_play_drives(df_games: pd.DataFrame, team: str = v.TEAM, side: str = "offense") -> pd.DataFrame:
     """
     One row per `team` offensive drive (same drives as the Season Drives page) with first_play_yards (yards on
     the drive's first run or pass; penalties before the first snap are skipped), bucket, and points (actual).
-    Drives with no run or pass snap get bucket = NaN.
+    Drives with no run or pass snap get bucket = NaN. side="defense" gives the drives of whoever played `team`
+    instead (points = what that offense scored on the drive).
     """
-    drives = bd.season_drives(df_games, team)
+    drives = bd.season_drives(df_games, team, side=side)
     if drives.empty:
         return drives
     rows = []
     for gid, d in drives.groupby("game_id", sort=False):
         g = df_games[df_games["game_id"] == gid]
-        snaps = v.run_pass(g[g["offense"] == team]).sort_values("PLAY #", kind="stable")
+        offense = d["offense"].iat[0]
+        snaps = v.run_pass(g[g["offense"] == offense]).sort_values("PLAY #", kind="stable")
         first = snaps.groupby("drive")["GN/LS"].first()
-        pts = _drive_points(g, team)
+        pts = _drive_points(g, offense)
         rows.append(d.assign(first_play_yards=d["drive"].map(first), points=d["drive"].map(pts).fillna(0)))
     out = pd.concat(rows, ignore_index=True)
     has_snap = out["first_play_yards"].notna()
@@ -67,31 +69,37 @@ def first_play_table(drives: pd.DataFrame) -> pd.DataFrame:
     return t.set_index("First play of the drive")
 
 
-def render_first_play_study(df_all: pd.DataFrame) -> None:
+def render_first_play_study(df_all: pd.DataFrame, side: str = "offense") -> None:
+    """side="offense": Dowling's drives. side="defense": opponents' drives against Dowling's defense."""
+    defense = side == "defense"
     st.subheader("Does the first play set the tone?")
-    st.caption(f"Dowling Catholic offensive drives, split by the yards gained on the drive's first play. "
-               f"{FIRST_PLAY_YARDS} yards is the success line on 1st & 10, so a drive that gets it is on schedule.")
+    who = "Opponent drives against the Dowling Catholic defense" if defense else "Dowling Catholic offensive drives"
+    st.caption(f"{who}, split by the yards gained on the drive's first play. {FIRST_PLAY_YARDS} yards is the "
+               f"success line on 1st & 10, so a drive that gets it is on schedule"
+               + (" (for the opponent: holding them under 4 is a win for the defense)." if defense else "."))
     weeks = sorted(df_all["WEEK"].dropna().unique())
-    sel = st.multiselect("Weeks", weeks, default=weeks, key="sp_weeks", format_func=lambda w: f"Week {int(w)}")
+    sel = st.multiselect("Weeks", weeks, default=weeks, key=f"sp_weeks_{side}",
+                         format_func=lambda w: f"Week {int(w)}")
     games = df_all[df_all["WEEK"].isin(sel)]
-    drives = first_play_drives(ins.dowling_only(games))
+    drives = first_play_drives(ins.dowling_only(games), side=side)
     if drives.empty:
-        st.info("No Dowling Catholic drives in the selected weeks.")
+        st.info("No drives in the selected weeks.")
         return
     t = first_play_table(drives)
     st.dataframe(t.style.format({"Avg Points Scored per Drive": "{:.2f}", "Drives": "{:,.0f}"}, na_rep="–"),
                  width="stretch")
     skipped = int(drives["bucket"].isna().sum())
-    note = ("Points are what the drive actually scored: a touchdown counts 6 plus the try's real result (so a "
+    note = (("Points allowed are what the opponent scored on the drive (a Dowling defensive touchdown isn't "
+             "subtracted). " if defense else "") + "Points are what the drive actually scored: a touchdown counts 6 plus the try's real result (so a "
             "missed PAT is 6, a 2-pointer is 8), a made field goal 3. Every possession counts, including ones that "
             "ran out the clock at the end of a half or game.")
     if skipped:
-        note += f" {skipped} drive{'s' if skipped != 1 else ''} with no run or pass snap {'are' if skipped != 1 else 'is'} left out."
+        note += f" {skipped} drive{'s' if skipped != 1 else ''} with no yardage tagged on a run or pass {'are' if skipped != 1 else 'is'} left out."
     st.caption(note)
     with st.expander("Every drive"):
-        shown = drives[drives["bucket"].notna()][["Game", "QTR", "start", "first_play_yards", "bucket", "plays",
+        shown = drives[drives["bucket"].notna()][["Game", "offense", "QTR", "start", "first_play_yards", "bucket", "plays",
                                                    "result", "points"]].copy()
         shown["start"] = shown["start"].map(ins._yard_label)
-        st.dataframe(shown.rename(columns={"start": "Start", "first_play_yards": "1st play yds", "bucket": "Bucket",
+        st.dataframe(shown.rename(columns={"offense": "Offense", "start": "Start", "first_play_yards": "1st play yds", "bucket": "Bucket",
                                            "plays": "Plays", "result": "Result", "points": "Points"}),
                      hide_index=True, width="stretch")
