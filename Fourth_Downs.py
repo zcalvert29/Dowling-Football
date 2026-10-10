@@ -69,6 +69,7 @@ LINK_SPEC = [
     ("range", "fd_fg_range", int, int(BOT_SETTINGS["max_fg_distance"]), (20, 65)),
     ("guard", "fd_guard", bool, bool(BOT_SETTINGS["own_end"]), None),
     ("edge", "fd_guard_edge", str, f'{BOT_SETTINGS["own_min_edge"]:g}', ["1", "1.5", "2", "3"]),
+    ("robust", "fd_guard_robust", bool, bool(BOT_SETTINGS["require_robust"]), None),
     ("nogo", "fd_nogo", bool, BOT_SETTINGS["no_go"] is not None, None),
     ("ng1", "fd_nogo_1", int, (BOT_SETTINGS["no_go"] or STAFF_NO_GO_DEFAULT)[0][2], (1, 30)),
     ("ng2", "fd_nogo_2", int, (BOT_SETTINGS["no_go"] or STAFF_NO_GO_DEFAULT)[1][2], (1, 30)),
@@ -131,11 +132,13 @@ with st.container(border=True):
 
     with st.expander("Guardrails"):
         guard_on = st.checkbox("Own-end guardrails", key="fd_guard",
-                               help="In our own territory, a go call becomes the kick if it's a toss-up, wins by "
-                                    "less than the bar below, or flips when our estimates move 10 points. "
-                                    "Guardrails are off when we trail in the last 5:00.")
+                               help="In our own territory, a go call becomes the kick if it's a toss-up or wins by "
+                                    "less than the bar below (and, if checked, if it flips when our estimates "
+                                    "move 10 points). Guardrails are off when we trail in the last 5:00.")
         guard_edge = float(st.segmented_control("Go must win by (WP pts) in our own end", ["1", "1.5", "2", "3"],
                                                 key="fd_guard_edge") or BOT_SETTINGS["own_min_edge"])
+        guard_robust = st.checkbox("Also require go to hold if our conversion estimate is 10 pts too high",
+                                   key="fd_guard_robust", disabled=not guard_on)
         nogo_on = st.checkbox("Staff no-go table", key="fd_nogo",
                               help="Never go for it on these distances or longer, whatever the math says.")
         c1, c2, c3 = st.columns(3)
@@ -160,7 +163,7 @@ score_diff = off_score - def_score
 conv_shift = CONV.team_shift(off_team, def_team)
 MODEL_KW = dict(conv_logit_shift=conv_shift, p_xp=pat_pct / 100, max_fg_distance=fg_range)
 NO_GO = ((80, 99, ng1), (60, 79, ng2), (50, 59, ng3)) if nogo_on else None
-GUARD_KW = dict(own_end=guard_on, own_min_edge=guard_edge, no_go=NO_GO)
+GUARD_KW = dict(own_end=guard_on, own_min_edge=guard_edge, require_robust=guard_robust, no_go=NO_GO)
 
 result = evaluate_site(SITE, yards_to_goal, distance, score_diff, seconds_remaining_in_game,
                        off_timeouts=off_timeouts, def_timeouts=def_timeouts,
@@ -313,7 +316,7 @@ CALL_COLORS = {"Go for it": "#55A868", "Field goal": "#4C72B0", "Punt": "#C44E52
 @st.cache_data(show_spinner=False)
 def build_decision_chart(score_diff_, seconds_remaining_, off_timeouts_, def_timeouts_, site_,
                          wind_speed_, wind_direction_, rain_, snow_, conv_shift_=0.0, p_xp_=DEFAULT_P_XP,
-                         fg_range_=MAX_FG_KICK_DISTANCE, guard_on_=True, guard_edge_=OWN_MIN_EDGE,
+                         fg_range_=MAX_FG_KICK_DISTANCE, guard_on_=True, guard_edge_=OWN_MIN_EDGE, robust_=False,
                          no_go_=None) -> pd.DataFrame:
     # Full 1-yard resolution: ~1,900 situations priced in a single model call.
     Y, D = np.meshgrid(np.arange(1, 100), np.arange(1, 21))
@@ -323,7 +326,7 @@ def build_decision_chart(score_diff_, seconds_remaining_, off_timeouts_, def_tim
     res = evaluate_many(Y, D, score_diff_, seconds_remaining_, off_timeouts_, def_timeouts_, site_flag(site_),
                         wind_speed_, wind_direction_, rain_, snow_, conv_logit_shift=conv_shift_, p_xp=p_xp_,
                         max_fg_distance=fg_range_)
-    g = guarded_calls(res, Y, D, own_end=guard_on_, own_min_edge=guard_edge_, no_go=no_go_,
+    g = guarded_calls(res, Y, D, own_end=guard_on_, own_min_edge=guard_edge_, require_robust=robust_, no_go=no_go_,
                       score_diff=score_diff_, seconds_remaining=seconds_remaining_)
     call = np.where(g["rule"] != "", np.char.add(g["call"], " (guardrail)"),
                     np.where(g["toss_up"], "Toss-up", g["call"]))
@@ -339,7 +342,7 @@ def build_decision_chart(score_diff_, seconds_remaining_, off_timeouts_, def_tim
 
 grid = build_decision_chart(score_diff, seconds_remaining_in_game, off_timeouts, def_timeouts, SITE,
                             wind_speed, wind_direction, rain, snow, conv_shift, pat_pct / 100, fg_range,
-                            guard_on, guard_edge, NO_GO)
+                            guard_on, guard_edge, guard_robust, NO_GO)
 grid = grid.assign(label=lambda g: "4th & " + g["dist"].astype(str) + " at " + g["spot"])
 
 pct = lambda f, t: alt.Tooltip(f, format=".0%", title=t)

@@ -482,8 +482,8 @@ def robustness(res, conv_band=0.10, fg_band=0.10):
 # Own-end rules (on by default), for go calls in our own territory only:
 #   * a toss-up (edge under 1 point) goes to the kick;
 #   * going must win by at least own_min_edge WP points (default 1);
-#   * going must survive the robustness check (conversion and FG chances
-#     each moved 10 points either way).
+#   * optional, off by default (require_robust): going must survive the
+#     robustness check (conversion and FG chances each moved 10 points).
 # Neither applies when we're trailing in the last 5:00 of the game (high
 # school clock) — punting there to protect field position gives the game away.
 # Staff no-go table (off by default): never go on 4th & N or longer in a
@@ -505,7 +505,7 @@ def _spot(ytg):
 
 
 def guarded_calls(res, yards_to_goal, distance, own_end=True, own_min_edge=OWN_MIN_EDGE,
-                  require_robust=True, no_go=None, toss_up_pts=1.0, score_diff=None, seconds_remaining=None):
+                  require_robust=False, no_go=None, toss_up_pts=1.0, score_diff=None, seconds_remaining=None):
     """
     The bot's call after guardrails. Returns flat arrays:
       call       the recommendation (a guardrail turns "Go for it" into the best kick)
@@ -582,10 +582,11 @@ BOT_SETTINGS = {
     "max_fg_distance": MAX_FG_KICK_DISTANCE,  # kicker's range, yards
     "own_end": True,                         # own-end guardrails on
     "own_min_edge": OWN_MIN_EDGE,            # go must win by this much in our own end
+    "require_robust": False,                 # also: go must hold if conversion/FG chances are 10 pts off
     "no_go": None,                           # staff no-go table: None (off) or zones like STAFF_NO_GO_DEFAULT
 }
 MODEL_KEYS = ("p_xp", "max_fg_distance")
-GUARD_KEYS = ("own_end", "own_min_edge", "no_go")
+GUARD_KEYS = ("own_end", "own_min_edge", "require_robust", "no_go")
 
 
 def site_flag(site):

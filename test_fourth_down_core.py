@@ -228,7 +228,7 @@ def test_own_end_guardrail_turns_close_go_into_punt():
     secs = fd.model_seconds_remaining(2, 360)
     Y, D = np.array([91, 91, 30]), np.array([6, 2, 3])          # 4th & 6 at our 9, 4th & 2 at our 9, 4th & 3 at their 30
     r = fd.evaluate_many(Y, D, 0, secs, is_home_pos=0.5)
-    g = fd.guarded_calls(r, Y, D)
+    g = fd.guarded_calls(r, Y, D, own_min_edge=3.0)
     assert g["raw_call"][0] == "Go for it" and g["call"][0] == "Punt" and g["rule"][0] and g["cost"][0] > 0
     assert g["call"][1] == "Go for it" and g["rule"][1] == ""   # clear short-yardage go stays
     assert g["call"][2] == "Go for it" and g["rule"][2] == ""   # their territory is never guarded
@@ -298,3 +298,13 @@ def test_bot_page_handles_go_as_the_only_option():
         at.session_state[k] = val
     at.run()
     assert not at.exception
+
+
+def test_robustness_guardrail_is_optional():
+    """4th & 2 at our 34, Q3, up 4: go by ~1.5, but it flips if conversion is 10 pts lower."""
+    secs = fd.model_seconds_remaining(3, 390)
+    r = fd.evaluate_many(66, 2, 4, secs, is_home_pos=1, conv_logit_shift=0.23)
+    assert fd.best_calls(r)["best"][0] == "Go for it" and not fd.robustness(r)["robust"][0]
+    assert fd.guarded_calls(r, 66, 2)["call"][0] == "Go for it"                       # default: off
+    assert fd.guarded_calls(r, 66, 2, require_robust=True)["call"][0] == "Punt"       # when switched on
+    assert fd.BOT_SETTINGS["require_robust"] is False
