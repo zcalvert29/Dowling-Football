@@ -479,24 +479,22 @@ def robustness(res, conv_band=0.10, fg_band=0.10):
 # end doesn't get recommended. Every override is labeled with its reason and
 # what it costs by the bot's own numbers; the raw math is always kept.
 #
-# Own-end rules (on by default), for go calls in our own territory only:
+# Own-end rules (on), for go calls in our own territory only:
 #   * a toss-up (edge under 1 point) goes to the kick;
-#   * going must win by at least own_min_edge WP points (default 1);
-#   * optional, off by default (require_robust): going must survive the
-#     robustness check (conversion and FG chances each moved 10 points).
-# Neither applies when we're trailing in the last 5:00 of the game (high
+#   * going must win by at least own_min_edge WP points (default 1).
+# Staff no-go rules (on): never go on 4th & N or longer in a zone, whatever
+# the math says. Zones are (fewest yards to goal, most yards to goal, N),
+# checked in order: (75, 99, 3) = our 25 and in, 4th & 3 or longer.
+# None of these apply when we're trailing in the last 5:00 of the game (high
 # school clock) — punting there to protect field position gives the game away.
-# Staff no-go table (off by default): never go on 4th & N or longer in a
-# zone, whatever the math says. Zones are (fewest yards to goal, most yards
-# to goal, N): (80, 99, 4) = our 1 to our 20.
 # ==============================================================================
 OWN_MIN_EDGE = 1.0
 LATE_TRAILING_HS_SECONDS = 5 * 60   # guardrails off when trailing with this little left
-STAFF_NO_GO_DEFAULT = (
-    (80, 99, 4),   # own 1-20: never go on 4th & 4 or longer
-    (60, 79, 7),   # own 21-40: 4th & 7 or longer
-    (50, 59, 10),  # own 41 to midfield: 4th & 10 or longer
+STAFF_NO_GO = (
+    (75, 99, 3),   # our 25 and in: never go on 4th & 3 or longer
+    (60, 99, 4),   # our 40 and in: never go on 4th & 4 or longer
 )
+STAFF_NO_GO_DEFAULT = STAFF_NO_GO  # old name
 
 
 def _spot(ytg):
@@ -505,7 +503,7 @@ def _spot(ytg):
 
 
 def guarded_calls(res, yards_to_goal, distance, own_end=True, own_min_edge=OWN_MIN_EDGE,
-                  require_robust=False, no_go=None, toss_up_pts=1.0, score_diff=None, seconds_remaining=None):
+                  no_go=None, toss_up_pts=1.0, score_diff=None, seconds_remaining=None):
     """
     The bot's call after guardrails. Returns flat arrays:
       call       the recommendation (a guardrail turns "Go for it" into the best kick)
@@ -524,7 +522,6 @@ def guarded_calls(res, yards_to_goal, distance, own_end=True, own_min_edge=OWN_M
     dist = np.broadcast_to(np.asarray(distance, dtype=float).ravel(), (n,)) if np.ndim(distance) == 0 \
         else np.asarray(distance, dtype=float).ravel()
     raw = best_calls(res, toss_up_pts)
-    robust = robustness(res)["robust"]
     fg = np.nan_to_num(res["wp_fg"], nan=-1.0)
     punt = np.nan_to_num(res["wp_punt"], nan=-1.0)
     kick_name = np.where(fg >= punt, "Field goal", "Punt")
@@ -537,8 +534,6 @@ def guarded_calls(res, yards_to_goal, distance, own_end=True, own_min_edge=OWN_M
             if np.ndim(seconds_remaining) == 0 else np.asarray(seconds_remaining, dtype=float).ravel()
         late_trailing = (sd < 0) & (secs <= LATE_TRAILING_HS_SECONDS * CLOCK_SCALE)
 
-    be = break_even_conversion(res)
-    p_conv = res["p_conv"]
     call = raw["best"].astype(object).copy()
     rule = np.full(n, "", dtype=object)
     for i in range(n):
@@ -548,8 +543,9 @@ def guarded_calls(res, yards_to_goal, distance, own_end=True, own_min_edge=OWN_M
         if no_go:
             for shallow, deep, min_dist in no_go:
                 if shallow <= ytg[i] <= deep and dist[i] >= min_dist:
-                    why = (f"Staff rule: no go on 4th & {min_dist}+ from our {100 - deep} to "
-                           f"{'midfield' if shallow == 50 else 'our ' + str(100 - shallow)}")
+                    where = (f"our {100 - shallow} and in" if deep >= 99 else
+                             f"our {100 - deep} to {'midfield' if shallow == 50 else 'our ' + str(100 - shallow)}")
+                    why = f"Staff rule: no go on 4th & {min_dist}+ from {where}"
                     break
         if not why and own_end and ytg[i] > 50:
             m = raw["margin"][i]
@@ -557,9 +553,6 @@ def guarded_calls(res, yards_to_goal, distance, own_end=True, own_min_edge=OWN_M
                 why = "Coin flip in our own end, so we kick"
             elif m < own_min_edge:
                 why = f"Going only wins by {np.floor(m * 10) / 10:.1f} pts, too thin in our own end"
-            elif require_robust and not robust[i]:
-                why = (f"Going needs {be[i]:.0%} to convert and we estimate {p_conv[i]:.0%}, too close to risk "
-                       f"in our own end" if np.isfinite(be[i]) else "Too close to risk in our own end")
         if why:
             call[i] = kick_name[i]
             rule[i] = why
@@ -574,19 +567,18 @@ def guarded_calls(res, yards_to_goal, distance, own_end=True, own_min_edge=OWN_M
 # starts from these (and can change them for a single situation), and the
 # season review on the Win Probability page always uses them, so the review
 # never grades a call the bot wouldn't make on game day.
-# Change them here, e.g. BOT_SETTINGS["no_go"] = STAFF_NO_GO_DEFAULT to turn
-# the staff no-go table on everywhere.
+# Change them here, e.g. edit STAFF_NO_GO above to change the no-go rules
+# everywhere.
 # ==============================================================================
 BOT_SETTINGS = {
     "p_xp": DEFAULT_P_XP,                    # PAT make rate
     "max_fg_distance": MAX_FG_KICK_DISTANCE,  # kicker's range, yards
     "own_end": True,                         # own-end guardrails on
     "own_min_edge": OWN_MIN_EDGE,            # go must win by this much in our own end
-    "require_robust": False,                 # also: go must hold if conversion/FG chances are 10 pts off
-    "no_go": None,                           # staff no-go table: None (off) or zones like STAFF_NO_GO_DEFAULT
+    "no_go": STAFF_NO_GO,                    # staff no-go rules (None turns them off)
 }
 MODEL_KEYS = ("p_xp", "max_fg_distance")
-GUARD_KEYS = ("own_end", "own_min_edge", "require_robust", "no_go")
+GUARD_KEYS = ("own_end", "own_min_edge", "no_go")
 
 
 def site_flag(site):

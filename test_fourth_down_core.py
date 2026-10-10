@@ -236,14 +236,19 @@ def test_own_end_guardrail_turns_close_go_into_punt():
     assert (off["call"] == off["raw_call"]).all()
 
 
-def test_staff_no_go_table():
+def test_staff_no_go_rules():
     secs = fd.model_seconds_remaining(2, 360)
-    Y, D = np.array([91, 91, 70]), np.array([2, 4, 6])
-    r = fd.evaluate_many(Y, D, 0, secs, is_home_pos=0.5)
-    g = fd.guarded_calls(r, Y, D, own_end=False, no_go=fd.STAFF_NO_GO_DEFAULT)
-    assert g["call"][0] == "Go for it"                         # 4th & 2 at our 9: under the table's 4
-    assert g["call"][1] == "Punt" and g["rule"][1].startswith("Staff rule")
-    assert g["call"][2] == g["raw_call"][2] or g["rule"][2] == ""  # 4th & 6 at our 30: table says 7+
+    # 4th & 2 at our 9, 4th & 3 at our 20, 4th & 3 at our 35, 4th & 4 at our 38, 4th & 4 at our 45
+    Y, D = np.array([91, 80, 65, 62, 55]), np.array([2, 3, 3, 4, 4])
+    r = fd.evaluate_many(Y, D, 0, secs, is_home_pos=0.5, conv_logit_shift=1.0)  # strong offense: math says go
+    g = fd.guarded_calls(r, Y, D, own_end=False, no_go=fd.STAFF_NO_GO)
+    assert (g["raw_call"] == "Go for it").all()
+    assert g["call"][0] == "Go for it"                                       # 2 yards: allowed
+    assert g["call"][1] == "Punt" and "25 and in" in g["rule"][1]            # 3+ inside our 25
+    assert g["call"][2] == "Go for it"                                       # 3 yards at our 35: allowed
+    assert g["call"][3] == "Punt" and "40 and in" in g["rule"][3]            # 4+ inside our 40
+    assert g["call"][4] == "Go for it"                                       # our 45: outside the rules
+    assert fd.BOT_SETTINGS["no_go"] == fd.STAFF_NO_GO                        # on everywhere by default
 
 
 def test_guardrails_never_touch_kicks():
@@ -298,13 +303,3 @@ def test_bot_page_handles_go_as_the_only_option():
         at.session_state[k] = val
     at.run()
     assert not at.exception
-
-
-def test_robustness_guardrail_is_optional():
-    """4th & 2 at our 34, Q3, up 4: go by ~1.5, but it flips if conversion is 10 pts lower."""
-    secs = fd.model_seconds_remaining(3, 390)
-    r = fd.evaluate_many(66, 2, 4, secs, is_home_pos=1, conv_logit_shift=0.23)
-    assert fd.best_calls(r)["best"][0] == "Go for it" and not fd.robustness(r)["robust"][0]
-    assert fd.guarded_calls(r, 66, 2)["call"][0] == "Go for it"                       # default: off
-    assert fd.guarded_calls(r, 66, 2, require_robust=True)["call"][0] == "Punt"       # when switched on
-    assert fd.BOT_SETTINGS["require_robust"] is False
