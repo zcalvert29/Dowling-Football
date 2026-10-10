@@ -205,9 +205,14 @@ clock_str = f"{minutes}:{seconds:02d}"
 tier_color = {"VERY STRONG": "#0F6E56", "STRONG": "#1D9E75", "LEAN": "#BA7517", "TOSS-UP": "#888780",
               "GUARDRAIL": "#534AB7", "STAFF RULE": "#534AB7", "ONLY OPTION": "#5F5E5A"}[tier]
 verdict = "TOSS-UP" if tier == "TOSS-UP" else best_option.upper()
+# For close calls, say what would change the call in sideline terms: the
+# conversion rate going needs (break-even) vs. what the bot estimates.
+_be0 = float(break_even_conversion(_res)[0])
+_p0 = float(_res["p_conv"][0])
+_name = {"Go for it": "going", "Field goal": "the field goal", "Punt": "the punt"}
 if guard_rule:
-    sub = (f"{guard_rule}. The math alone says {math_option.lower()} by +{math_margin:.1f} WP pts, "
-           f"so this costs {float(_g['cost'][0]):.1f} by the bot's numbers.")
+    sub = f"{guard_rule}. " + (f"(Math alone: go by +{math_margin:.1f})" if math_margin >= 0.1
+                                else "(Go and kick are dead even.)")
 elif only_option:
     _why = ["no punt inside their 35"] if yards_to_goal <= PUNT_MIN_YTG else []
     _why.append(f"a {yards_to_goal + 17}-yard field goal is past the kicker's range ({fg_range} yds)")
@@ -215,8 +220,14 @@ elif only_option:
 elif tier == "TOSS-UP":
     sub = f"{best_option} by a hair over {second_option.lower()} (+{margin_pts:.1f} WP pts). Either call is fine."
 else:
-    sub = (f"{tier.title()} · +{margin_pts:.1f} win probability points over {second_option.lower()}"
-           + ("" if is_robust else " · flips if our estimates are 10 pts off"))
+    sub = f"{tier.title()} · +{margin_pts:.1f} win probability points over {_name[second_option]}"
+    if not is_robust:
+        if np.isfinite(_be0) and best_option == "Go for it":
+            sub += f" · close: kick instead if this play converts under {_be0:.0%} (we estimate {_p0:.0%})"
+        elif np.isfinite(_be0) and second_option == "Go for it":
+            sub += f" · close: go instead if this play converts {_be0:.0%}+ (we estimate {_p0:.0%})"
+        else:
+            sub += " · close: changes if the kick is 10 points more or less likely"
 st.html(
     f'<div style="text-align:center;padding:6px 0 2px">'
     f'<div style="font-size:14px;opacity:.7">4th &amp; {distance} {spot} · Q{quarter} {clock_str} · '

@@ -537,6 +537,8 @@ def guarded_calls(res, yards_to_goal, distance, own_end=True, own_min_edge=OWN_M
             if np.ndim(seconds_remaining) == 0 else np.asarray(seconds_remaining, dtype=float).ravel()
         late_trailing = (sd < 0) & (secs <= LATE_TRAILING_HS_SECONDS * CLOCK_SCALE)
 
+    be = break_even_conversion(res)
+    p_conv = res["p_conv"]
     call = raw["best"].astype(object).copy()
     rule = np.full(n, "", dtype=object)
     for i in range(n):
@@ -552,11 +554,12 @@ def guarded_calls(res, yards_to_goal, distance, own_end=True, own_min_edge=OWN_M
         if not why and own_end and ytg[i] > 50:
             m = raw["margin"][i]
             if m < toss_up_pts:
-                why = "Toss-up in our own end goes to the kick"
+                why = "Coin flip in our own end, so we kick"
             elif m < own_min_edge:
-                why = f"Go edge (+{np.floor(m * 10) / 10:.1f}) is under the {own_min_edge:g}-point bar for our own end"
+                why = f"Going only wins by {np.floor(m * 10) / 10:.1f} pts, too thin in our own end"
             elif require_robust and not robust[i]:
-                why = "Go flips if our conversion or kick estimates are 10 points off"
+                why = (f"Going needs {be[i]:.0%} to convert and we estimate {p_conv[i]:.0%}, too close to risk "
+                       f"in our own end" if np.isfinite(be[i]) else "Too close to risk in our own end")
         if why:
             call[i] = kick_name[i]
             rule[i] = why
