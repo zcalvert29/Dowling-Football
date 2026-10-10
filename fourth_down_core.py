@@ -156,13 +156,10 @@ def half_seconds_from_game(seconds_remaining):
 #     trained on real goal-to-go snaps and never saw "1st & 10 at the 3".
 # ==============================================================================
 
-# Beyond the kicker's range a field goal is taken off the table instead of
-# being priced with a small probability. 50 yards is a reasonable high school
-# default (our longest tagged attempt this season is 44); set it to your
-# kicker's real range with max_fg_distance. A miss in high school is a
-# touchback at the 20, the same as most punts from that range, so an
-# out-of-range kick the curve still gives 20%+ would look like a free roll.
-MAX_FG_KICK_DISTANCE = 50  # yards_to_goal + 17
+# Beyond the kicker's range a field goal is taken off the table. The default
+# is where the staff's FG curve reaches zero, so the curve decides; set it
+# lower (max_fg_distance, or on the page) for a kicker with less leg.
+MAX_FG_KICK_DISTANCE = 61  # yards_to_goal + 17; FG_CURVE hits 0% at ~61.4
 PUNT_MIN_YTG = 35          # no punts from inside the opponent's 35
 OPTIONS = ("Go for it", "Field goal", "Punt")
 
@@ -484,7 +481,7 @@ def robustness(res, conv_band=0.10, fg_band=0.10):
 #
 # Own-end rules (on by default), for go calls in our own territory only:
 #   * a toss-up (edge under 1 point) goes to the kick;
-#   * going must win by at least own_min_edge WP points (default 2);
+#   * going must win by at least own_min_edge WP points (default 1);
 #   * going must survive the robustness check (conversion and FG chances
 #     each moved 10 points either way).
 # Neither applies when we're trailing in the last 5:00 of the game (high
@@ -493,7 +490,7 @@ def robustness(res, conv_band=0.10, fg_band=0.10):
 # zone, whatever the math says. Zones are (fewest yards to goal, most yards
 # to goal, N): (80, 99, 4) = our 1 to our 20.
 # ==============================================================================
-OWN_MIN_EDGE = 2.0
+OWN_MIN_EDGE = 1.0
 LATE_TRAILING_HS_SECONDS = 5 * 60   # guardrails off when trailing with this little left
 STAFF_NO_GO_DEFAULT = (
     (80, 99, 4),   # own 1-20: never go on 4th & 4 or longer

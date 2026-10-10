@@ -49,9 +49,10 @@ def test_neutral_is_average_of_home_and_away():
 def test_option_availability():
     assert "Punt" not in fd.evaluate_site("home", 30, 5, 0, Q3_START)["wp"]       # inside the 35
     assert "Field goal" not in fd.evaluate_site("home", 60, 5, 0, Q3_START)["wp"]  # 77-yard kick
-    assert "Field goal" not in fd.evaluate_site("home", 38, 5, 0, Q3_START)["wp"]  # 55 yards: past the default range
-    r = fd.evaluate_many(38, 5, 0, Q3_START, is_home_pos=1, max_fg_distance=55)   # ...unless the kicker has it
-    assert not any(np.isnan(r[k][0]) for k in ("wp_go", "wp_fg", "wp_punt"))
+    assert "Field goal" not in fd.evaluate_site("home", 45, 5, 0, Q3_START)["wp"]  # 62 yards: past the curve
+    assert set(fd.evaluate_site("home", 38, 5, 0, Q3_START)["wp"]) == {"Go for it", "Field goal", "Punt"}  # 55 yds
+    r = fd.evaluate_many(38, 5, 0, Q3_START, is_home_pos=1, max_fg_distance=50)   # a shorter-range kicker
+    assert np.isnan(r["wp_fg"][0])
 
 
 def test_timeouts_swap_after_change_of_possession():
@@ -286,3 +287,14 @@ def test_review_matches_the_bot():
         bot = fd.guarded_calls(res, r["ytg"], max(r["dist"], 1), score_diff=sd, seconds_remaining=secs,
                                **{k: fd.BOT_SETTINGS[k] for k in fd.GUARD_KEYS})
         assert bot["call"][0] == r["Model"], r["Situation"]
+
+
+def test_bot_page_handles_go_as_the_only_option():
+    """4th & 7 at their 34: no punt inside the 35 and a 51-yard kick is past the default range."""
+    from streamlit.testing.v1 import AppTest
+    at = AppTest.from_file("../Fourth_Downs.py", default_timeout=120)
+    for k, val in dict(fd_side="Opp", fd_yard_line=34, fd_distance=7, fd_quarter=3, fd_minutes=6,
+                       fd_off_score=7, fd_def_score=3).items():
+        at.session_state[k] = val
+    at.run()
+    assert not at.exception

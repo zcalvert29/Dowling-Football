@@ -135,7 +135,7 @@ with st.container(border=True):
                                     "less than the bar below, or flips when our estimates move 10 points. "
                                     "Guardrails are off when we trail in the last 5:00.")
         guard_edge = float(st.segmented_control("Go must win by (WP pts) in our own end", ["1", "1.5", "2", "3"],
-                                                key="fd_guard_edge") or "2")
+                                                key="fd_guard_edge") or BOT_SETTINGS["own_min_edge"])
         nogo_on = st.checkbox("Staff no-go table", key="fd_nogo",
                               help="Never go for it on these distances or longer, whatever the math says.")
         c1, c2, c3 = st.columns(3)
@@ -169,9 +169,13 @@ result = evaluate_site(SITE, yards_to_goal, distance, score_diff, seconds_remain
 wp = result["wp"]
 ranked = sorted(wp.items(), key=lambda kv: -kv[1])
 best_option, best_wp = ranked[0]
-second_option, second_wp = ranked[1]
+# Sometimes going for it is the only option: no punts inside their 35, and a
+# field goal past the kicker's range is off the table (e.g. 4th & 7 at their
+# 34 = a 51-yard kick with the default 50-yard range).
+only_option = len(ranked) == 1
+second_option, second_wp = ranked[1] if not only_option else (None, best_wp)
 margin_pts = (best_wp - second_wp) * 100
-tier = mu.strength_tier(margin_pts)
+tier = "ONLY OPTION" if only_option else mu.strength_tier(margin_pts)
 
 # Robustness: does the call hold if the conversion and FG estimates are each
 # off by 10 points either way? If not, it's never labeled better than LEAN.
@@ -180,7 +184,7 @@ _res = evaluate_many(yards_to_goal, distance, score_diff, seconds_remaining_in_g
                      **MODEL_KW)
 _rob = robustness(_res)
 is_robust = bool(_rob["robust"][0])
-if not is_robust and tier in ("VERY STRONG", "STRONG"):
+if not only_option and not is_robust and tier in ("VERY STRONG", "STRONG"):
     tier = "LEAN"
 
 # Guardrails: may turn a go call into the kick. Keep the math's call for the note.
@@ -199,11 +203,15 @@ emoji = {"Go for it": "👉", "Field goal": "🦵", "Punt": "🏈"}[best_option]
 spot = field_spot_label(yards_to_goal, off_abbr, def_abbr)
 clock_str = f"{minutes}:{seconds:02d}"
 tier_color = {"VERY STRONG": "#0F6E56", "STRONG": "#1D9E75", "LEAN": "#BA7517", "TOSS-UP": "#888780",
-              "GUARDRAIL": "#534AB7", "STAFF RULE": "#534AB7"}[tier]
+              "GUARDRAIL": "#534AB7", "STAFF RULE": "#534AB7", "ONLY OPTION": "#5F5E5A"}[tier]
 verdict = "TOSS-UP" if tier == "TOSS-UP" else best_option.upper()
 if guard_rule:
     sub = (f"{guard_rule}. The math alone says {math_option.lower()} by +{math_margin:.1f} WP pts, "
            f"so this costs {float(_g['cost'][0]):.1f} by the bot's numbers.")
+elif only_option:
+    _why = ["no punt inside their 35"] if yards_to_goal <= PUNT_MIN_YTG else []
+    _why.append(f"a {yards_to_goal + 17}-yard field goal is past the kicker's range ({fg_range} yds)")
+    sub = f"Only option: {' and '.join(_why)}."
 elif tier == "TOSS-UP":
     sub = f"{best_option} by a hair over {second_option.lower()} (+{margin_pts:.1f} WP pts). Either call is fine."
 else:
@@ -223,7 +231,8 @@ with st.expander("Copy as text"):
     st.code(f"---> {def_abbr} ({def_score}) @ {off_abbr} ({off_score}) <---\n"
             f"{off_abbr} has 4th & {distance} {spot}\nQ{quarter} {clock_str} remaining\n\n"
             f"Recommendation ({tier}): {emoji} {best_option}"
-            + (f" ({guard_rule}; math says {math_option} +{math_margin:.1f} WP)" if guard_rule else f" (+{margin_pts:.1f} WP)"),
+            + (f" ({guard_rule}; math says {math_option} +{math_margin:.1f} WP)" if guard_rule
+               else "" if only_option else f" (+{margin_pts:.1f} WP)"),
             language=None)
 
 # ---- gt-style results table (rbsdm/nfl4th style: success prob + WP on each branch) ----
