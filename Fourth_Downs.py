@@ -13,8 +13,10 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
+
 import model_utils as mu
 import qol
+import conversion_model as cm
 
 # This page is built for a narrow layout; the scouting pages use "wide".
 st.set_page_config(layout="centered")
@@ -62,7 +64,20 @@ LINK_SPEC = [
     ("def", "fd_def_abbr", str, "OPP", None), ("wind", "fd_wind_speed", int, 0, (0, 40)),
     ("wdir", "fd_wind_dir", str, "Into", ["Into", "With", "Crosswind"]),
     ("rain", "fd_rain", bool, False, None), ("snow", "fd_snow", bool, False, None),
+    ("oteam", "fd_off_team", str, "Dowling Catholic", None), ("dteam", "fd_def_team", str, "Average", None),
+    ("pat", "fd_pat", int, round(BOT_SETTINGS["p_xp"] * 100), (50, 100)),
+    ("range", "fd_fg_range", int, int(BOT_SETTINGS["max_fg_distance"]), (20, 65)),
+    ("guard", "fd_guard", bool, bool(BOT_SETTINGS["own_end"]), None),
+    ("edge", "fd_guard_edge", str, f'{BOT_SETTINGS["own_min_edge"]:g}', ["1", "1.5", "2", "3"]),
+    ("nogo", "fd_nogo", bool, BOT_SETTINGS["no_go"] is not None, None),
+    ("ng1", "fd_nogo_1", int, (BOT_SETTINGS["no_go"] or STAFF_NO_GO_DEFAULT)[0][2], (1, 30)),
+    ("ng2", "fd_nogo_2", int, (BOT_SETTINGS["no_go"] or STAFF_NO_GO_DEFAULT)[1][2], (1, 30)),
+    ("ng3", "fd_nogo_3", int, (BOT_SETTINGS["no_go"] or STAFF_NO_GO_DEFAULT)[2][2], (1, 30)),
 ]
+
+
+CONV = cm.fitted()  # same fit the season review uses
+TEAMS = ["Average"] + sorted(set(CONV.offense) | set(CONV.defense))
 qol.apply_link_params(LINK_SPEC, "_fd_link_applied")
 
 # Inputs live on the page, not the sidebar: on a phone the sidebar is
@@ -103,6 +118,33 @@ with st.container(border=True):
         c1, c2 = st.columns(2)
         rain = c1.checkbox("Rain", key="fd_rain")
         snow = c2.checkbox("Snow", key="fd_snow")
+        st.caption("Matchup: adjusts the conversion chance for these two units, from our film. "
+                   "Teams with few snaps stay close to average.")
+        c1, c2 = st.columns(2)
+        off_team = c1.selectbox("Offense unit", TEAMS, key="fd_off_team")
+        def_team = c2.selectbox("Defense unit", TEAMS, key="fd_def_team")
+        c1, c2 = st.columns(2)
+        pat_pct = c1.number_input("PAT make rate (%)", 50, 100, key="fd_pat",
+                                  help="Used when a conversion is a touchdown. Our film: 89% overall, Dowling 92%.")
+        fg_range = c2.number_input("Kicker's range (yds)", 20, 65, key="fd_fg_range",
+                                   help="Longest field goal you'd attempt. Beyond it, the bot won't consider a kick.")
+
+    with st.expander("Guardrails"):
+        guard_on = st.checkbox("Own-end guardrails", key="fd_guard",
+                               help="In our own territory, a go call becomes the kick if it's a toss-up, wins by "
+                                    "less than the bar below, or flips when our estimates move 10 points. "
+                                    "Guardrails are off when we trail in the last 5:00.")
+        guard_edge = float(st.segmented_control("Go must win by (WP pts) in our own end", ["1", "1.5", "2", "3"],
+                                                key="fd_guard_edge") or "2")
+        nogo_on = st.checkbox("Staff no-go table", key="fd_nogo",
+                              help="Never go for it on these distances or longer, whatever the math says.")
+        c1, c2, c3 = st.columns(3)
+        ng1 = c1.number_input("Own 1-20: 4th &", 1, 30, key="fd_nogo_1", disabled=not nogo_on)
+        ng2 = c2.number_input("Own 21-40: 4th &", 1, 30, key="fd_nogo_2", disabled=not nogo_on)
+        ng3 = c3.number_input("Own 41-50: 4th &", 1, 30, key="fd_nogo_3", disabled=not nogo_on)
+        st.caption("A guardrail never hides the math: the page shows what it changed and what that costs. "
+                   "Changes here are for this situation only; the season review uses the staff settings "
+                   "in fourth_down_core.BOT_SETTINGS.")
 
 # "home" / "away" / "neutral" from the offense's point of view. After a change
 # of possession, evaluate_options() flips home/away for the other team.
@@ -115,11 +157,15 @@ if minutes == 12:
 # clock is scaled by 15/12 (see fourth_down_core.model_seconds_remaining).
 seconds_remaining_in_game = model_seconds_remaining(quarter, minutes * 60 + seconds)
 score_diff = off_score - def_score
+conv_shift = CONV.team_shift(off_team, def_team)
+MODEL_KW = dict(conv_logit_shift=conv_shift, p_xp=pat_pct / 100, max_fg_distance=fg_range)
+NO_GO = ((80, 99, ng1), (60, 79, ng2), (50, 59, ng3)) if nogo_on else None
+GUARD_KW = dict(own_end=guard_on, own_min_edge=guard_edge, no_go=NO_GO)
 
 result = evaluate_site(SITE, yards_to_goal, distance, score_diff, seconds_remaining_in_game,
                        off_timeouts=off_timeouts, def_timeouts=def_timeouts,
                        wind_speed=wind_speed, wind_direction=wind_direction,
-                       rain=rain, snow=snow)
+                       rain=rain, snow=snow, **MODEL_KW)
 wp = result["wp"]
 ranked = sorted(wp.items(), key=lambda kv: -kv[1])
 best_option, best_wp = ranked[0]
@@ -127,15 +173,42 @@ second_option, second_wp = ranked[1]
 margin_pts = (best_wp - second_wp) * 100
 tier = mu.strength_tier(margin_pts)
 
+# Robustness: does the call hold if the conversion and FG estimates are each
+# off by 10 points either way? If not, it's never labeled better than LEAN.
+_res = evaluate_many(yards_to_goal, distance, score_diff, seconds_remaining_in_game,
+                     off_timeouts, def_timeouts, site_flag(SITE), wind_speed, wind_direction, rain, snow,
+                     **MODEL_KW)
+_rob = robustness(_res)
+is_robust = bool(_rob["robust"][0])
+if not is_robust and tier in ("VERY STRONG", "STRONG"):
+    tier = "LEAN"
+
+# Guardrails: may turn a go call into the kick. Keep the math's call for the note.
+_g = guarded_calls(_res, yards_to_goal, distance, score_diff=score_diff,
+                   seconds_remaining=seconds_remaining_in_game, **GUARD_KW)
+guard_rule = str(_g["rule"][0])
+math_option, math_margin = best_option, margin_pts
+if guard_rule:
+    best_option = str(_g["call"][0])
+    best_wp = wp[best_option]
+    tier = "STAFF RULE" if guard_rule.startswith("Staff") else "GUARDRAIL"
+
 emoji = {"Go for it": "👉", "Field goal": "🦵", "Punt": "🏈"}[best_option]
 
 # ---- Verdict (big and wrapping, so it reads on a phone) ----
 spot = field_spot_label(yards_to_goal, off_abbr, def_abbr)
 clock_str = f"{minutes}:{seconds:02d}"
-tier_color = {"VERY STRONG": "#0F6E56", "STRONG": "#1D9E75", "LEAN": "#BA7517", "TOSS-UP": "#888780"}[tier]
+tier_color = {"VERY STRONG": "#0F6E56", "STRONG": "#1D9E75", "LEAN": "#BA7517", "TOSS-UP": "#888780",
+              "GUARDRAIL": "#534AB7", "STAFF RULE": "#534AB7"}[tier]
 verdict = "TOSS-UP" if tier == "TOSS-UP" else best_option.upper()
-sub = (f"{best_option} by a hair over {second_option.lower()} (+{margin_pts:.1f} WP pts). Either call is fine."
-       if tier == "TOSS-UP" else f"{tier.title()} · +{margin_pts:.1f} win probability points over {second_option.lower()}")
+if guard_rule:
+    sub = (f"{guard_rule}. The math alone says {math_option.lower()} by +{math_margin:.1f} WP pts, "
+           f"so this costs {float(_g['cost'][0]):.1f} by the bot's numbers.")
+elif tier == "TOSS-UP":
+    sub = f"{best_option} by a hair over {second_option.lower()} (+{margin_pts:.1f} WP pts). Either call is fine."
+else:
+    sub = (f"{tier.title()} · +{margin_pts:.1f} win probability points over {second_option.lower()}"
+           + ("" if is_robust else " · flips if our estimates are 10 pts off"))
 st.html(
     f'<div style="text-align:center;padding:6px 0 2px">'
     f'<div style="font-size:14px;opacity:.7">4th &amp; {distance} {spot} · Q{quarter} {clock_str} · '
@@ -149,7 +222,9 @@ qol.share_link_box(_link)
 with st.expander("Copy as text"):
     st.code(f"---> {def_abbr} ({def_score}) @ {off_abbr} ({off_score}) <---\n"
             f"{off_abbr} has 4th & {distance} {spot}\nQ{quarter} {clock_str} remaining\n\n"
-            f"Recommendation ({tier}): {emoji} {best_option} (+{margin_pts:.1f} WP)", language=None)
+            f"Recommendation ({tier}): {emoji} {best_option}"
+            + (f" ({guard_rule}; math says {math_option} +{math_margin:.1f} WP)" if guard_rule else f" (+{margin_pts:.1f} WP)"),
+            language=None)
 
 # ---- gt-style results table (rbsdm/nfl4th style: success prob + WP on each branch) ----
 st.write("#### Win probability by option")
@@ -190,8 +265,6 @@ st.caption(
 # Break-even: how often you'd need to convert for going to tie the best kick.
 # This is the number to argue with: if you trust your 4th & short offense
 # more (or less) than the generic conversion curve, compare against this.
-_res = evaluate_many(yards_to_goal, distance, score_diff, seconds_remaining_in_game,
-                     off_timeouts, def_timeouts, site_flag(SITE), wind_speed, wind_direction, rain, snow)
 _be = float(break_even_conversion(_res)[0])
 if not np.isnan(_be):
     _kick = "field goal" if np.nan_to_num(_res["wp_fg"][0], nan=-1) >= np.nan_to_num(_res["wp_punt"][0], nan=-1) \
@@ -213,24 +286,31 @@ st.caption(f"The model's call for every spot on the field and every distance, at
            f"timeouts, site, and weather. The ringed square is the current situation: 4th & {distance} {spot}. "
            f"Hover any square for the numbers.")
 
-CALL_COLORS = {"Go for it": "#55A868", "Field goal": "#4C72B0", "Punt": "#C44E52", "Toss-up": "#BDBDBD"}
+CALL_COLORS = {"Go for it": "#55A868", "Field goal": "#4C72B0", "Punt": "#C44E52", "Toss-up": "#BDBDBD",
+               "Field goal (guardrail)": "#A9BCDD", "Punt (guardrail)": "#E3A6A8"}
 
 
 @st.cache_data(show_spinner=False)
 def build_decision_chart(score_diff_, seconds_remaining_, off_timeouts_, def_timeouts_, site_,
-                         wind_speed_, wind_direction_, rain_, snow_) -> pd.DataFrame:
+                         wind_speed_, wind_direction_, rain_, snow_, conv_shift_=0.0, p_xp_=DEFAULT_P_XP,
+                         fg_range_=MAX_FG_KICK_DISTANCE, guard_on_=True, guard_edge_=OWN_MIN_EDGE,
+                         no_go_=None) -> pd.DataFrame:
     # Full 1-yard resolution: ~1,900 situations priced in a single model call.
     Y, D = np.meshgrid(np.arange(1, 100), np.arange(1, 21))
     Y, D = Y.ravel(), D.ravel()
     keep = D <= Y
     Y, D = Y[keep], D[keep]
     res = evaluate_many(Y, D, score_diff_, seconds_remaining_, off_timeouts_, def_timeouts_, site_flag(site_),
-                        wind_speed_, wind_direction_, rain_, snow_)
-    calls = best_calls(res)
+                        wind_speed_, wind_direction_, rain_, snow_, conv_logit_shift=conv_shift_, p_xp=p_xp_,
+                        max_fg_distance=fg_range_)
+    g = guarded_calls(res, Y, D, own_end=guard_on_, own_min_edge=guard_edge_, no_go=no_go_,
+                      score_diff=score_diff_, seconds_remaining=seconds_remaining_)
+    call = np.where(g["rule"] != "", np.char.add(g["call"], " (guardrail)"),
+                    np.where(g["toss_up"], "Toss-up", g["call"]))
     return pd.DataFrame({
         "ytg": Y, "dist": D, "x": 100 - Y,
-        "call": np.where(calls["toss_up"], "Toss-up", calls["best"]),
-        "margin": calls["margin"],
+        "call": call, "rule": np.where(g["rule"] != "", g["rule"], "—"),
+        "margin": g["margin"],
         "go": res["wp_go"], "fg": res["wp_fg"], "punt": res["wp_punt"],
         "p_conv": res["p_conv"], "break_even": break_even_conversion(res),
         "spot": [field_spot_label(int(y), "own", "opp").replace("at the ", "") for y in Y],
@@ -238,7 +318,8 @@ def build_decision_chart(score_diff_, seconds_remaining_, off_timeouts_, def_tim
 
 
 grid = build_decision_chart(score_diff, seconds_remaining_in_game, off_timeouts, def_timeouts, SITE,
-                            wind_speed, wind_direction, rain, snow)
+                            wind_speed, wind_direction, rain, snow, conv_shift, pat_pct / 100, fg_range,
+                            guard_on, guard_edge, NO_GO)
 grid = grid.assign(label=lambda g: "4th & " + g["dist"].astype(str) + " at " + g["spot"])
 
 pct = lambda f, t: alt.Tooltip(f, format=".0%", title=t)
@@ -250,6 +331,7 @@ heat = alt.Chart(grid).mark_rect().encode(
     color=alt.Color("call:N", title=None, scale=alt.Scale(domain=list(CALL_COLORS), range=list(CALL_COLORS.values())),
                     legend=alt.Legend(orient="top")),
     tooltip=[alt.Tooltip("label:N", title="Situation"), alt.Tooltip("call:N", title="Call"),
+             alt.Tooltip("rule:N", title="Guardrail"),
              alt.Tooltip("margin:Q", format=".1f", title="Margin (WP pts)"),
              pct("go:Q", "WP go"), pct("fg:Q", "WP field goal"), pct("punt:Q", "WP punt"),
              pct("p_conv:Q", "Conversion chance"), pct("break_even:Q", "Break-even conversion")],
@@ -257,7 +339,8 @@ heat = alt.Chart(grid).mark_rect().encode(
 here = alt.Chart(pd.DataFrame({"x": [100 - yards_to_goal], "dist": [min(distance, 20)]})).mark_rect(
     fill=None, stroke="black", strokeWidth=2.5).encode(x="x:O", y=alt.Y("dist:O", sort="descending"))
 st.altair_chart((heat + here).properties(height=360), width="stretch")
-st.caption("Gray = toss-up: the top two options are within 1 point of win probability.")
+st.caption("Gray = toss-up: the top two options are within 1 point of win probability. "
+           "Pale red/blue = a go call a guardrail turned into a punt/field goal (hover for why).")
 
 st.divider()
 st.caption(
@@ -272,10 +355,25 @@ with st.expander("Model notes & limitations"):
   `cfb_wp_model_truth.json` are present (see export_models_to_json.R);
   otherwise this falls back to heuristic curves. Currently:
   **{"real trained models" if mu.USING_REAL_MODELS else "heuristic fallback"}**.
-- Conversion probability, FG probability, and punt distance are still
-  hand-calibrated heuristics — no trained model exists for those yet. The
-  break-even conversion rate tells you how much that matters: if your real
-  conversion rate is on the same side of break-even, the call doesn't change.
+- Conversion probability is fit to our own high school film
+  (conversion_model.py: {CONV.n_plays} third- and fourth-down snaps), with an
+  optional matchup adjustment for the two units on the field. FG probability
+  and punt distance are still hand-calibrated. The break-even conversion rate
+  tells you how much that matters: if your real conversion rate is on the
+  same side of break-even, the call doesn't change.
+- Field position is priced in points first (EP model), then converted to
+  win probability at the 25 (fourth_down_core.wp_new_possession). The WP
+  model on its own was nearly flat in field position, which made a turnover
+  deep in our own end look cheap.
+- A missed field goal is the other team's ball at their 20 (NFHS touchback),
+  not at the spot of the kick.
+- Labels: a call that flips when the conversion or FG chance moves 10
+  points either way is never labeled better than LEAN.
+- Guardrails (expander above): in our own territory a go call becomes the
+  kick if it's a toss-up, wins by less than the bar, or flips when our
+  estimates move 10 points. The staff no-go table, when on, overrides the
+  math by distance. The verdict always says when a guardrail fired and what
+  it costs by the bot's own numbers.
 - After a change of possession (turnover on downs, punt, score) the timeouts
   swap sides, and a new first down inside the 10 is 1st & goal.
 - FG probability weather adjustment (hand-calibrated, applied on top of the

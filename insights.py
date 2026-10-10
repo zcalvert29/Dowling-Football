@@ -1033,11 +1033,21 @@ def fourth_down_review(df: pd.DataFrame, team: str = TEAM) -> pd.DataFrame:
     if d.empty:
         return pd.DataFrame()
 
-    # Every 4th down priced in one batched model call.
+    # Every 4th down priced in one batched model call, with the same settings,
+    # matchup adjustment and guardrails the 4th Down Bot uses on game day
+    # (fourth_down_core.BOT_SETTINGS), so this page never grades us against a
+    # call the bot wouldn't make. Home/away isn't in the data: neutral site.
+    import conversion_model as cm
+    conv = cm.fitted()
+    shift = np.array([conv.team_shift(o, dfn) for o, dfn in zip(d["offense"], d["defense"])])
     sd = (d["pre_off_score"] - d["pre_def_score"]).to_numpy(dtype=float)
-    res = fd.evaluate_many(d["YARDLINE_100"].to_numpy(dtype=float), np.maximum(d["DIST"].to_numpy(dtype=float), 1),
-                           sd, d["seconds_remaining"].to_numpy(dtype=float), is_home_pos=0.5)
-    calls = fd.best_calls(res, TOSS_UP_PTS)
+    ytg = d["YARDLINE_100"].to_numpy(dtype=float)
+    dist = np.maximum(d["DIST"].to_numpy(dtype=float), 1)
+    secs = d["seconds_remaining"].to_numpy(dtype=float)
+    res = fd.evaluate_many(ytg, dist, sd, secs, is_home_pos=0.5, conv_logit_shift=shift,
+                           **{k: fd.BOT_SETTINGS[k] for k in fd.MODEL_KEYS})
+    calls = fd.guarded_calls(res, ytg, dist, toss_up_pts=TOSS_UP_PTS, score_diff=sd, seconds_remaining=secs,
+                             **{k: fd.BOT_SETTINGS[k] for k in fd.GUARD_KEYS})
     be = fd.break_even_conversion(res)
 
     rows = []
@@ -1048,7 +1058,7 @@ def fourth_down_review(df: pd.DataFrame, team: str = TEAM) -> pd.DataFrame:
         wp = one["wp"]
         pt = r["PLAY TYPE"]
         did = "Punt" if pt in PUNT_TYPES else "Field goal" if pt in FG_TYPES else "Go for it"
-        best, best_wp = str(calls["best"][i]), float(calls["best_wp"][i])
+        best, best_wp = str(calls["call"][i]), float(calls["call_wp"][i])
         chosen = wp.get(did, np.nan)
         left = (best_wp - chosen) * 100 if pd.notna(chosen) else np.nan
         if not DECIDED_WP[0] < best_wp < DECIDED_WP[1]:
@@ -1065,7 +1075,9 @@ def fourth_down_review(df: pd.DataFrame, team: str = TEAM) -> pd.DataFrame:
             "game": gid, "Game": game_label(df, gid) if team == TEAM else scout_game_label(df, gid), "opp": opp, "Est. clock": r["clock"], "score_text": score,
             "dist": int(r["DIST"]), "ytg": float(r["YARDLINE_100"]),
             "Situation": f"4th & {int(r['DIST'])} at {_spot_text(r['YARDLINE_100'], opp)}",
-            "We chose": did, "Model": best, "Strength": mu.strength_tier(float(calls["margin"][i])),
+            "We chose": did, "Model": best,
+            "Strength": "GUARDRAIL" if calls["rule"][i] else mu.strength_tier(float(calls["margin"][i])),
+            "Guardrail": calls["rule"][i], "Math alone": str(calls["raw_call"][i]),
             "WP if we": chosen, "WP if model": best_wp, "WP left (pts)": left, "category": category,
             "options": one["options"], "Result": r["RESULT"], "break_even": float(be[i]),
             "team": team, "who": "We" if team == TEAM else team,
@@ -1140,14 +1152,20 @@ MAP_COLORS = {"G": "#9FE1CB", "F": "#FAC775", "P": "#D3D1C7", "T": "rgba(128,128
 
 
 @st.cache_data(show_spinner=False)
-def decision_map_grid(score_diff: int = 0) -> list[list[str]]:
-    """Model's call for each (yards to goal, distance): tie game, start of Q3, neutral site."""
+def decision_map_grid(score_diff: int = 0, team: str = TEAM) -> list[list[str]]:
+    """Bot's call for each (yards to goal, distance): tie game, start of Q3, neutral site,
+    `team`'s offense against an average defense, staff settings and guardrails."""
+    import conversion_model as cm
     import fourth_down_core as fd
 
     secs = fd.model_seconds_remaining(3, HS_QUARTER)
     Y, D = np.meshgrid(MAP_YTG, MAP_DIST, indexing="ij")
-    calls = fd.best_calls(fd.evaluate_many(Y.ravel(), D.ravel(), score_diff, secs, is_home_pos=0.5), TOSS_UP_PTS)
-    code = np.where(calls["toss_up"], "T", [b[0] for b in calls["best"]])  # G / F / P / T
+    res = fd.evaluate_many(Y.ravel(), D.ravel(), score_diff, secs, is_home_pos=0.5,
+                           conv_logit_shift=cm.fitted().team_shift(team, None),
+                           **{k: fd.BOT_SETTINGS[k] for k in fd.MODEL_KEYS})
+    calls = fd.guarded_calls(res, Y.ravel(), D.ravel(), toss_up_pts=TOSS_UP_PTS, score_diff=score_diff,
+                             seconds_remaining=secs, **{k: fd.BOT_SETTINGS[k] for k in fd.GUARD_KEYS})
+    code = np.where(calls["toss_up"], "T", [b[0] for b in calls["call"]])  # G / F / P / T
     code = np.where(D.ravel() > Y.ravel(), "", code).reshape(Y.shape)
     return code.tolist()
 
@@ -1189,8 +1207,8 @@ def decision_map_html(t: pd.DataFrame, grid: list[list[str]]) -> str:
                           f'height:12px;border-radius:50%;background:{c}"></span>{lab}</span>')
     return (
         f'<div style="font-family:inherit;font-size:12px">'
-        f'<div style="display:flex;flex-wrap:wrap;gap:14px;margin-bottom:6px;opacity:.8"><span>Model\'s call (tie game, '
-        f'start of Q3, neutral site):</span>{sw(MAP_COLORS["G"], "Go")}{sw(MAP_COLORS["F"], "Field goal")}'
+        f'<div style="display:flex;flex-wrap:wrap;gap:14px;margin-bottom:6px;opacity:.8"><span>Bot\'s call (tie game, '
+        f'start of Q3, neutral site, guardrails on):</span>{sw(MAP_COLORS["G"], "Go")}{sw(MAP_COLORS["F"], "Field goal")}'
         f'{sw(MAP_COLORS["P"], "Punt")}{sw(MAP_COLORS["T"], "Toss-up")}</div>'
         f'<div style="display:flex;flex-wrap:wrap;gap:14px;margin-bottom:8px;opacity:.8"><span>{dots_head}:'
         f'</span>{dot(GREEN, "Agreed")}{dot(RED, "Disagreed, cost 1+ point")}'
@@ -1239,6 +1257,10 @@ def decision_card_html(r: pd.Series) -> str:
                                              f'+{r["WP left (pts)"]:.1f} win probability points.')
     else:
         box, text = ("rgba(128,128,128,.12)", "inherit"), f"{who} {verb}; that option isn't modeled from this spot."
+    rule = r.get("Guardrail", "")
+    if isinstance(rule, str) and rule:
+        text += (f' <span style="opacity:.75">Guardrail: {rule.lower() if not rule.startswith("Staff") else rule}; '
+                 f'the math alone says {str(r.get("Math alone", "")).lower()}.</span>')
     opts = []
     for name in ("Go for it", "Field goal", "Punt"):
         o = r["options"].get(name)
@@ -1292,7 +1314,7 @@ def render_fourth_down_review(df: pd.DataFrame, team: str = TEAM) -> None:
         import breakdowns as bd  # imported here: breakdowns imports this module
         bd.render_aggressiveness(t, games(df))
     st.markdown("**Decision map**")
-    st.html(decision_map_html(t, decision_map_grid()))
+    st.html(decision_map_html(t, decision_map_grid(team=team)))
     st.markdown("**Decision card**")
     order = t.assign(_k=t["category"].map({"Costly": 0, "Toss-up": 1, "Agreed": 2, "Not modeled": 3, "Decided": 4}))
     order = order.sort_values(["_k", "WP left (pts)"], ascending=[True, False])
@@ -1301,8 +1323,9 @@ def render_fourth_down_review(df: pd.DataFrame, team: str = TEAM) -> None:
     scope = "all" if df["game_id"].nunique() > 1 else str(df["game_id"].iat[0])
     pick = st.selectbox("Pick a decision", list(labels), format_func=labels.get, key=f"g_fd_pick_{scope}_{team}")
     st.html(decision_card_html(t.loc[pick]))
-    st.caption("Same math as the 4th Down Bot: score at the snap, estimated clock scaled to the model's 15-minute "
-               "quarters, neutral site, 3 timeouts each, no weather. Under 1 point of win probability is a toss-up.")
+    st.caption("Same math and staff settings as the 4th Down Bot: score at the snap, estimated clock scaled to the "
+               "model's 15-minute quarters, the two units' matchup adjustment, the bot's guardrails, neutral site, "
+               "3 timeouts each, no weather. Under 1 point of win probability is a toss-up.")
 
 
 # ---------------------------------------------------------------------------
