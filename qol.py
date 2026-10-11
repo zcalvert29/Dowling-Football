@@ -60,7 +60,7 @@ def check_password() -> bool:
 # ---------------------------------------------------------------------------
 # Tagging checks
 # ---------------------------------------------------------------------------
-KNOWN_PLAY_TYPES = {"Run", "Pass", "KO", "KO Rec", "Punt", "Punt Rec", "Fake Punt", "FG", "FG Block", "Extra Pt.",
+KNOWN_PLAY_TYPES = {"Run", "Pass", "KO", "KO Rec", "Onside Kick", "Onside Kick Rec", "Punt", "Punt Rec", "Fake Punt", "FG", "FG Block", "Extra Pt.",
                     "Extra Pt. Block", "2 Pt.", "2 Pt. Block", "2 Pt. Defend"}
 
 
@@ -101,13 +101,16 @@ def validate_plays(df: pd.DataFrame) -> pd.DataFrame:
             if i > 0 and g.loc[i - 1, "QTR"] == 2 and r["QTR"] == 3:
                 last_scorer = None  # second-half kickoff: can't tell who kicks from the score
             pt = r["PLAY TYPE"]
-            if pt in ("KO", "KO Rec") and last_scorer:
+            if pt in ("KO", "KO Rec", "Onside Kick", "Onside Kick Rec") and last_scorer:
                 we_kick = (last_scorer == "us") != last_was_safety
-                expected = "KO" if we_kick else "KO Rec"
+                onside = pt.startswith("Onside")
+                expected = ("Onside Kick" if we_kick else "Onside Kick Rec") if onside else ("KO" if we_kick else "KO Rec")
                 if pt != expected:
                     add(r, f"Tagged {pt}, but {'Dowling' if last_scorer == 'us' else 'the opponent'} just scored, "
                            f"so it should be {expected}")
                 last_scorer = None
+            if pt in ("Onside Kick", "Onside Kick Rec") and str(r["RESULT"]).strip() not in ("Recovered", "Return", "Penalty"):
+                add(r, f"{pt} RESULT is '{r['RESULT']}': use Recovered (kicking team got it) or Return (receiving team)")
             # Tries need a touchdown right before them (ignoring timeouts/penalty re-tries).
             if pt in ("Extra Pt.", "Extra Pt. Block", "2 Pt.", "2 Pt. Block", "2 Pt. Defend"):
                 j = i - 1
@@ -129,8 +132,10 @@ def validate_plays(df: pd.DataFrame) -> pd.DataFrame:
             if pt in ("FG", "FG Block") and str(r["RESULT"]) == "No Good" and i + 1 < len(g) and "offense" in g:
                 nxt = g.loc[i + 1]
                 same_half = (r["QTR"] in (1, 2)) == (nxt["QTR"] in (1, 2))
-                if nxt["PLAY TYPE"] in ("KO", "KO Rec") and same_half:
-                    kicker = ins.other_team(g, nxt["offense"]) if nxt["offense"] in ins.game_teams(gid) else None
+                if nxt["PLAY TYPE"] in ("KO", "KO Rec", "Onside Kick", "Onside Kick Rec") and same_half:
+                    kept = str(nxt["PLAY TYPE"]).startswith("Onside") and str(nxt["RESULT"]).strip() == "Recovered"
+                    kicker = (nxt["offense"] if kept else ins.other_team(g, nxt["offense"])) \
+                        if nxt["offense"] in ins.game_teams(gid) else None
                     if kicker == r["offense"]:
                         add(r, "FG tagged No Good, but the kicking team kicks off next: it was probably good")
     return pd.DataFrame(issues, columns=["Game", "PLAY #", "QTR", "Issue"])
@@ -342,7 +347,7 @@ def render_home(df: pd.DataFrame, opponents: list[str], pages: dict) -> None:
 # ---------------------------------------------------------------------------
 # Play finder
 # ---------------------------------------------------------------------------
-ST_PLAY_TYPES = {"KO", "KO Rec", "Punt", "Punt Rec", "Fake Punt", "FG", "FG Block", "Extra Pt.", "Extra Pt. Block",
+ST_PLAY_TYPES = {"KO", "KO Rec", "Onside Kick", "Onside Kick Rec", "Punt", "Punt Rec", "Fake Punt", "FG", "FG Block", "Extra Pt.", "Extra Pt. Block",
                  "2 Pt.", "2 Pt. Block", "2 Pt. Defend"}
 
 

@@ -23,7 +23,7 @@ import streamlit as st
 import visuals as v
 
 TEAM = v.TEAM
-KICKOFF_TYPES = {"KO", "KO Rec"}
+KICKOFF_TYPES = {"KO", "KO Rec", "Onside Kick", "Onside Kick Rec"}  # onside kicks are kickoffs
 TRY_TYPES = {"Extra Pt.", "Extra Pt. Block", "2 Pt.", "2 Pt. Block", "2 Pt. Defend"}
 PUNT_TYPES = {"Punt", "Punt Rec"}
 FG_TYPES = {"FG", "FG Block"}

@@ -17,6 +17,7 @@ import insights as ins
 
 TEAM = ins.TEAM
 KICKOFFS = {"KO", "KO Rec"}
+ONSIDES = {"Onside Kick", "Onside Kick Rec"}   # "Recovered" = kicking team got it back
 PUNTS = {"Punt", "Punt Rec"}
 FGS = {"FG", "FG Block"}
 XPS = {"Extra Pt.", "Extra Pt. Block"}
@@ -35,15 +36,26 @@ def kick_events(df: pd.DataFrame) -> pd.DataFrame:
         g = g.sort_values("PLAY #").reset_index(drop=True)
         opp = ins.other_team(g, TEAM) or ins.opponent_of(gid)
         week = g["WEEK"].iat[0]
-        scrim = g.index[g["DN"].isin([1, 2, 3, 4]) & ~g["PLAY TYPE"].isin(KICKOFFS | XPS | TWO_PTS)
+        scrim = g.index[g["DN"].isin([1, 2, 3, 4]) & ~g["PLAY TYPE"].isin(KICKOFFS | ONSIDES | XPS | TWO_PTS)
                         & g["YARDLINE_100"].notna()].to_numpy()
-        for i, r in g[g["PLAY TYPE"].isin(KICKOFFS | PUNTS)].iterrows():
+        for i, r in g[g["PLAY TYPE"].isin(KICKOFFS | ONSIDES | PUNTS)].iterrows():
             later = scrim[scrim > i]
             if not len(later):
                 continue
             nxt = g.loc[later[0]]
             start = 100 - nxt["YARDLINE_100"]           # yards from the receiver's own goal
-            if r["PLAY TYPE"] in KICKOFFS:
+            if r["PLAY TYPE"] in ONSIDES:
+                # Kept out of the kickoff numbers (touchback rate, starting spot): it's a different play.
+                recovered = str(r["RESULT"]).strip() == "Recovered"
+                other = ins.other_team(g, r["offense"])
+                if other is None:
+                    continue
+                kicker, receiver = (r["offense"], other) if recovered else (other, r["offense"])
+                rows.append({"game": gid, "week": week, "opp": opp, "kind": "Onside", "kicker": kicker,
+                             "receiver": receiver, "QTR": r["QTR"], "spot": np.nan, "start": start,
+                             "net": np.nan, "result": "Recovered" if recovered else r["RESULT"],
+                             "ret": r.get("RET YARDS", np.nan)})
+            elif r["PLAY TYPE"] in KICKOFFS:
                 receiver = nxt["offense"]
                 kicker = ins.other_team(g, receiver)   # whoever didn't receive it (works for any two teams)
                 if kicker is None:
@@ -78,6 +90,11 @@ def render_unit_cards(df: pd.DataFrame, ev: pd.DataFrame, team: str = TEAM) -> N
     ko_r = ev[(ev["kind"] == "Kickoff") & (ev["receiver"] == team)]
     pu_k = ev[(ev["kind"] == "Punt") & (ev["kicker"] == team)]
     pu_r = ev[(ev["kind"] == "Punt") & (ev["receiver"] == team)]
+    on_k = ev[(ev["kind"] == "Onside") & (ev["kicker"] == team)]
+    on_r = ev[(ev["kind"] == "Onside") & (ev["receiver"] == team)]
+    onside_k = f" · onside {int((on_k['result'] == 'Recovered').sum())}/{len(on_k)} recovered" if len(on_k) else ""
+    onside_r = (f" · {len(on_r)} onside faced, {len(on_r) - int((on_r['result'] == 'Recovered').sum())} kept"
+                if len(on_r) else "")
     fg = df[df["PLAY TYPE"].isin(FGS) & (df["offense"] == team)]
     xp = df[df["PLAY TYPE"].isin(XPS) & (df["offense"] == team) & (df["RESULT"] != "Penalty")]
     fg_dist = fg["YARDLINE_100"] + 17
@@ -85,9 +102,10 @@ def render_unit_cards(df: pd.DataFrame, ev: pd.DataFrame, team: str = TEAM) -> N
     long_make = f"long make {int(fg_dist[made].max())} yds" if made.any() else "no makes yet"
     cards = [
         _card("Kickoffs", f"{(ko_k['result'] == 'Touchback').mean():.0%} TB" if len(ko_k) else "–",
-              f"{len(ko_k)} kicks · opponents start at their {_own(ko_k['start'].mean()) if len(ko_k) else '–'}"),
+              f"{len(ko_k)} kicks · opponents start at their {_own(ko_k['start'].mean()) if len(ko_k) else '–'}"
+              + onside_k),
         _card("Kick returns", _own(ko_r["start"].mean()).capitalize() if len(ko_r) else "–",
-              f"average start · {len(ko_r)} kickoffs received"),
+              f"average start · {len(ko_r)} kickoffs received" + onside_r),
         _card("Punting", f"{pu_k['net'].mean():.1f} net" if len(pu_k) else "–",
               f"{len(pu_k)} punts · {(pu_k['start'] <= 20).mean():.0%} inside the 20" if len(pu_k) else "no punts"),
         _card("Punt returns", _own(pu_r["start"].mean()).capitalize() if len(pu_r) else "–",

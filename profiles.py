@@ -221,6 +221,7 @@ def add_st_epa(kicks: pd.DataFrame, fgs: pd.DataFrame, touchback_ytg: float) -> 
 # Hudl (our curated data) -> standard tables
 # ---------------------------------------------------------------------------
 _KICKOFFS = {"KO", "KO Rec"}
+_ONSIDES = {"Onside Kick", "Onside Kick Rec"}  # left out of kickoff value (not a touchback-type kick)
 _TRIES = {"Extra Pt.", "Extra Pt. Block", "2 Pt.", "2 Pt. Block", "2 Pt. Defend"}
 _PUNTS = {"Punt", "Punt Rec"}
 _FGS = {"FG", "FG Block"}
@@ -255,7 +256,7 @@ def standardize_hudl(df: pd.DataFrame, team: str = "Dowling Catholic") -> dict:
             ds = ins.drive_summary(g, off)
             for res in ds.get("result", []):
                 drives.append({"game": gid, "offense": off, "defense": deff, "scored": res in ("Touchdown", "FG Made")})
-        scrim = g.index[g["DN"].isin([1, 2, 3, 4]) & ~g["PLAY TYPE"].isin(_KICKOFFS | _TRIES)
+        scrim = g.index[g["DN"].isin([1, 2, 3, 4]) & ~g["PLAY TYPE"].isin(_KICKOFFS | _ONSIDES | _TRIES)
                         & g["YARDLINE_100"].notna()].to_numpy()
         for i, r in g[g["PLAY TYPE"].isin(_KICKOFFS | _PUNTS)].iterrows():
             later = scrim[scrim > i]

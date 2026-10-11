@@ -9,7 +9,14 @@ import re
 # ---------------------------------------------------------------------------
 # PLAY TYPE groupings (from the filming team's perspective, i.e. `team`)
 # ---------------------------------------------------------------------------
-KICKOFF_TYPES = {"KO", "KO Rec"}          # KO = team kicks off, KO Rec = team receives
+# Onside kicks are named like kickoffs: "Onside Kick" = team kicks, "Onside Kick Rec" = team receives.
+# RESULT "Recovered" = the kicking team got it back; anything else ("Return", a penalty, out of bounds)
+# = the receiving team's ball. They're kickoffs in every other way (fixed ep, no series, never the
+# last play of a drive), so they're part of KICKOFF_TYPES.
+ONSIDE_TYPES = {"Onside Kick", "Onside Kick Rec"}
+ONSIDE_RECOVERED = "Recovered"
+KICKOFF_TYPES = {"KO", "KO Rec"} | ONSIDE_TYPES   # KO = team kicks off, KO Rec = team receives
+WE_KICK_TYPES = {"KO", "Onside Kick"}           # kickoff types where `team` is the kicking team
 PUNT_TYPES = {"Punt", "Punt Rec"}
 XP_TYPES = {"Extra Pt.", "Extra Pt. Block"}
 TWO_PT_TYPES = {"2 Pt.", "2 Pt. Block", "2 Pt. Defend"}
@@ -40,6 +47,9 @@ def assign_offense_defense(team, opponent, plays):
     says which side kicked:
       - "KO"     -> `team` kicked, so `opponent` is the offense (receiving)
       - "KO Rec" -> `team` received, so `team` is the offense
+      - "Onside Kick" / "Onside Kick Rec" -> the same, EXCEPT when RESULT is
+        "Recovered": the kicking team got it back, so the kicking team is the
+        offense (its new possession starts with this play)
     That means the opening kickoff and second-half kickoff no longer need
     to be seeded manually.
 
@@ -90,6 +100,10 @@ def assign_offense_defense(team, opponent, plays):
                 off, defn = opponent, team
             elif pt == "KO Rec":      # team receives
                 off, defn = team, opponent
+            elif pt in ONSIDE_TYPES:
+                kicker, receiver = (team, opponent) if pt == "Onside Kick" else (opponent, team)
+                recovered = str(row["RESULT"]).strip() == ONSIDE_RECOVERED
+                off, defn = (kicker, receiver) if recovered else (receiver, kicker)
             elif pt in OUR_TRIES:
                 off, defn = team, opponent
             elif pt in THEIR_TRIES:
@@ -150,7 +164,7 @@ def fix_scoring_tags(plays, team, opponent):
                   f"touchdown -> '{result[i]}'. Fix the tag in Hudl too.")
         if r["PLAY TYPE"] in FG_TYPES and res == "No Good" and nxt["PLAY TYPE"] in KICKOFF_TYPES \
                 and half(r["QTR"]) == half(nxt["QTR"]):
-            kicker = team if nxt["PLAY TYPE"] == "KO" else opponent
+            kicker = team if nxt["PLAY TYPE"] in WE_KICK_TYPES else opponent
             if kicker == r["offense"]:
                 result[i] = "Good"
                 print(f"FIXED PLAY # {r['PLAY #']}: FG tagged No Good, but {kicker} kicked off next, so it was "
@@ -448,7 +462,12 @@ def calculate_ep_epa(df: pd.DataFrame) -> pd.DataFrame:
             )
             if row["QTR"] == 4 and row["_pre_margin"] > 21:
                 raw_ep *= 0.6
-            return float(np.clip(raw_ep, -2, 7))
+            ko_ep = float(np.clip(raw_ep, -2, 7))
+            # A recovered onside kick's offense is the KICKING team, so its
+            # pre-kick value is the receiving team's kickoff value, negated.
+            if row["PLAY TYPE"] in ONSIDE_TYPES and str(row["RESULT"]).strip() == ONSIDE_RECOVERED:
+                return -ko_ep
+            return ko_ep
 
         if row["PLAY TYPE"] in XP_TYPES:
             return XP_EP
@@ -568,6 +587,8 @@ def _drive_numbers(df: pd.DataFrame) -> pd.Series:
       * the play after a defensive touchdown and its try. After a pick-six or scoop-and-score the team that
         lost the ball gets it right back on the kickoff, so 'offense' never changes; without this, their next
         possession merged into the drive that ended in the score (one "drive" holding two or three).
+      * an onside kick (but not a re-kick right after another kick). A recovered onside kick keeps the ball with
+        the team that just scored, so 'offense' doesn't change there. (Regular kickoffs always change 'offense'.)
     """
     halftime_boundary = (df["QTR"] == 3) & (df["QTR"].shift() == 2)
     res = df["RESULT"].astype("string").fillna("")
@@ -580,8 +601,10 @@ def _drive_numbers(df: pd.DataFrame) -> pd.Series:
             after[i], pending = True, False
         if def_td[i]:
             pending = True
+    is_ko = df["PLAY TYPE"].isin(KICKOFF_TYPES)
+    new_kick = df["PLAY TYPE"].isin(ONSIDE_TYPES) & ~is_ko.shift(fill_value=False)
     return ((df["offense"] != df["offense"].shift()) | halftime_boundary
-            | pd.Series(after, index=df.index)).cumsum()
+            | pd.Series(after, index=df.index) | new_kick).cumsum()
 
 
 def assign_drives(game: pd.DataFrame) -> pd.DataFrame:
@@ -698,6 +721,8 @@ def add_play_detail_columns(df: pd.DataFrame, team: str, opponent: str, date: st
     result = df["RESULT"].fillna("")
 
     df["KICKOFF"] = play_type.isin(KICKOFF_TYPES).astype(int)
+    df["ONSIDE"] = play_type.isin(ONSIDE_TYPES).astype(int)
+    df["ONSIDE_RECOVERED"] = (play_type.isin(ONSIDE_TYPES) & (result.astype(str).str.strip() == ONSIDE_RECOVERED)).astype(int)
     df["PUNT"] = play_type.isin(PUNT_TYPES).astype(int)
     df["XP_ATTEMPT"] = play_type.isin(XP_TYPES).astype(int)
     df["FG_ATTEMPT"] = play_type.isin(FG_TYPES).astype(int)
