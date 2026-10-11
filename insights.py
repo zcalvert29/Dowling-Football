@@ -872,8 +872,9 @@ def render_tagging_coverage(df: pd.DataFrame) -> None:
 # The data has no game clock, so the clock is estimated by spreading each
 # quarter's scrimmage plays evenly across the 12-minute quarter. That high
 # school clock is then scaled by 15/12 for the model (trained on 15-minute
-# college quarters), exactly like the 4th Down Bot page. Home/away isn't in
-# the data, so every evaluation is neutral-site (home and away averaged).
+# college quarters), exactly like the 4th Down Bot page. Site follows the bot:
+# Dowling is always home (fourth_down_core.dowling_home_flag), its opponent is
+# the visitor, and scout film of two other teams is neutral.
 # ---------------------------------------------------------------------------
 HS_QUARTER = 12 * 60
 
@@ -915,8 +916,16 @@ def _estimate_clock(d: pd.DataFrame) -> pd.DataFrame:
     return d.drop(columns=["_i", "_n"])
 
 
+def _home_flags(d: pd.DataFrame) -> np.ndarray:
+    """is_home_pos per row: Dowling home, its opponent away, neutral when Dowling isn't in the game."""
+    import fourth_down_core as fd
+    in_game = d["game_id"].astype(str).str.contains(fd.DOWLING, regex=False).to_numpy()
+    return np.array([fd.dowling_home_flag(o, g) for o, g in zip(d["offense"], in_game)], dtype=float)
+
+
 def _predict_wp(d: pd.DataFrame) -> np.ndarray:
-    """Offense win probability for each row, neutral site (vectorized predict_wp_chained)."""
+    """Offense win probability for each row, Dowling at home (vectorized predict_wp_chained)."""
+    import fourth_down_core as fd
     import model_utils as mu
 
     ytg = d["YARDLINE_100"].astype(float).to_numpy()
@@ -934,11 +943,17 @@ def _predict_wp(d: pd.DataFrame) -> np.ndarray:
                                 (dist >= ytg).astype(float)])
         ep = mu._ep_booster.predict(xgb.DMatrix(ep_x, feature_names=mu.EP_FEATURE_ORDER))
         ratio = sd / (game / 60 + 1)
-        out = []
-        for home in (0.0, 1.0):
-            wp_x = np.column_stack([ep, sd, ytg, dummies, dist, half, game, to, to, np.full(len(d), home), ratio])
-            out.append(mu._wp_booster.predict(xgb.DMatrix(wp_x, feature_names=mu.WP_FEATURE_ORDER)))
-        return (out[0] + out[1]) / 2
+        home = _home_flags(d)
+        out = {}
+        for h in np.unique(home):  # 0.5 (neutral) = average of the home and away answers
+            for flag in ((0.0, 1.0) if h == 0.5 else (h,)):
+                if flag not in out:
+                    wp_x = np.column_stack([ep, sd, ytg, dummies, dist, half, game, to, to,
+                                            np.full(len(d), flag), ratio])
+                    out[flag] = mu._wp_booster.predict(xgb.DMatrix(wp_x, feature_names=mu.WP_FEATURE_ORDER))
+        return np.select([home == 1.0, home == 0.0],
+                         [out.get(1.0, 0), out.get(0.0, 0)],
+                         (out.get(0.0, 0) + out.get(1.0, 0)) / 2)
     ep = np.array([mu._heuristic_ep(y) for y in ytg])
     return np.array([mu._heuristic_wp(s, gs, e) for s, gs, e in zip(sd, game, ep)])
 
@@ -981,7 +996,7 @@ def render_win_probability(g: pd.DataFrame, opponent: str, team: str = TEAM) -> 
     ).properties(height=320)
     st.altair_chart(chart, width="stretch")
     mode = "trained models" if mu.USING_REAL_MODELS else "fallback heuristic (model files not found)"
-    st.caption(f"Uses the 4th Down Bot's {mode}, neutral site. There's no game clock in the data, so time is "
+    st.caption(f"Uses the 4th Down Bot's {mode}, with Dowling as the home team. There's no game clock in the data, so time is "
                f"estimated by spreading each quarter's plays evenly. Treat it as the shape of the game, not exact "
                f"numbers.")
 
@@ -1021,7 +1036,8 @@ def _spot_text(ytg: float, opp: str) -> str:
 
 @st.cache_data(show_spinner="Checking every 4th down...")
 def fourth_down_review(df: pd.DataFrame, team: str = TEAM) -> pd.DataFrame:
-    """Every 4th down by `team`: what they did vs what the 4th Down Bot recommends (neutral site)."""
+    """Every 4th down by `team`: what they did vs what the 4th Down Bot recommends (Dowling at home,
+    average defense)."""
     import fourth_down_core as fd
     import model_utils as mu
 
@@ -1036,15 +1052,15 @@ def fourth_down_review(df: pd.DataFrame, team: str = TEAM) -> pd.DataFrame:
     # Every 4th down priced in one batched model call, with the same settings,
     # matchup adjustment and guardrails the 4th Down Bot uses on game day
     # (fourth_down_core.BOT_SETTINGS), so this page never grades us against a
-    # call the bot wouldn't make. Home/away isn't in the data: neutral site.
+    # call the bot wouldn't make: the offense's adjustment against an average defense, Dowling at home.
     import conversion_model as cm
     conv = cm.fitted()
-    shift = np.array([conv.team_shift(o, dfn) for o, dfn in zip(d["offense"], d["defense"])])
+    shift = np.array([conv.team_shift(o, None) for o in d["offense"]])
     sd = (d["pre_off_score"] - d["pre_def_score"]).to_numpy(dtype=float)
     ytg = d["YARDLINE_100"].to_numpy(dtype=float)
     dist = np.maximum(d["DIST"].to_numpy(dtype=float), 1)
     secs = d["seconds_remaining"].to_numpy(dtype=float)
-    res = fd.evaluate_many(ytg, dist, sd, secs, is_home_pos=0.5, conv_logit_shift=shift,
+    res = fd.evaluate_many(ytg, dist, sd, secs, is_home_pos=_home_flags(d), conv_logit_shift=shift,
                            **{k: fd.BOT_SETTINGS[k] for k in fd.MODEL_KEYS})
     calls = fd.guarded_calls(res, ytg, dist, toss_up_pts=TOSS_UP_PTS, score_diff=sd, seconds_remaining=secs,
                              **{k: fd.BOT_SETTINGS[k] for k in fd.GUARD_KEYS})
@@ -1153,14 +1169,14 @@ MAP_COLORS = {"G": "#9FE1CB", "F": "#FAC775", "P": "#D3D1C7", "T": "rgba(128,128
 
 @st.cache_data(show_spinner=False)
 def decision_map_grid(score_diff: int = 0, team: str = TEAM) -> list[list[str]]:
-    """Bot's call for each (yards to goal, distance): tie game, start of Q3, neutral site,
-    `team`'s offense against an average defense, staff settings and guardrails."""
+    """Bot's call for each (yards to goal, distance): tie game, start of Q3, `team`'s offense against an
+    average defense, staff settings and guardrails. Dowling is home; any other team is drawn at a neutral site."""
     import conversion_model as cm
     import fourth_down_core as fd
 
     secs = fd.model_seconds_remaining(3, HS_QUARTER)
     Y, D = np.meshgrid(MAP_YTG, MAP_DIST, indexing="ij")
-    res = fd.evaluate_many(Y.ravel(), D.ravel(), score_diff, secs, is_home_pos=0.5,
+    res = fd.evaluate_many(Y.ravel(), D.ravel(), score_diff, secs, is_home_pos=1.0 if team == fd.DOWLING else 0.5,
                            conv_logit_shift=cm.fitted().team_shift(team, None),
                            **{k: fd.BOT_SETTINGS[k] for k in fd.MODEL_KEYS})
     calls = fd.guarded_calls(res, Y.ravel(), D.ravel(), toss_up_pts=TOSS_UP_PTS, score_diff=score_diff,
@@ -1208,7 +1224,7 @@ def decision_map_html(t: pd.DataFrame, grid: list[list[str]]) -> str:
     return (
         f'<div style="font-family:inherit;font-size:12px">'
         f'<div style="display:flex;flex-wrap:wrap;gap:14px;margin-bottom:6px;opacity:.8"><span>Bot\'s call (tie game, '
-        f'start of Q3, neutral site, guardrails on):</span>{sw(MAP_COLORS["G"], "Go")}{sw(MAP_COLORS["F"], "Field goal")}'
+        f'start of Q3, Dowling at home, guardrails on):</span>{sw(MAP_COLORS["G"], "Go")}{sw(MAP_COLORS["F"], "Field goal")}'
         f'{sw(MAP_COLORS["P"], "Punt")}{sw(MAP_COLORS["T"], "Toss-up")}</div>'
         f'<div style="display:flex;flex-wrap:wrap;gap:14px;margin-bottom:8px;opacity:.8"><span>{dots_head}:'
         f'</span>{dot(GREEN, "Agreed")}{dot(RED, "Disagreed, cost 1+ point")}'
@@ -1324,7 +1340,8 @@ def render_fourth_down_review(df: pd.DataFrame, team: str = TEAM) -> None:
     pick = st.selectbox("Pick a decision", list(labels), format_func=labels.get, key=f"g_fd_pick_{scope}_{team}")
     st.html(decision_card_html(t.loc[pick]))
     st.caption("Same math and staff settings as the 4th Down Bot: score at the snap, estimated clock scaled to the "
-               "model's 15-minute quarters, the two units' matchup adjustment, the bot's guardrails, neutral site, "
+               "model's 15-minute quarters, the offense's adjustment against an average defense, the bot's guardrails, "
+               "Dowling as the home team, "
                "3 timeouts each, no weather. Under 1 point of win probability is a toss-up.")
 
 

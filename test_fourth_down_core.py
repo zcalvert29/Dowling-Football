@@ -15,6 +15,11 @@ import pytest
 import fourth_down_core as fd
 import model_utils as mu
 
+# Works whether this file sits in the repo root or in tests/.
+from pathlib import Path
+_HERE = Path(__file__).resolve().parent
+BOT_PAGE = str(_HERE / "Fourth_Downs.py" if (_HERE / "Fourth_Downs.py").exists() else _HERE.parent / "Fourth_Downs.py")
+
 Q3_START = fd.model_seconds_remaining(3, 10 * 60)  # 10:00 left in Q3 (clear of the first-minute clamp)
 
 
@@ -286,8 +291,8 @@ def test_review_matches_the_bot():
         q, clock = r["Est. clock"].split()
         m, s_ = map(int, clock.split(":"))
         secs = fd.model_seconds_remaining(int(q[1]), m * 60 + s_)
-        res = fd.evaluate_many(r["ytg"], max(r["dist"], 1), sd, secs, is_home_pos=0.5,
-                               conv_logit_shift=conv.team_shift(r["team"], opp),
+        res = fd.evaluate_many(r["ytg"], max(r["dist"], 1), sd, secs, is_home_pos=fd.dowling_home_flag(r["team"]),
+                               conv_logit_shift=conv.team_shift(r["team"], None),
                                **{k: fd.BOT_SETTINGS[k] for k in fd.MODEL_KEYS})
         bot = fd.guarded_calls(res, r["ytg"], max(r["dist"], 1), score_diff=sd, seconds_remaining=secs,
                                **{k: fd.BOT_SETTINGS[k] for k in fd.GUARD_KEYS})
@@ -297,9 +302,34 @@ def test_review_matches_the_bot():
 def test_bot_page_handles_go_as_the_only_option():
     """4th & 7 at their 34: no punt inside the 35 and a 51-yard kick is past the default range."""
     from streamlit.testing.v1 import AppTest
-    at = AppTest.from_file("../Fourth_Downs.py", default_timeout=120)
+    at = AppTest.from_file(BOT_PAGE, default_timeout=120)
     for k, val in dict(fd_side="Opp", fd_yard_line=34, fd_distance=7, fd_quarter=3, fd_minutes=6,
                        fd_off_score=7, fd_def_score=3).items():
         at.session_state[k] = val
     at.run()
     assert not at.exception
+
+
+def test_bot_page_matches_review_on_waukee_4th_and_7():
+    """W7 Waukee, PLAY # 82: 4th & 7 at their 34, Q3 8:04, up 7-3. The bot (Dowling home, average defense,
+    no site or defense inputs) and the season review must give the same call."""
+    import re
+    from streamlit.testing.v1 import AppTest
+    import insights as ins
+    import visuals as v
+    t = getattr(ins.fourth_down_review, "__wrapped__", ins.fourth_down_review)(
+        ins.dowling_only(v.load_data("curated-pbp.xlsx")))
+    row = t[t["game"].str.contains("Waukee") & (t["Situation"] == "4th & 7 at Waukee 34")]
+    if row.empty:
+        pytest.skip("Waukee game not in the data")
+    at = AppTest.from_file(BOT_PAGE, default_timeout=120)
+    for k, val in dict(fd_side="Opp", fd_yard_line=34, fd_distance=7, fd_quarter=3, fd_minutes=8, fd_seconds=4,
+                       fd_off_score=7, fd_def_score=3).items():
+        at.session_state[k] = val
+    at.run()
+    assert not at.exception
+    text = re.sub("<[^>]+>", " ", at.get("html")[0].proto.body)
+    r = row.iloc[0]
+    expected = "TOSS-UP" if r["category"] == "Toss-up" or r["Strength"] == "TOSS-UP" else r["Model"].upper()
+    assert expected in text, (expected, text[:200])
+    assert "fd_site" not in at.session_state and "fd_def_team" not in at.session_state

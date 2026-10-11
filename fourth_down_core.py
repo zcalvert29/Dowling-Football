@@ -581,6 +581,19 @@ MODEL_KEYS = ("p_xp", "max_fg_distance")
 GUARD_KEYS = ("own_end", "own_min_edge", "no_go")
 
 
+# Site: Dowling is always treated as the home team. In a Dowling game the
+# other team is the visitor; in scout film of two other teams, neutral.
+# Both the 4th Down Bot and the 4th-down review use this, so they match.
+DOWLING = "Dowling Catholic"
+
+
+def dowling_home_flag(offense, dowling_in_game=True):
+    """is_home_pos for an offense: 1 for Dowling, 0 for Dowling's opponent, 0.5 when Dowling isn't playing."""
+    if offense == DOWLING:
+        return 1.0
+    return 0.0 if dowling_in_game else 0.5
+
+
 def site_flag(site):
     return {"home": 1.0, "away": 0.0, "neutral": 0.5}[site]
 

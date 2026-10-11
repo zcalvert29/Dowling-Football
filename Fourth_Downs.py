@@ -53,18 +53,17 @@ else:
 
 # Every input, its URL name, default, and allowed values. The URL keeps the
 # non-default ones, so a shared link opens to the same situation.
-SITES = ["Offense is home", "Offense is away", "Neutral"]
 LINK_SPEC = [
     ("us", "fd_off_score", int, 0, (0, 99)), ("them", "fd_def_score", int, 0, (0, 99)),
     ("q", "fd_quarter", int, 1, [1, 2, 3, 4]), ("min", "fd_minutes", int, 11, (0, 12)),
     ("sec", "fd_seconds", int, 30, (0, 59)), ("side", "fd_side", str, "Own", ["Own", "Opp"]),
     ("yl", "fd_yard_line", int, 35, (1, 50)), ("togo", "fd_distance", int, 2, (1, 30)),
     ("our_to", "fd_off_to", int, 3, [0, 1, 2, 3]), ("their_to", "fd_def_to", int, 3, [0, 1, 2, 3]),
-    ("site", "fd_site", str, SITES[0], SITES), ("off", "fd_off_abbr", str, "DCHS", None),
+    ("off", "fd_off_abbr", str, "DCHS", None),
     ("def", "fd_def_abbr", str, "OPP", None), ("wind", "fd_wind_speed", int, 0, (0, 40)),
     ("wdir", "fd_wind_dir", str, "Into", ["Into", "With", "Crosswind"]),
     ("rain", "fd_rain", bool, False, None), ("snow", "fd_snow", bool, False, None),
-    ("oteam", "fd_off_team", str, "Dowling Catholic", None), ("dteam", "fd_def_team", str, "Average", None),
+    ("oteam", "fd_off_team", str, "Dowling Catholic", None),
     ("pat", "fd_pat", int, round(BOT_SETTINGS["p_xp"] * 100), (50, 100)),
     ("range", "fd_fg_range", int, int(BOT_SETTINGS["max_fg_distance"]), (20, 65)),
     ("guard", "fd_guard", bool, bool(BOT_SETTINGS["own_end"]), None),
@@ -74,7 +73,7 @@ LINK_SPEC = [
 
 
 CONV = cm.fitted()  # same fit the season review uses
-TEAMS = ["Average"] + sorted(set(CONV.offense) | set(CONV.defense))
+TEAMS = ["Average"] + sorted(CONV.offense)
 qol.apply_link_params(LINK_SPEC, "_fd_link_applied")
 
 # Inputs live on the page, not the sidebar: on a phone the sidebar is
@@ -96,15 +95,12 @@ with st.container(border=True):
     distance = c3.number_input("To go", 1, 30, key="fd_distance")
     yards_to_goal = 100 - yard_line if side == "Own" else yard_line
 
-    with st.expander("Timeouts, site, teams & weather"):
+    with st.expander("Timeouts, teams & weather"):
         c1, c2 = st.columns(2)
         off_timeouts = c1.segmented_control("Our timeouts", [0, 1, 2, 3], key="fd_off_to")
         def_timeouts = c2.segmented_control("Their timeouts", [0, 1, 2, 3], key="fd_def_to")
         off_timeouts = 3 if off_timeouts is None else off_timeouts
         def_timeouts = 3 if def_timeouts is None else def_timeouts
-        site_label = st.segmented_control("Site", SITES, key="fd_site", width="stretch",
-                                          help="The win probability model includes home-field advantage.") \
-            or "Offense is home"
         c1, c2 = st.columns(2)
         off_abbr = c1.text_input("Offense", key="fd_off_abbr").upper()[:4]
         def_abbr = c2.text_input("Defense", key="fd_def_abbr").upper()[:4]
@@ -115,11 +111,9 @@ with st.container(border=True):
         c1, c2 = st.columns(2)
         rain = c1.checkbox("Rain", key="fd_rain")
         snow = c2.checkbox("Snow", key="fd_snow")
-        st.caption("Matchup: adjusts the conversion chance for these two units, from our film. "
-                   "Teams with few snaps stay close to average.")
-        c1, c2 = st.columns(2)
-        off_team = c1.selectbox("Offense unit", TEAMS, key="fd_off_team")
-        def_team = c2.selectbox("Defense unit", TEAMS, key="fd_def_team")
+        off_team = st.selectbox("Offense unit", TEAMS, key="fd_off_team",
+                                help="Adjusts the conversion chance for this offense, from our film, against an "
+                                     "average defense. Teams with few snaps stay close to average.")
         c1, c2 = st.columns(2)
         pat_pct = c1.number_input("PAT make rate (%)", 50, 100, key="fd_pat",
                                   help="Used when a conversion is a touchdown. Our film: 89% overall, Dowling 92%.")
@@ -140,9 +134,12 @@ with st.container(border=True):
                    "Changes here are for this situation only; the season review uses the staff settings "
                    "in fourth_down_core.BOT_SETTINGS.")
 
-# "home" / "away" / "neutral" from the offense's point of view. After a change
-# of possession, evaluate_options() flips home/away for the other team.
-SITE = {"Offense is home": "home", "Offense is away": "away", "Neutral": "neutral"}[site_label]
+# Site isn't an input: Dowling is always home (fourth_down_core.dowling_home_flag),
+# so when another team's offense is picked, that team is the visitor. "Average"
+# is treated as Dowling's offense. After a change of possession the model flips
+# home/away for the other team.
+HOME = dowling_home_flag(DOWLING if off_team == "Average" else off_team)
+SITE = {1.0: "home", 0.0: "away"}[HOME]
 
 if minutes == 12:
     seconds = 0  # quarters are 12:00 max; 12:30 isn't a real clock time
@@ -151,7 +148,7 @@ if minutes == 12:
 # clock is scaled by 15/12 (see fourth_down_core.model_seconds_remaining).
 seconds_remaining_in_game = model_seconds_remaining(quarter, minutes * 60 + seconds)
 score_diff = off_score - def_score
-conv_shift = CONV.team_shift(off_team, def_team)
+conv_shift = CONV.team_shift(off_team, None)  # against an average defense
 MODEL_KW = dict(conv_logit_shift=conv_shift, p_xp=pat_pct / 100, max_fg_distance=fg_range)
 NO_GO = STAFF_NO_GO if nogo_on else None
 GUARD_KW = dict(own_end=guard_on, own_min_edge=guard_edge, no_go=NO_GO)
@@ -297,7 +294,7 @@ if not np.isnan(_be):
 st.divider()
 st.write("#### Decision chart")
 st.caption(f"The model's call for every spot on the field and every distance, at the current score, clock, "
-           f"timeouts, site, and weather. The ringed square is the current situation: 4th & {distance} {spot}. "
+           f"timeouts, and weather. The ringed square is the current situation: 4th & {distance} {spot}. "
            f"Hover any square for the numbers.")
 
 CALL_COLORS = {"Go for it": "#55A868", "Field goal": "#4C72B0", "Punt": "#C44E52", "Toss-up": "#BDBDBD",
@@ -371,7 +368,8 @@ with st.expander("Model notes & limitations"):
   **{"real trained models" if mu.USING_REAL_MODELS else "heuristic fallback"}**.
 - Conversion probability is fit to our own high school film
   (conversion_model.py: {CONV.n_plays} third- and fourth-down snaps), with an
-  optional matchup adjustment for the two units on the field. FG probability
+  adjustment for the offense unit, always against an average defense. Dowling
+  is always the home team (no site input). FG probability
   and punt distance are still hand-calibrated. The break-even conversion rate
   tells you how much that matters: if your real conversion rate is on the
   same side of break-even, the call doesn't change.
