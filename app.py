@@ -105,6 +105,7 @@ def dchs_o_run_game():
 def dchs_o_pass_game():
     page_header("DCHS O Pass Game")
     v.render_pass_zones(df, "offense", v.TEAM, "DCHS O Pass Zones", key="pz_dchs_o")
+    v.render_pass_chart(df, "offense", v.TEAM, "DCHS O Pass Chart")
     calls = v.o_pass_detail_table(df)
     v.render_takeaways(calls, "pass play")
     v.render_o_pass_game_detail(df, table=calls)
@@ -173,6 +174,7 @@ def dchs_d_run_game():
 def dchs_d_pass_game():
     page_header("DCHS D Pass Game")
     v.render_pass_zones(df, "defense", v.TEAM, "DCHS D Pass Zones", key="pz_dchs_d", good_high=False)
+    v.render_pass_chart(df, "defense", v.TEAM, "Pass Chart vs DCHS D")
     cov = v.d_coverage_table(df)
     v.render_takeaways(cov, "coverage", good_high=False)
     v.render_d_pass_coverage(df, table=cov)
@@ -215,6 +217,7 @@ def scout_opposing_offense():
         v.render_pass_zones(df, "offense", opponent, f"{opponent} O Pass Zones", key="pz_opp_o",
                             good_high=v.SCOUT_GOOD_HIGH,
                             min_att=v.SCOUT_MIN_SAMPLE)
+        v.render_pass_chart(df, "offense", opponent, f"{opponent} O Pass Chart")
         v.render_opp_play_calls(df, opponent, "Pass")
     with red_zone:
         bd.render_red_zone(df, _week_games(), opponent, "offense", f"{opponent} offense", good_high=v.SCOUT_GOOD_HIGH,

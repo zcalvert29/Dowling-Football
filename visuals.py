@@ -320,6 +320,12 @@ def theme_ink() -> str:
     return "#FAFAFA" if theme == "dark" else "#31333F"
 
 
+def theme_bg() -> str:
+    """Page background matching Streamlit's light/dark theme."""
+    theme = getattr(getattr(st.context, "theme", None), "type", None)
+    return "#0E1117" if theme == "dark" else "#FFFFFF"
+
+
 # ---------------------------------------------------------------------------
 # Takeaway cards and "use more / use less" chart (work off any crosstab
 # that has Plays and EPA per Play columns)
@@ -769,6 +775,19 @@ def render_pass_zones(df: pd.DataFrame, side: str, team: str, title: str, key: s
     if min_att:
         st.caption(f"Zones with fewer than {min_att} throws only show their attempts and share of throws.")
     tag_note(run_pass(df[df[side] == team], ["Pass"]), "PASS ZONE", "pass zone")
+
+
+def render_pass_chart(df: pd.DataFrame, side: str, team: str, title: str) -> None:
+    """Pass chart (pass_chart.py): every throw where `side` == team, placed by air yards and pass zone.
+    Follows the sidebar filters, so pick one week to see a single game."""
+    import pass_chart as pc
+
+    st.markdown(f"**{title}**")
+    chart = pc.pass_chart_html(df, team, ink=theme_ink(), bg=theme_bg(), side=side)
+    if not chart:
+        st.info("No pass attempts match the current filters.")
+        return
+    st.html(chart)
 
 
 # ---------------------------------------------------------------------------
