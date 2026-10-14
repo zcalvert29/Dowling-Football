@@ -12,6 +12,7 @@ use (visuals.load_data), so the sidebar filters apply where it makes sense.
 """
 from __future__ import annotations
 
+import hmac
 import io
 import re
 from datetime import date as _date
@@ -1359,11 +1360,35 @@ def _slug(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
 
 
+def _existing_game(team: str, opponent: str, game_day: _date):
+    """The games.csv entry for this team, opponent, and date (a re-upload), or None for a new game."""
+    import build_data
+
+    date_str = game_day.strftime("%Y_%m_%d")
+    for g in build_data.read_manifest():
+        try:
+            if (g.team, g.opponent.lower(), g.date) == (team, opponent.lower(), date_str):
+                return g
+        except ValueError:  # a games.csv row whose file name has no date
+            continue
+    return None
+
+
 def new_game_files(team: str, opponent: str, game_day: _date) -> tuple[str, str | None]:
-    """(game file, offense file or None) paths for a new game, following the games.csv naming rules."""
+    """(game file, offense file or None) paths for this game. A game already in games.csv keeps its file names,
+    so the new film replaces the old one; a new game gets names that follow the games.csv rules."""
+    g = _existing_game(team, opponent, game_day)
+    if g is not None:
+        return g.file, (build_data_offense_name(g.file) if team == TEAM else None)
     folder, who = ("Dowling", "dowling") if team == TEAM else ("Scout", _slug(team))
     base = f"{folder}/{who}-vs-{_slug(opponent)}"
     return f"{base}-{game_day:%m%d%y}.xlsx", (f"{base}-offense.xlsx" if team == TEAM else None)
+
+
+def build_data_offense_name(game_file: str) -> str:
+    import build_data
+
+    return build_data.DATE_IN_NAME.sub("-offense.xlsx", game_file)
 
 
 def process_new_game(film, offense_film, team: str, opponent: str, game_day: _date, week: int) -> pd.DataFrame:
@@ -1380,14 +1405,20 @@ def process_new_game(film, offense_film, team: str, opponent: str, game_day: _da
     return new
 
 
-def updated_manifest(game_file: str, team: str, opponent: str, week: int) -> bytes:
-    """games.csv with this game added (or its row replaced, if the file is already listed)."""
+def updated_manifest(game_file: str, team: str, opponent: str, week: int, current: str | None = None) -> bytes:
+    """games.csv with this game added, or its row updated in place if the game is already listed. current = the
+    games.csv text to start from (the newest copy in the repo when saving to GitHub); default the app's copy."""
     import build_data
 
-    m = pd.read_csv(build_data.MANIFEST, dtype=str)
-    m = m[m["file"].str.strip() != game_file]
-    row = {c: "" for c in m.columns} | {"file": game_file, "team": team, "opponent": opponent, "week": str(week)}
-    return pd.concat([m, pd.DataFrame([row])], ignore_index=True).to_csv(index=False).encode()
+    m = pd.read_csv(io.StringIO(current) if current is not None else build_data.MANIFEST, dtype=str)
+    row = {"file": game_file, "team": team, "opponent": opponent, "week": str(week)}
+    same = m["file"].str.strip() == game_file
+    if same.any():
+        for k, val in row.items():
+            m.loc[same, k] = val  # keeps that row's drop_plays / drop_offense_plays
+    else:
+        m = pd.concat([m, pd.DataFrame([{c: "" for c in m.columns} | row])], ignore_index=True)
+    return m.to_csv(index=False).encode()
 
 
 def _as_xlsx(f) -> bytes:
@@ -1402,12 +1433,97 @@ def to_xlsx_bytes(df: pd.DataFrame) -> bytes:
     return buf.getvalue()
 
 
+def _process_upload(film, offense_film, team: str, opponent: str, game_day: _date, week: int) -> dict:
+    """Curate the upload and collect everything the page shows, so it survives reruns (Save, downloads)."""
+    import build_data
+    import qol  # local import: qol imports this module
+
+    new = process_new_game(film, offense_film, team, opponent, game_day, week)
+    film.seek(0)
+    existing = _existing_game(team, opponent, game_day)
+    game_file, offense_file = new_game_files(team, opponent, game_day)
+    files = {game_file: _as_xlsx(film)}
+    if offense_film is not None:
+        files[offense_file] = _as_xlsx(offense_film)
+    return {
+        "new": new, "team": team, "opponent": opponent, "week": week, "game_file": game_file, "files": files,
+        "existing": existing.file if existing is not None else None,
+        "errors": int((new["drive_result"] == "Error").sum() + (new["SERIES_RESULT"] == "Error").sum()),
+        "notes": build_data._error_drive_notes(film.name, new, _read_upload(film)),
+        "dup": int(new["PLAY #"].duplicated().sum()),
+        "issues": qol.validate_plays(new),
+        "saved": None,
+    }
+
+
+def _upload_unlocked() -> bool:
+    """True if saving is allowed this session: no upload_password in secrets, or it's been entered."""
+    import qol
+
+    expected = qol._secret("upload_password")
+    if not expected or st.session_state.get("_upload_ok"):
+        return True
+    with st.form("upload_login"):
+        pw = st.text_input("Upload password", type="password")
+        ok = st.form_submit_button("Unlock saving")
+    if ok:
+        if hmac.compare_digest(str(pw), str(expected)):
+            st.session_state["_upload_ok"] = True
+            st.rerun()
+        st.error("That password isn't right.")
+    return False
+
+
+def _render_save(res: dict) -> None:
+    import github_sync
+
+    cfg = github_sync.config()
+    names = ", ".join(f"`{f}`" for f in res["files"])
+    if res["saved"]:
+        st.success(f"Saved to the app. {res['saved']}")
+        return
+    if cfg is None:
+        st.caption("Saving straight to the app isn't set up (it needs a `[github]` section in the app's secrets). "
+                   "Download the files below and add them to the repo instead.")
+        return
+    if res["dup"]:
+        st.error("Can't save this film: some PLAY #s appear more than once. Fix it in Hudl and upload it again.")
+        return
+    if not _upload_unlocked():
+        return
+    st.markdown(f"Saves {names} and `games.csv` to GitHub in one commit. The app redeploys with the new data "
+                "for everyone in a minute or two.")
+    confirmed = True
+    if res["errors"]:
+        confirmed = st.checkbox("Save anyway. I'll fix the flagged drives in Hudl and upload the game again.",
+                                key="add_confirm")
+    if not st.button("Save to app", type="primary", disabled=not confirmed):
+        return
+    verb = "Update" if res["existing"] else "Add"
+    message = (f"{verb} game: {res['team']} vs {res['opponent']} (Week {res['week']})\n\n"
+               "Uploaded from the app's Add a Game page.")
+
+    def build_files(read):
+        current = read("games.csv")
+        manifest = updated_manifest(res["game_file"], res["team"], res["opponent"], res["week"], current)
+        return {**res["files"], "games.csv": manifest}
+
+    try:
+        with st.spinner("Saving to GitHub…"):
+            url = github_sync.commit_files(cfg, build_files, message)
+    except github_sync.SaveError as e:
+        st.error(f"Couldn't save: {e}")
+        return
+    res["saved"] = (f"[See the commit]({url})." if url else
+                    "Nothing changed: the repo already had exactly these files.")
+    st.rerun()
+
+
 def render_add_game() -> None:
     st.markdown(
-        "Upload a game's Hudl export to check it with the same curation code the app uses (`curate_pbp.py`). "
-        "You'll get the film file named the way the app expects and an updated `games.csv`. The app builds "
-        "its data from those files when it starts, so nothing changes on the live app until you add them to "
-        "the GitHub repo and push."
+        "Upload a game's Hudl export to check it with the same curation code the app uses (`curate_pbp.py`), "
+        "then save it to the app. Saving adds the film and a `games.csv` row to the GitHub repo, and the app "
+        "rebuilds with it for everyone. Uploading a game that's already in the app replaces it."
     )
     xlsx = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     c0, c1, c2, c3 = st.columns(4)
@@ -1420,47 +1536,56 @@ def render_add_game() -> None:
     if team == TEAM:
         offense_film = st.file_uploader("Dowling offense film export (optional, fills OFF FORM / OFF PLAY for our "
                                         "offense)", type=["xlsx", "xls", "csv"], key="add_off_film")
-    if not st.button("Process game", type="primary", disabled=not (film and opponent and team)):
+    inputs = (team, opponent, game_day, week, getattr(film, "file_id", None), getattr(offense_film, "file_id", None))
+    if st.button("Process game", type="primary", disabled=not (film and opponent and team)):
+        try:
+            st.session_state["add_game"] = {"inputs": inputs, **_process_upload(film, offense_film, team, opponent,
+                                                                                game_day, week)}
+        except Exception as e:  # noqa: BLE001 — show the coach what went wrong instead of a stack trace
+            st.session_state.pop("add_game", None)
+            st.error(f"Couldn't process that file: {e}")
+            return
+    res = st.session_state.get("add_game")
+    if res is None or res["inputs"] != inputs:  # nothing processed yet, or the inputs changed since
         if not (opponent and team and film):
             st.caption("Add the team, an opponent name, and the film export to continue.")
         return
-    try:
-        new = process_new_game(film, offense_film, team, opponent, game_day, week)
-    except Exception as e:  # noqa: BLE001 — show the coach what went wrong instead of a stack trace
-        st.error(f"Couldn't process that file: {e}")
-        return
-    gid = new["game_id"].iat[0]
-    errors = int((new["drive_result"] == "Error").sum() + (new["SERIES_RESULT"] == "Error").sum())
-    last = new.iloc[-1]
-    st.success(f"Processed {gid}: {len(new)} plays, final {team} {int(last['team_score'])}, "
-               f"{opponent} {int(last['opponent_score'])}.")
-    dup = int(new["PLAY #"].duplicated().sum())
-    if dup:
-        st.warning(f"{dup} PLAY # value(s) appear more than once. Is more than one game or cut-up in this file? "
-                   "Fix that in Hudl before adding it.")
-    if errors:
-        import build_data
 
-        film.seek(0)
-        notes = build_data._error_drive_notes(film.name, new, _read_upload(film))
-        st.warning(f"{errors} rows came out as 'Error' in drive_result/SERIES_RESULT. Check the tagging before "
-                   "committing." + "".join(f"\n- {n.split(': ', 1)[1]}" for n in notes))
+    new = res["new"]
+    last = new.iloc[-1]
+    st.success(f"Processed {new['game_id'].iat[0]}: {len(new)} plays, final {team} {int(last['team_score'])}, "
+               f"{opponent} {int(last['opponent_score'])}.")
+    if res["dup"]:
+        st.warning(f"{res['dup']} PLAY # value(s) appear more than once. Is more than one game or cut-up in this "
+                   "file? Fix that in Hudl before adding it.")
+    if res["errors"]:
+        st.warning(f"{res['errors']} rows came out as 'Error' in drive_result/SERIES_RESULT. Check the tagging."
+                   + "".join(f"\n- {n.split(': ', 1)[1]}" for n in res["notes"]))
     st.markdown("**Tagging check for this game**")
     st.dataframe(tagging_coverage(new).style.format("{:.0%}", na_rep="–"), width="stretch")
-    import qol  # local import: qol imports this module
+    st.markdown("**Possible tagging mistakes in this game**")
+    if res["issues"].empty:
+        st.success("No likely tagging mistakes found.")
+    else:
+        st.caption(f"{len(res['issues'])} things worth a second look in Hudl. Use PLAY # to find each one.")
+        st.dataframe(res["issues"], width="stretch", hide_index=True)
 
-    qol.render_validation(new, "Possible tagging mistakes in this game")
-
-    game_file, offense_file = new_game_files(team, opponent, game_day)
     st.markdown("**Add it to the app**")
-    d = st.columns(3)
-    d[0].download_button(f"Download {game_file.split('/')[-1]}", _as_xlsx(film), file_name=game_file.split("/")[-1],
-                         mime=xlsx, type="primary")
-    if offense_film is not None:
-        d[1].download_button(f"Download {offense_file.split('/')[-1]}", _as_xlsx(offense_film),
-                             file_name=offense_file.split("/")[-1], mime=xlsx, type="primary")
-    d[2].download_button("Download updated games.csv", updated_manifest(game_file, team, opponent, week),
-                         file_name="games.csv", mime="text/csv", type="primary")
-    folder = game_file.split("/")[0]
-    st.caption(f"Next: put the film file{'s' if offense_film is not None else ''} in the `{folder}/` folder, replace "
-               "`games.csv` in the repo with the new one, push, then reboot the app.")
+    if res["existing"]:
+        st.info(f"This game is already in the app ({res['existing']}). Saving keeps its file names, so the new "
+                "film replaces the old one.")
+    _render_save(res)
+
+    with st.expander("Or download the files and add them to the repo yourself"):
+        d = st.columns(3)
+        # on_click="ignore": a download shouldn't rerun the page
+        for i, (path, data) in enumerate(res["files"].items()):
+            d[i].download_button(f"Download {path.split('/')[-1]}", data, file_name=path.split("/")[-1], mime=xlsx,
+                                 on_click="ignore")
+        d[2].download_button("Download updated games.csv",
+                             updated_manifest(res["game_file"], team, opponent, week), file_name="games.csv",
+                             mime="text/csv", on_click="ignore")
+        folder = res["game_file"].split("/")[0]
+        st.caption(f"Put the film file{'s' if len(res['files']) > 1 else ''} in the `{folder}/` folder"
+                   f"{' (replacing the old one)' if res['existing'] else ''}, replace `games.csv` in the repo with "
+                   "the new one, and push. The app rebuilds its data from the new files on its own.")
