@@ -56,6 +56,7 @@ breakdowns.py           Tendency trees, field/strength splits, sequencing, drive
 insights.py             Game recap, self-scout, matchup, scouting report, WP / 4th-down review
 profiles.py             FBS-benchmarked team profile radar charts
 special_teams.py        Special teams page
+github_sync.py          Saves Add a Game uploads to the GitHub repo in one commit
 curate_pbp.py           Play-by-play curation: turns one game's Hudl export into the app's columns
 build_data.py           Builds the season from games.csv + the film folders (the app runs it at startup)
 games.csv               One row per game: film file, team, opponent, week
@@ -92,7 +93,9 @@ The app builds its play-by-play straight from the Hudl exports when it starts, s
 3. Run `python build_data.py` to build every game and list anything that needs a look (repeated PLAY #s, drives that came out as "Error", film files not in `games.csv`).
 4. Commit and push. The app rebuilds whenever a film file or `games.csv` changes.
 
-The **Add a Game** page does steps 1–2 from the browser. For Tableau, `python build_data.py --excel` writes `curated-pbp.xlsx`.
+Or use the **Add a Game** page: upload the film, review the tagging checks, and click **Save to app**. It commits the film file(s) and the updated `games.csv` to GitHub in one commit, and the app redeploys with the new game for everyone in a minute or two. Uploading a game that's already in the app replaces it. (Needs the `[github]` secrets below; without them the page offers the files as downloads instead.)
+
+For Tableau, `python build_data.py --excel` writes `curated-pbp.xlsx`.
 
 Run the tests with:
 
@@ -109,6 +112,8 @@ Copy `secrets.toml.example` to `.streamlit/secrets.toml` (or paste it into Strea
 - `app_password`: require a password to open the app
 - `next_opponent`: default opponent on the Home and Scouting pages
 - `notes_sheet_url` and `[gcp_service_account]`: save coach notes to a Google Sheet
+- `[github]` (`token`, `repo`, `branch`): lets the Add a Game page save games to the repo. Use a [fine-grained personal access token](https://github.com/settings/personal-access-tokens) limited to this repository with **Contents: Read and write**, and set `branch` to the branch the app deploys from
+- `upload_password`: only people who know it can save games from the Add a Game page
 
 ---
 
