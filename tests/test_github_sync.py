@@ -5,7 +5,7 @@ import github_sync as gs
 import insights as ins
 from fake_github import FakeGitHub
 
-GAMES = b"file,team,opponent,week,drop_plays,drop_offense_plays\nDowling/a-082826.xlsx,Dowling Catholic,A,1,,\n"
+GAMES = b"file,team,opponent,season,drop_plays,drop_offense_plays\nDowling/a-082826.xlsx,Dowling Catholic,A,2026,,\n"
 
 
 @pytest.fixture
@@ -20,7 +20,7 @@ def _cfg(fake, token="good-token"):
 
 
 def _add_game(read):
-    manifest = ins.updated_manifest("Dowling/dowling-vs-b-090426.xlsx", "Dowling Catholic", "B", 2,
+    manifest = ins.updated_manifest("Dowling/dowling-vs-b-090426.xlsx", "Dowling Catholic", "B", 2026,
                                     read("games.csv"))
     return {"Dowling/dowling-vs-b-090426.xlsx": b"new film", "games.csv": manifest}
 
@@ -33,17 +33,17 @@ def test_one_commit_with_film_and_manifest(gh):
     files = gh.files()
     assert files["Dowling/dowling-vs-b-090426.xlsx"] == b"new film"
     assert files["Dowling/a-082826.xlsx"] == b"old film"                  # everything else untouched
-    assert files["games.csv"].decode().splitlines()[-1] == "Dowling/dowling-vs-b-090426.xlsx,Dowling Catholic,B,2,,"
+    assert files["games.csv"].decode().splitlines()[-1] == "Dowling/dowling-vs-b-090426.xlsx,Dowling Catholic,B,2026,,"
 
 
 def test_manifest_edit_uses_the_repos_newest_copy(gh):
     # The repo's games.csv has a game the app's local copy doesn't: it must survive the save.
     gh.head = gh._commit(gh._tree({**{p: gh._blob(d) for p, d in gh.files().items()},
-                                   "games.csv": gh._blob(GAMES + b"Scout/x-091126.xlsx,X,Y,3,,\n")}),
+                                   "games.csv": gh._blob(GAMES + b"Scout/x-091126.xlsx,X,Y,2026,,\n")}),
                          [gh.head], "someone else's upload")
     gs.commit_files(_cfg(gh), _add_game, "Add game")
     rows = gh.files()["games.csv"].decode().splitlines()
-    assert "Scout/x-091126.xlsx,X,Y,3,," in rows and rows[-1].startswith("Dowling/dowling-vs-b-090426.xlsx")
+    assert "Scout/x-091126.xlsx,X,Y,2026,," in rows and rows[-1].startswith("Dowling/dowling-vs-b-090426.xlsx")
 
 
 def test_retries_when_someone_pushes_mid_save(gh):
