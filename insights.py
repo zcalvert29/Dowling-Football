@@ -1439,8 +1439,12 @@ def render_add_game() -> None:
         st.warning(f"{dup} PLAY # value(s) appear more than once. Is more than one game or cut-up in this file? "
                    "Fix that in Hudl before adding it.")
     if errors:
+        import build_data
+
+        film.seek(0)
+        notes = build_data._error_drive_notes(film.name, new, _read_upload(film))
         st.warning(f"{errors} rows came out as 'Error' in drive_result/SERIES_RESULT. Check the tagging before "
-                   "committing.")
+                   "committing." + "".join(f"\n- {n.split(': ', 1)[1]}" for n in notes))
     st.markdown("**Tagging check for this game**")
     st.dataframe(tagging_coverage(new).style.format("{:.0%}", na_rep="–"), width="stretch")
     import qol  # local import: qol imports this module

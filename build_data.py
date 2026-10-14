@@ -102,6 +102,58 @@ def _film_problems(f: str, plays: pd.DataFrame) -> list[str]:
             f"scores will be wrong until it's fixed."]
 
 
+def _ordinal(n) -> str:
+    n = int(n)
+    return f"{n}{'th' if 10 <= n % 100 <= 20 else {1: 'st', 2: 'nd', 3: 'rd'}.get(n % 10, 'th')}"
+
+
+def _play_text(r: pd.Series, offense: bool = True) -> str:
+    """'#48 (Q2, CR Kennedy 3rd & 13, Pass, Incomplete)'."""
+    bits = [f"Q{int(r['QTR'])}" if pd.notna(r.get("QTR")) else None]
+    who = r.get("offense") if offense and pd.notna(r.get("offense")) else None
+    situation = f"{_ordinal(r['DN'])} & {int(r['DIST'])}" if pd.notna(r.get("DN")) and r["DN"] >= 1 and pd.notna(
+        r.get("DIST")) else None
+    bits.append(" ".join(x for x in (who, situation) if x) or None)
+    bits += [r.get("PLAY TYPE"), r.get("RESULT")]
+    return f"#{int(r['PLAY #'])} ({', '.join(str(b) for b in bits if b is not None and pd.notna(b))})"
+
+
+def _skipped_text(raw: pd.DataFrame, after: int, before: int | None) -> str:
+    """Rows of the export between two plays that curation drops (blank 'S' rows, timeouts)."""
+    between = raw[(raw["PLAY #"] > after) & ((raw["PLAY #"] < before) if before is not None else True)]
+    if between.empty:
+        return ""
+    kinds = [f"#{int(r['PLAY #'])} is {'a timeout' if r.get('RESULT') == 'Timeout' else 'a blank S row'}"
+             for _, r in between.iterrows()]
+    return f" In between, {', '.join(kinds)} (dropped when the game is built). Was that the missing play?"
+
+
+def _error_drive_notes(f: str, df: pd.DataFrame, raw: pd.DataFrame) -> list[str]:
+    """One plain-English note per drive whose result came out 'Error': what the last play was, and what the
+    film shows next, so the play to fix in Hudl is easy to find."""
+    plays = df.reset_index(drop=True)
+    notes = []
+    for _, d in plays[plays["drive_result"] == "Error"].groupby("drive", sort=False):
+        scrimmage = d[~d["PLAY TYPE"].isin(cp.KICKOFF_TYPES)]
+        last = (scrimmage if len(scrimmage) else d).iloc[-1]
+        pos = int((scrimmage if len(scrimmage) else d).index[-1])
+        nxt = plays.iloc[pos + 1] if pos + 1 < len(plays) else None
+        skipped = _skipped_text(raw, last["PLAY #"], None if nxt is None else nxt["PLAY #"])
+        if nxt is None:
+            msg = (f"the film ends after {_play_text(last)}, in Q{int(last['QTR'])} rather than at the end of "
+                   f"the game. Missing plays at the end?")
+        elif nxt["offense"] != last["offense"]:
+            msg = (f"the ball goes from {last['offense']} to {nxt['offense']} after {_play_text(last, False)} "
+                   f"with no punt, turnover, or score tagged. Next play: {_play_text(nxt)}. A missing punt, or a "
+                   f"fumble/interception not in RESULT?")
+        else:
+            msg = (f"{last['offense']}'s drive ends after {_play_text(last, False)} without a punt, turnover, or "
+                   f"score tagged. Next play: {_play_text(nxt)}.")
+        notes.append(f"{f}: {msg}{skipped} ({len(d)} play{'s' if len(d) != 1 else ''} show drive_result "
+                     f"'Error'.)")
+    return notes
+
+
 def curate_game(g: Game) -> tuple[pd.DataFrame, list[str]]:
     """One game, curated exactly the way the old notebook did it. Returns (plays, problems)."""
     plays = _read_film(g.file, g.drop_plays)
@@ -114,9 +166,7 @@ def curate_game(g: Game) -> tuple[pd.DataFrame, list[str]]:
         off = cp.curate_play_by_play_data(plays=off_raw, team=g.team, opponent=g.opponent, date=g.date,
                                           week=g.week)
         df = cp.add_dowling_offense_plays(df, off)
-    errors = int((df["drive_result"] == "Error").sum())
-    if errors:
-        problems.append(f"{g.file}: {errors} play(s) came out with drive_result 'Error'. Check the tagging.")
+    problems += _error_drive_notes(g.file, df, pd.read_excel(_path(g.file)))
     return df, problems
 
 
