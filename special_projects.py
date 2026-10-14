@@ -4,6 +4,9 @@ special_projects.py — one-off studies that don't belong on a regular page.
 First study: does the first play of a drive predict how many points the drive scores? Dowling Catholic offensive
 drives are split by the yards gained on their first snap (4+ yards vs. under 4 yards). Four yards is the success
 line on 1st & 10 (40% of the distance), so the buckets are "on schedule" and "behind schedule".
+
+Second study (offense): 3-and-out rate, game by game. A 3-and-out is a drive that ends in a punt after 3 or fewer
+offensive snaps (the same flag the Game Recap and Season Drives pages use).
 """
 from __future__ import annotations
 
@@ -69,18 +72,55 @@ def first_play_table(drives: pd.DataFrame) -> pd.DataFrame:
     return t.set_index("First play of the drive")
 
 
-def render_first_play_study(df_all: pd.DataFrame, side: str = "offense") -> None:
-    """side="offense": Dowling's drives. side="defense": opponents' drives against Dowling's defense."""
+def three_and_out_table(drives: pd.DataFrame) -> pd.DataFrame:
+    """One row per game (in week order) plus a Season row: drives, 3-and-outs, and 3-and-out %."""
+    def row(name, d):
+        n, tao = len(d), int(d["three_and_out"].sum())
+        return {"Game": name, "Drives": n, "3-and-outs": tao, "3-and-out %": tao / n if n else np.nan}
+    rows = [row(name, d) for name, d in drives.groupby("Game", sort=False)] + [row("Season", drives)]
+    return pd.DataFrame(rows).set_index("Game")
+
+
+def select_weeks(df_all: pd.DataFrame, key: str) -> pd.DataFrame:
+    """Week picker for a Special Projects page; returns the plays from the chosen weeks."""
+    weeks = sorted(df_all["WEEK"].dropna().unique())
+    sel = st.multiselect("Weeks", weeks, default=weeks, key=key, format_func=lambda w: f"Week {int(w)}")
+    return df_all[df_all["WEEK"].isin(sel)]
+
+
+def render_three_and_out_study(games: pd.DataFrame) -> None:
+    """Dowling's 3-and-out % by game. `games` = whole games for the selected weeks."""
+    st.subheader("3-and-out rate")
+    st.caption("Share of Dowling Catholic offensive drives that end in a punt after 3 or fewer offensive plays "
+               "(3-and-outs ÷ total offensive drives). Lower is better.")
+    drives = bd.season_drives(ins.dowling_only(games), v.TEAM)
+    if drives.empty:
+        st.info("No drives in the selected weeks.")
+        return
+    t = three_and_out_table(drives)
+    st.dataframe(t.style.format({"Drives": "{:,.0f}", "3-and-outs": "{:,.0f}", "3-and-out %": "{:.0%}"}, na_rep="–")
+                 .apply(lambda r: ["font-weight: bold" if r.name == "Season" else ""] * len(r), axis=1),
+                 width="stretch")
+    st.caption("Total drives count every possession, including ones that ran out the clock at the end of a half "
+               "or game. Plays are runs and passes; penalties don't count toward the 3.")
+    with st.expander("Every 3-and-out"):
+        shown = drives[drives["three_and_out"]][["Game", "QTR", "start", "plays", "yards"]].copy()
+        shown["start"] = shown["start"].map(ins._yard_label)
+        st.dataframe(shown.rename(columns={"start": "Start", "plays": "Plays", "yards": "Yards"}),
+                     hide_index=True, width="stretch")
+
+
+def render_first_play_study(games: pd.DataFrame, side: str = "offense") -> None:
+    """
+    `games` = whole games for the selected weeks (see select_weeks). side="offense": Dowling's drives.
+    side="defense": opponents' drives against Dowling's defense.
+    """
     defense = side == "defense"
     st.subheader("Does the first play set the tone?")
     who = "Opponent drives against the Dowling Catholic defense" if defense else "Dowling Catholic offensive drives"
     st.caption(f"{who}, split by the yards gained on the drive's first play. {FIRST_PLAY_YARDS} yards is the "
                f"success line on 1st & 10, so a drive that gets it is on schedule"
                + (" (for the opponent: holding them under 4 is a win for the defense)." if defense else "."))
-    weeks = sorted(df_all["WEEK"].dropna().unique())
-    sel = st.multiselect("Weeks", weeks, default=weeks, key=f"sp_weeks_{side}",
-                         format_func=lambda w: f"Week {int(w)}")
-    games = df_all[df_all["WEEK"].isin(sel)]
     drives = first_play_drives(ins.dowling_only(games), side=side)
     if drives.empty:
         st.info("No drives in the selected weeks.")

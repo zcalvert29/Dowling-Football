@@ -24,7 +24,7 @@ A multipage Streamlit app built on Dowling's tagged play-by-play data.
 | **Win Probability & 4th-Down Review** | WP charts by game and a postgame review of every 4th-down decision against the bot's recommendation |
 | **Scouting Report & Matchup** | Printable opponent report and side-by-side matchup view |
 | **Play Finder & Sideline Mode** | Fast filtering for specific situations and a phone-friendly view for game day |
-| **Add a Game** | Upload a new film-tagging export; `curate_pbp.py` standardizes it and appends it to the dataset |
+| **Add a Game** | Upload a new film-tagging export to check its tagging; get back the film file named for the repo and an updated `games.csv` |
 
 Coach notes can optionally be saved to a Google Sheet, and the app can be password-protected (see [Configuration](#configuration)).
 
@@ -56,7 +56,10 @@ breakdowns.py           Tendency trees, field/strength splits, sequencing, drive
 insights.py             Game recap, self-scout, matchup, scouting report, WP / 4th-down review
 profiles.py             FBS-benchmarked team profile radar charts
 special_teams.py        Special teams page
-curate_pbp.py           Play-by-play curation pipeline (used by "Add a game")
+curate_pbp.py           Play-by-play curation: turns one game's Hudl export into the app's columns
+build_data.py           Builds the season from games.csv + the film folders (the app runs it at startup)
+games.csv               One row per game: film file, team, opponent, week
+Dowling/, Scout/        Hudl exports: our games (plus -offense files) and scout film
 fourth_down_core.py     4th Down Bot decision math (no Streamlit code)
 Fourth_Downs.py         4th Down Bot page
 Go_for_2.py             Go for 2 Bot page
@@ -79,6 +82,17 @@ cd Dowling-Football
 pip install -r requirements.txt
 streamlit run app.py
 ```
+
+## Adding a game
+
+The app builds its play-by-play straight from the Hudl exports when it starts, so there's no combined data file to maintain.
+
+1. Save the export as `<team>-vs-<opponent>-MMDDYY.xlsx` in `Dowling/` (our games) or `Scout/` (scout film). For our games, save the offense film next to it as `dowling-vs-<opponent>-offense.xlsx`.
+2. Add a row to `games.csv`: the file, the team and opponent as they should appear in the app, and the week. `drop_plays` / `drop_offense_plays` are optional PLAY #s to remove (space-separated); the rest get renumbered.
+3. Run `python build_data.py` to build every game and list anything that needs a look (repeated PLAY #s, drives that came out as "Error", film files not in `games.csv`).
+4. Commit and push. The app rebuilds whenever a film file or `games.csv` changes.
+
+The **Add a Game** page does steps 1–2 from the browser. For Tableau, `python build_data.py --excel` writes `curated-pbp.xlsx`.
 
 Run the tests with:
 

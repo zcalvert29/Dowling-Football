@@ -3,3 +3,6 @@ __pycache__/
 .pytest_cache/
 .streamlit/secrets.toml
 cfb_data/
+
+# Built from games.csv + the film folders by build_data.py (python build_data.py --excel, for Tableau)
+curated-pbp.xlsx
