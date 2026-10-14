@@ -318,12 +318,16 @@ def season_drives_page():
 
 def special_projects_offense():
     page_header("Special Projects: Offense", show_definitions=False, show_filters=False)
-    special_projects.render_first_play_study(df_all, "offense")
+    games = special_projects.select_weeks(df_all, "sp_weeks_offense")
+    special_projects.render_first_play_study(games, "offense")
+    st.divider()
+    special_projects.render_three_and_out_study(games)
 
 
 def special_projects_defense():
     page_header("Special Projects: Defense", show_definitions=False, show_filters=False)
-    special_projects.render_first_play_study(df_all, "defense")
+    games = special_projects.select_weeks(df_all, "sp_weeks_defense")
+    special_projects.render_first_play_study(games, "defense")
 
 
 def win_prob_fourth_downs():
