@@ -1359,11 +1359,35 @@ def _slug(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
 
 
+def _existing_game(team: str, opponent: str, game_day: _date):
+    """The games.csv entry for this team, opponent, and date (a re-upload), or None for a new game."""
+    import build_data
+
+    date_str = game_day.strftime("%Y_%m_%d")
+    for g in build_data.read_manifest():
+        try:
+            if (g.team, g.opponent.lower(), g.date) == (team, opponent.lower(), date_str):
+                return g
+        except ValueError:  # a games.csv row whose file name has no date
+            continue
+    return None
+
+
 def new_game_files(team: str, opponent: str, game_day: _date) -> tuple[str, str | None]:
-    """(game file, offense file or None) paths for a new game, following the games.csv naming rules."""
+    """(game file, offense file or None) paths for this game. A game already in games.csv keeps its file names,
+    so the new film replaces the old one; a new game gets names that follow the games.csv rules."""
+    g = _existing_game(team, opponent, game_day)
+    if g is not None:
+        return g.file, (build_data_offense_name(g.file) if team == TEAM else None)
     folder, who = ("Dowling", "dowling") if team == TEAM else ("Scout", _slug(team))
     base = f"{folder}/{who}-vs-{_slug(opponent)}"
     return f"{base}-{game_day:%m%d%y}.xlsx", (f"{base}-offense.xlsx" if team == TEAM else None)
+
+
+def build_data_offense_name(game_file: str) -> str:
+    import build_data
+
+    return build_data.DATE_IN_NAME.sub("-offense.xlsx", game_file)
 
 
 def process_new_game(film, offense_film, team: str, opponent: str, game_day: _date, week: int) -> pd.DataFrame:
@@ -1381,13 +1405,18 @@ def process_new_game(film, offense_film, team: str, opponent: str, game_day: _da
 
 
 def updated_manifest(game_file: str, team: str, opponent: str, week: int) -> bytes:
-    """games.csv with this game added (or its row replaced, if the file is already listed)."""
+    """games.csv with this game added, or its row updated in place if the game is already listed."""
     import build_data
 
     m = pd.read_csv(build_data.MANIFEST, dtype=str)
-    m = m[m["file"].str.strip() != game_file]
-    row = {c: "" for c in m.columns} | {"file": game_file, "team": team, "opponent": opponent, "week": str(week)}
-    return pd.concat([m, pd.DataFrame([row])], ignore_index=True).to_csv(index=False).encode()
+    row = {"file": game_file, "team": team, "opponent": opponent, "week": str(week)}
+    same = m["file"].str.strip() == game_file
+    if same.any():
+        for k, val in row.items():
+            m.loc[same, k] = val  # keeps that row's drop_plays / drop_offense_plays
+    else:
+        m = pd.concat([m, pd.DataFrame([{c: "" for c in m.columns} | row])], ignore_index=True)
+    return m.to_csv(index=False).encode()
 
 
 def _as_xlsx(f) -> bytes:
@@ -1451,16 +1480,22 @@ def render_add_game() -> None:
 
     qol.render_validation(new, "Possible tagging mistakes in this game")
 
+    existing = _existing_game(team, opponent, game_day)
     game_file, offense_file = new_game_files(team, opponent, game_day)
     st.markdown("**Add it to the app**")
+    if existing is not None:
+        st.info(f"This game is already in the app ({existing.file}). The downloads keep its file names, so the new "
+                "film replaces the old one.")
     d = st.columns(3)
+    # on_click="ignore": a download shouldn't rerun the page, or the other buttons would disappear
     d[0].download_button(f"Download {game_file.split('/')[-1]}", _as_xlsx(film), file_name=game_file.split("/")[-1],
-                         mime=xlsx, type="primary")
+                         mime=xlsx, type="primary", on_click="ignore")
     if offense_film is not None:
         d[1].download_button(f"Download {offense_file.split('/')[-1]}", _as_xlsx(offense_film),
-                             file_name=offense_file.split("/")[-1], mime=xlsx, type="primary")
+                             file_name=offense_file.split("/")[-1], mime=xlsx, type="primary", on_click="ignore")
     d[2].download_button("Download updated games.csv", updated_manifest(game_file, team, opponent, week),
-                         file_name="games.csv", mime="text/csv", type="primary")
+                         file_name="games.csv", mime="text/csv", type="primary", on_click="ignore")
     folder = game_file.split("/")[0]
-    st.caption(f"Next: put the film file{'s' if offense_film is not None else ''} in the `{folder}/` folder, replace "
-               "`games.csv` in the repo with the new one, push, then reboot the app.")
+    st.caption(f"Next: put the film file{'s' if offense_film is not None else ''} in the `{folder}/` folder"
+               f"{' (replacing the old one)' if existing is not None else ''}, replace `games.csv` in the repo with "
+               "the new one, and push. The app rebuilds its data from the new files on its own.")
