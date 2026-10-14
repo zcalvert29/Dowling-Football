@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+import build_data
 import fourth_down_core as fd
 import model_utils as mu
 
@@ -200,7 +201,7 @@ def test_conversion_lower_in_our_own_territory():
 
 def test_conversion_model_fit():
     import conversion_model as cm
-    m = cm.fit(pd.read_excel("curated-pbp.xlsx"))
+    m = cm.fit(build_data.load_games()[0])
     assert m.n_plays > 300
     assert (np.diff(m.prob(np.arange(1, 21))) < 0).all()
     assert m.c < 0                                       # harder to convert in our own territory
@@ -280,7 +281,7 @@ def test_review_matches_the_bot():
     import conversion_model as cm
     import insights as ins
     import visuals as v
-    df = v.load_data("curated-pbp.xlsx")
+    df = v.load_data()
     review = getattr(ins.fourth_down_review, "__wrapped__", ins.fourth_down_review)
     t = review(ins.dowling_only(df))
     conv = cm.fitted()
@@ -318,7 +319,7 @@ def test_bot_page_matches_review_on_waukee_4th_and_7():
     import insights as ins
     import visuals as v
     t = getattr(ins.fourth_down_review, "__wrapped__", ins.fourth_down_review)(
-        ins.dowling_only(v.load_data("curated-pbp.xlsx")))
+        ins.dowling_only(v.load_data()))
     row = t[t["game"].str.contains("Waukee") & (t["Situation"] == "4th & 7 at Waukee 34")]
     if row.empty:
         pytest.skip("Waukee game not in the data")

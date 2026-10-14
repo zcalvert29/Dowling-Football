@@ -13,6 +13,7 @@ use (visuals.load_data), so the sidebar filters apply where it makes sense.
 from __future__ import annotations
 
 import io
+import re
 from datetime import date as _date
 
 import altair as alt
@@ -1346,30 +1347,52 @@ def render_fourth_down_review(df: pd.DataFrame, team: str = TEAM) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Add a game: run the curation pipeline on a Hudl export and hand back the
-# updated curated-pbp.xlsx to commit
+# Add a game: check a Hudl export with the curation code, then hand back the
+# film file(s) named the way build_data.py expects plus the updated games.csv
 # ---------------------------------------------------------------------------
 def _read_upload(f) -> pd.DataFrame:
     name = f.name.lower()
     return pd.read_csv(f) if name.endswith(".csv") else pd.read_excel(f)
 
 
-def process_new_game(existing_path: str, film, offense_film, opponent: str, game_day: _date, week: int):
-    """Returns (combined_df, new_game_df, game_id)."""
+def _slug(name: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+
+
+def new_game_files(team: str, opponent: str, game_day: _date) -> tuple[str, str | None]:
+    """(game file, offense file or None) paths for a new game, following the games.csv naming rules."""
+    folder, who = ("Dowling", "dowling") if team == TEAM else ("Scout", _slug(team))
+    base = f"{folder}/{who}-vs-{_slug(opponent)}"
+    return f"{base}-{game_day:%m%d%y}.xlsx", (f"{base}-offense.xlsx" if team == TEAM else None)
+
+
+def process_new_game(film, offense_film, team: str, opponent: str, game_day: _date, week: int) -> pd.DataFrame:
+    """The new game, curated the same way build_data.py will curate it once it's in games.csv."""
     import curate_pbp as cp
 
     date_str = game_day.strftime("%Y_%m_%d")
     plays = _read_upload(film)
-    new = cp.curate_play_by_play_data(plays=plays, team=TEAM, opponent=opponent, date=date_str, week=week)
-    if offense_film is not None:
-        off = cp.curate_play_by_play_data(plays=_read_upload(offense_film), team=TEAM, opponent=opponent,
-                                          date=date_str, week=week)
+    new = cp.curate_play_by_play_data(plays=plays, team=team, opponent=opponent, date=date_str, week=week)
+    if team == TEAM:
+        off = _read_upload(offense_film) if offense_film is not None else plays
+        off = cp.curate_play_by_play_data(plays=off, team=team, opponent=opponent, date=date_str, week=week)
         new = cp.add_dowling_offense_plays(new, off)
-    gid = new["game_id"].iat[0]
-    existing = pd.read_excel(existing_path)
-    existing = existing[existing["game_id"] != gid]  # re-uploading a game replaces it
-    combined = pd.concat([existing, new], ignore_index=True, sort=False)
-    return combined, new, gid
+    return new
+
+
+def updated_manifest(game_file: str, team: str, opponent: str, week: int) -> bytes:
+    """games.csv with this game added (or its row replaced, if the file is already listed)."""
+    import build_data
+
+    m = pd.read_csv(build_data.MANIFEST, dtype=str)
+    m = m[m["file"].str.strip() != game_file]
+    row = {c: "" for c in m.columns} | {"file": game_file, "team": team, "opponent": opponent, "week": str(week)}
+    return pd.concat([m, pd.DataFrame([row])], ignore_index=True).to_csv(index=False).encode()
+
+
+def _as_xlsx(f) -> bytes:
+    """The upload as .xlsx bytes (the build only reads .xlsx)."""
+    return f.getvalue() if f.name.lower().endswith(".xlsx") else to_xlsx_bytes(_read_upload(f))
 
 
 def to_xlsx_bytes(df: pd.DataFrame) -> bytes:
@@ -1379,33 +1402,42 @@ def to_xlsx_bytes(df: pd.DataFrame) -> bytes:
     return buf.getvalue()
 
 
-def render_add_game(existing_path: str) -> None:
+def render_add_game() -> None:
     st.markdown(
-        "Upload a game's Hudl export to run it through the same curation code (`curate_pbp.py`) and get back an "
-        "updated `curated-pbp.xlsx`. Nothing on the live app changes until you commit that file to GitHub and "
-        "reboot the app. Re-uploading a game that's already in the data replaces it."
+        "Upload a game's Hudl export to check it with the same curation code the app uses (`curate_pbp.py`). "
+        "You'll get the film file named the way the app expects and an updated `games.csv`. The app builds "
+        "its data from those files when it starts, so nothing changes on the live app until you add them to "
+        "the GitHub repo and push."
     )
-    c1, c2, c3 = st.columns(3)
-    opponent = c1.text_input("Opponent (as it should appear in the app)", key="add_opp")
+    xlsx = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    c0, c1, c2, c3 = st.columns(4)
+    team = c0.text_input("Team on film", TEAM, key="add_team").strip()
+    opponent = c1.text_input("Opponent (as it should appear in the app)", key="add_opp").strip()
     game_day = c2.date_input("Game date", key="add_date")
-    week = c3.number_input("Week", 1, 20, 1, key="add_week")
+    week = int(c3.number_input("Week", 1, 20, 1, key="add_week"))
     film = st.file_uploader("Game film export (.xlsx or .csv)", type=["xlsx", "xls", "csv"], key="add_film")
-    offense_film = st.file_uploader("Dowling offense film export (optional, fills OFF FORM / OFF PLAY for our "
-                                    "offense)", type=["xlsx", "xls", "csv"], key="add_off_film")
-    if not st.button("Process game", type="primary", disabled=not (film and opponent.strip())):
-        if not opponent.strip() or not film:
-            st.caption("Add an opponent name and the film export to continue.")
+    offense_film = None
+    if team == TEAM:
+        offense_film = st.file_uploader("Dowling offense film export (optional, fills OFF FORM / OFF PLAY for our "
+                                        "offense)", type=["xlsx", "xls", "csv"], key="add_off_film")
+    if not st.button("Process game", type="primary", disabled=not (film and opponent and team)):
+        if not (opponent and team and film):
+            st.caption("Add the team, an opponent name, and the film export to continue.")
         return
     try:
-        combined, new, gid = process_new_game(existing_path, film, offense_film, opponent.strip(), game_day,
-                                              int(week))
+        new = process_new_game(film, offense_film, team, opponent, game_day, week)
     except Exception as e:  # noqa: BLE001 — show the coach what went wrong instead of a stack trace
         st.error(f"Couldn't process that file: {e}")
         return
+    gid = new["game_id"].iat[0]
     errors = int((new["drive_result"] == "Error").sum() + (new["SERIES_RESULT"] == "Error").sum())
     last = new.iloc[-1]
-    st.success(f"Processed {gid}: {len(new)} plays, final {TEAM} {int(last['team_score'])}, "
+    st.success(f"Processed {gid}: {len(new)} plays, final {team} {int(last['team_score'])}, "
                f"{opponent} {int(last['opponent_score'])}.")
+    dup = int(new["PLAY #"].duplicated().sum())
+    if dup:
+        st.warning(f"{dup} PLAY # value(s) appear more than once. Is more than one game or cut-up in this file? "
+                   "Fix that in Hudl before adding it.")
     if errors:
         st.warning(f"{errors} rows came out as 'Error' in drive_result/SERIES_RESULT. Check the tagging before "
                    "committing.")
@@ -1414,6 +1446,17 @@ def render_add_game(existing_path: str) -> None:
     import qol  # local import: qol imports this module
 
     qol.render_validation(new, "Possible tagging mistakes in this game")
-    st.download_button("Download updated curated-pbp.xlsx", to_xlsx_bytes(combined), file_name="curated-pbp.xlsx",
-                       mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", type="primary")
-    st.caption("Next: replace curated-pbp.xlsx in the GitHub repo with this file, push, then reboot the app.")
+
+    game_file, offense_file = new_game_files(team, opponent, game_day)
+    st.markdown("**Add it to the app**")
+    d = st.columns(3)
+    d[0].download_button(f"Download {game_file.split('/')[-1]}", _as_xlsx(film), file_name=game_file.split("/")[-1],
+                         mime=xlsx, type="primary")
+    if offense_film is not None:
+        d[1].download_button(f"Download {offense_file.split('/')[-1]}", _as_xlsx(offense_film),
+                             file_name=offense_file.split("/")[-1], mime=xlsx, type="primary")
+    d[2].download_button("Download updated games.csv", updated_manifest(game_file, team, opponent, week),
+                         file_name="games.csv", mime="text/csv", type="primary")
+    folder = game_file.split("/")[0]
+    st.caption(f"Next: put the film file{'s' if offense_film is not None else ''} in the `{folder}/` folder, replace "
+               "`games.csv` in the repo with the new one, push, then reboot the app.")

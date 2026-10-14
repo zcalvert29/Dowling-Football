@@ -26,11 +26,10 @@ The model here starts from that curve and lets the film correct it:
   from average. A team we've never seen gets 0 (league average).
 
 Fit on every 3rd and 4th down run or pass at 10 yards or less in
-curated-pbp.xlsx (both are "move the chains or else" downs; 3rd & long is
+this season's games (build_data.py; both are "move the chains or else" downs; 3rd & long is
 left out because offenses often aren't trying to convert). Refit whenever
 games are added.
 """
-import os
 from dataclasses import dataclass, field
 from functools import lru_cache
 
@@ -129,21 +128,20 @@ def calibration_table(pbp: pd.DataFrame, model: ConversionModel, by="distance") 
         original_curve=("college_curve", "mean"), high_school_curve=("model", "mean")).reset_index()
 
 
-DATA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "curated-pbp.xlsx")
-
-
 @lru_cache(maxsize=4)
-def _fit_cached(path, mtime):
+def _fit_cached(stamp):
+    import build_data
     try:
-        return fit(pd.read_excel(path))
+        return fit(build_data.load_games()[0])
     except Exception:
         return ConversionModel()
 
 
-def fitted(path=DATA_PATH) -> ConversionModel:
-    """The model fit to the data file, refit automatically when the file changes.
+def fitted() -> ConversionModel:
+    """The model fit to this season's games, refit automatically when a game file or games.csv changes.
     The 4th Down Bot and the 4th-down review both use this, so they agree."""
+    import build_data
     try:
-        return _fit_cached(path, os.path.getmtime(path))
+        return _fit_cached(build_data.fingerprint())
     except OSError:
         return ConversionModel()

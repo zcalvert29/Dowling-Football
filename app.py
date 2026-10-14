@@ -11,25 +11,25 @@ Folder layout (everything sits next to this file):
     profiles.py         team profile radar charts benchmarked against FBS
     build_cfb_benchmarks.py  builds cfb_benchmarks.csv from cfbfastR play-by-play (run locally)
     cfb_benchmarks.csv  FBS team-by-team metric table the radar charts compare against
-    curate_pbp.py       curation pipeline (used by the "Add a game" page)
+    curate_pbp.py       curation pipeline: turns one game's Hudl export into the app's columns
+    build_data.py       builds the season from games.csv + the Dowling/ and Scout/ film files when the app starts
+    games.csv           one row per game: film file, team, opponent, week
     fourth_down_core.py 4th Down Bot decision math (shared with the 4th-down review)
     Fourth_Downs.py     4th Down Bot page
     Go_for_2.py         Go for 2 Bot page
     model_utils.py      EP/WP model loading used by the bots and win probability
-    curated-pbp.xlsx    play-by-play data
     *.json              trained model files (optional)
 """
 import streamlit as st
 
 import breakdowns as bd
+import build_data
 import insights as ins
 import profiles
 import qol
 import special_projects
 import special_teams
 import visuals as v
-
-DATA_PATH = "curated-pbp.xlsx"
 
 st.set_page_config(page_title="Dowling Scouting Dashboard", layout="wide")
 
@@ -386,7 +386,7 @@ def tagging_coverage():
 
 def add_game():
     page_header("Add a Game", show_definitions=False, show_filters=False)
-    ins.render_add_game(DATA_PATH)
+    ins.render_add_game()
 
 
 HOME_PAGE = st.Page(home, title="Home", icon=":material/home:", url_path="home", default=True)
@@ -592,8 +592,13 @@ def _reset_filters():
     st.session_state["f_minplays"] = 1
 
 
-df_all = st.cache_data(ins.add_game_state, show_spinner=False)(v.load_data(DATA_PATH))
+df_all = st.cache_data(ins.add_game_state, show_spinner=False)(v.load_data())
 st.sidebar.caption(ins.last_updated_text(df_all))
+_data_problems = build_data.load_games()[1]
+if _data_problems:
+    with st.sidebar.expander(f"⚠️ {len(_data_problems)} data issue{'s' if len(_data_problems) != 1 else ''}"):
+        for _p in _data_problems:
+            st.caption(_p)
 OPPONENTS = sorted(o for o in df_all["offense"].dropna().unique() if o != v.TEAM)
 if st.session_state.get("f_opp") not in OPPONENTS:
     # Default opponent: next_opponent from the app's secrets (set weekly), else SEP, else the first one.

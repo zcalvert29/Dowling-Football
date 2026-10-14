@@ -2,6 +2,7 @@
 import pandas as pd
 import pytest
 
+import build_data
 import pass_chart as pc
 
 GAME = "Dowling Catholic_Johnston_2026_09_04"
@@ -9,7 +10,7 @@ GAME = "Dowling Catholic_Johnston_2026_09_04"
 
 @pytest.fixture(scope="module")
 def game():
-    d = pd.read_excel("curated-pbp.xlsx")
+    d = build_data.load_games()[0]
     return d[d["game_id"] == GAME]
 
 

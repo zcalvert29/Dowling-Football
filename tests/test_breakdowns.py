@@ -4,13 +4,14 @@ import pandas as pd
 import pytest
 
 import breakdowns as bd
+import build_data
 import insights as ins
 import visuals as v
 
 
 @pytest.fixture(scope="module")
 def df():
-    return v.load_data("curated-pbp.xlsx")
+    return v.load_data()
 
 
 def test_tree_levels_add_up(df):
@@ -83,7 +84,7 @@ def test_defensive_td_ends_the_drive(df):
 
 
 def test_drive_fix_leaves_other_games_alone():
-    raw = pd.read_excel("curated-pbp.xlsx")
+    raw = build_data.load_games()[0]
     import curate_pbp
     for gid, g in raw.groupby("game_id"):
         if g["RESULT"].astype(str).str.contains("Def TD").any():

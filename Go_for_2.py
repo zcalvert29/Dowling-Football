@@ -20,6 +20,7 @@ All timing cutoffs live in the TIMING section below so they're easy to tune.
 
 import streamlit as st
 
+import build_data
 import fourth_down_core as fd
 import qol
 
@@ -38,20 +39,21 @@ st.title("🎯 Go for 2 Bot")
 st.caption("Extra point vs. two-point try, based on ESPN's score-and-time cheat sheet.")
 
 @st.cache_data(show_spinner=False)
-def dowling_pat_record(path: str = "curated-pbp.xlsx") -> tuple[int, int]:
-    """(made, attempted) Dowling extra points this season. Penalties don't count as attempts."""
-    import pandas as pd
-
+def dowling_pat_record(stamp: tuple) -> tuple[int, int]:
+    """(made, attempted) Dowling extra points this season. Penalties don't count as attempts. stamp =
+    build_data.fingerprint(), so the record refreshes when a game is added."""
     try:
-        df = pd.read_excel(path, usecols=["offense", "PLAY TYPE", "RESULT"])
+        df = build_data.load_games()[0]
     except Exception:
+        return 0, 0
+    if df.empty:
         return 0, 0
     xp = df[(df["offense"] == "Dowling Catholic") & df["PLAY TYPE"].isin(["Extra Pt.", "Extra Pt. Block"])
             & (df["RESULT"] != "Penalty")]
     return int((xp["RESULT"] == "Good").sum()), len(xp)
 
 
-_made, _att = dowling_pat_record()
+_made, _att = dowling_pat_record(build_data.fingerprint())
 # Default PAT rate: Dowling's season rate, shrunk toward a 90% prior (worth
 # 10 kicks) so a perfect 4-for-4 start doesn't read as a 100% kicker.
 _pat_default = int(round(100 * (_made + 9) / (_att + 10)))

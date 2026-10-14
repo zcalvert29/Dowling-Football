@@ -62,16 +62,17 @@ AIR_YARDS_ORDER = ["Short", "Medium", "Long"]
 # ---------------------------------------------------------------------------
 # Data
 # ---------------------------------------------------------------------------
-@st.cache_data
-def load_data(path: str) -> pd.DataFrame:
-    df = pd.read_excel(path)
+def load_data() -> pd.DataFrame:
+    """Every game in games.csv, curated from the film files (build_data.py), plus the app's derived columns.
+    Rebuilt automatically when a film file, games.csv, or curate_pbp.py changes."""
+    import build_data
+    return _prepare(build_data.fingerprint())
 
-    # Re-derive drives with the current rules, so games curated before a fix pick it up without re-curating
-    # (e.g. a possession after a defensive touchdown used to merge into the drive that ended in the score).
-    import curate_pbp
-    if {"game_id", "PLAY #", "drive", "turnover", "success"} <= set(df.columns):
-        df = pd.concat([curate_pbp.assign_drives(g.sort_values("PLAY #", kind="stable"))
-                        for _, g in df.groupby("game_id", sort=False)]).sort_index()
+
+@st.cache_data(show_spinner="Building the play-by-play from the game files…")
+def _prepare(stamp: tuple) -> pd.DataFrame:  # stamp: build_data.fingerprint(), so new film rebuilds the cache
+    import build_data
+    df, _ = build_data.load_games()
 
     # Tableau calc: Distance
     dist = df["DIST"]
@@ -100,17 +101,10 @@ def load_data(path: str) -> pd.DataFrame:
         num = pd.to_numeric(df[col], errors="coerce")
         bad = df[col].notna() & num.isna()
         if bad.any():
-            st.warning(f"{int(bad.sum())} row(s) in {path} have a non-number in {col} "
+            st.warning(f"{int(bad.sum())} row(s) in the game files have a non-number in {col} "
                        f"({', '.join(sorted(df.loc[bad, col].astype(str).unique()))}); those cells are treated as blank.")
         df[col] = num.round().astype("Int64")
 
-    # Older curated files won't have 'completion' yet; derive it the same
-    # way curate_pbp.py does so the pass-zone visuals still work.
-    if "completion" not in df.columns:
-        res = df["RESULT"].fillna("")
-        df["completion"] = np.select(
-            [res.str.contains("Incomplete|Interception"), res.str.contains("Complete")], [0, 1], default=np.nan
-        )
     return df
 
 

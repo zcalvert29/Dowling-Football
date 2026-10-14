@@ -1,8 +1,5 @@
-import os
-from typing import Optional
 import numpy as np
 import pandas as pd
-from openpyxl import load_workbook
 import re
 
 
@@ -609,10 +606,8 @@ def _drive_numbers(df: pd.DataFrame) -> pd.Series:
 
 def assign_drives(game: pd.DataFrame) -> pd.DataFrame:
     """
-    Recompute drive, YDS_NET, and drive_result for ONE already-curated game, in play order. The app runs this
-    when it loads curated-pbp.xlsx, so games curated before the defensive-touchdown fix are corrected without
-    re-curating them. Needs the columns curation produces (offense, QTR, PLAY TYPE, RESULT, DN, success,
-    turnover, GN/LS).
+    Recompute drive, YDS_NET, and drive_result for ONE already-curated game, in play order. Needs the columns
+    curation produces (offense, QTR, PLAY TYPE, RESULT, DN, success, turnover, GN/LS).
     """
     df = game.reset_index(drop=True).copy()
     df["drive"] = _drive_numbers(df)
@@ -857,7 +852,7 @@ def add_play_detail_columns(df: pd.DataFrame, team: str, opponent: str, date: st
         last_idx = plays.groupby(key).tail(1).index
         return df[key].map({df.at[i, key]: fn(i) for i in last_idx})
 
-    # Same rules as assign_drives (one copy, so curation and the app's load-time fix can't drift apart).
+    # Same rules as assign_drives (one copy of the drive rules).
     df["drive_result"] = assign_drives(df)["drive_result"]
     df["SERIES_RESULT"] = _broadcast("SERIES", last_play_series_result)
     df["SERIES_SUCCESS"] = np.where(
@@ -885,6 +880,8 @@ def add_dowling_offense_plays(plays: pd.DataFrame, offense_plays: pd.DataFrame) 
     is_dowling = df["offense"] == "Dowling Catholic"
     play_nums = df.loc[is_dowling, "PLAY #"]
 
+    # object first: an all-blank column reads in as numbers, and newer pandas won't put text into it
+    df[["OFF FORM", "OFF PLAY"]] = df[["OFF FORM", "OFF PLAY"]].astype(object)
     df.loc[is_dowling, "OFF FORM"] = play_nums.map(lookup["OFF FORM"])
     df.loc[is_dowling, "OFF PLAY"] = play_nums.map(lookup["OFF PLAY"])
 
@@ -914,52 +911,3 @@ def curate_play_by_play_data(plays: pd.DataFrame, team: str, opponent: str, date
     plays = calculate_ep_epa(df=plays)
     plays = add_play_detail_columns(df=plays, team=team, opponent=opponent, date=date, week=week)
     return plays
-
-
-def curate_pbp_write_to_excel(
-    plays: pd.DataFrame,
-    team: str,
-    opponent: str,
-    date: str,
-    week,
-    dowling_film: bool = False,
-    offense_plays: Optional[pd.DataFrame] = None,
-):
-    """
-    Curate a game's play-by-play data and write it to curated-pbp.xlsx,
-    appending to "Sheet1" if the file already exists, or creating it
-    (with a header row) if it doesn't.
-    """
-    plays = curate_play_by_play_data(
-        plays=plays, team=team, opponent=opponent, date=date, week=week
-    )
-
-    if dowling_film:
-        offense_plays = curate_play_by_play_data(
-            plays=offense_plays, team=team, opponent=opponent, date=date, week=week
-        )
-        plays = add_dowling_offense_plays(plays, offense_plays)
-
-    file_path = "curated-pbp.xlsx"
-    sheet_name = "Sheet1"
-
-    if not os.path.exists(file_path):
-        # File doesn't exist yet: create it fresh, with a header row.
-        with pd.ExcelWriter(file_path, engine="openpyxl", mode="w") as writer:
-            plays.to_excel(writer, sheet_name=sheet_name, index=False, header=True)
-        print("Data written successfully!")
-        return
-
-    # File exists: find where to append, and whether a header is needed
-    # (only if the sheet is otherwise empty).
-    wb = load_workbook(file_path)
-    start_row = wb[sheet_name].max_row if sheet_name in wb.sheetnames else 0
-    wb.close()
-
-    header = start_row == 0
-
-    with pd.ExcelWriter(file_path, engine="openpyxl", mode="a", if_sheet_exists="overlay") as writer:
-        plays.to_excel(
-            writer, sheet_name=sheet_name, startrow=start_row, index=False, header=header
-        )
-    print("Data written successfully!")
