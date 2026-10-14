@@ -27,13 +27,13 @@ def _manifest(*args) -> pd.DataFrame:
 
 def test_manifest_update_replaces_in_place():
     before = pd.read_csv("games.csv", dtype=str)
-    m = _manifest("Dowling/dowling-vs-valley-082826.xlsx", "Dowling Catholic", "Valley", 1)
+    m = _manifest("Dowling/dowling-vs-valley-082826.xlsx", "Dowling Catholic", "Valley", 2026)
     assert len(m) == len(before)
-    assert m.iloc[0].tolist() == ["Dowling/dowling-vs-valley-082826.xlsx", "Dowling Catholic", "Valley", "1", "82", "57"]
+    assert m.iloc[0].tolist() == ["Dowling/dowling-vs-valley-082826.xlsx", "Dowling Catholic", "Valley", "2026", "82", "57"]
 
 
 def test_manifest_adds_new_game():
     before = pd.read_csv("games.csv", dtype=str)
-    m = _manifest("Dowling/dowling-vs-ankeny-101626.xlsx", "Dowling Catholic", "Ankeny", 8)
+    m = _manifest("Dowling/dowling-vs-ankeny-101626.xlsx", "Dowling Catholic", "Ankeny", 2026)
     assert len(m) == len(before) + 1
-    assert m.iloc[-1].tolist() == ["Dowling/dowling-vs-ankeny-101626.xlsx", "Dowling Catholic", "Ankeny", "8", "", ""]
+    assert m.iloc[-1].tolist() == ["Dowling/dowling-vs-ankeny-101626.xlsx", "Dowling Catholic", "Ankeny", "2026", "", ""]

@@ -24,7 +24,8 @@ A multipage Streamlit app built on Dowling's tagged play-by-play data.
 | **Win Probability & 4th-Down Review** | WP charts by game and a postgame review of every 4th-down decision against the bot's recommendation |
 | **Scouting Report & Matchup** | Printable opponent report and side-by-side matchup view |
 | **Play Finder & Sideline Mode** | Fast filtering for specific situations and a phone-friendly view for game day |
-| **Add a Game** | Upload a new film-tagging export to check its tagging; get back the film file named for the repo and an updated `games.csv` |
+| **Add a Game** | Upload a new film-tagging export, check its tagging, and save it to the app for everyone |
+| **Good Teams Filter** | Pick which teams count as good; the sidebar's Good Teams filter then shows only games against good teams (or only the rest) |
 
 Coach notes can optionally be saved to a Google Sheet, and the app can be password-protected (see [Configuration](#configuration)).
 
@@ -59,7 +60,8 @@ special_teams.py        Special teams page
 github_sync.py          Saves Add a Game uploads to the GitHub repo in one commit
 curate_pbp.py           Play-by-play curation: turns one game's Hudl export into the app's columns
 build_data.py           Builds the season from games.csv + the film folders (the app runs it at startup)
-games.csv               One row per game: film file, team, opponent, week
+games.csv               One row per game: film file, team, opponent, season
+good_teams.py           Good Teams filter; the list of good teams is good_teams.csv
 Dowling/, Scout/        Hudl exports: our games (plus -offense files) and scout film
 fourth_down_core.py     4th Down Bot decision math (no Streamlit code)
 Fourth_Downs.py         4th Down Bot page
@@ -89,7 +91,7 @@ streamlit run app.py
 The app builds its play-by-play straight from the Hudl exports when it starts, so there's no combined data file to maintain.
 
 1. Save the export as `<team>-vs-<opponent>-MMDDYY.xlsx` in `Dowling/` (our games) or `Scout/` (scout film). For our games, save the offense film next to it as `dowling-vs-<opponent>-offense.xlsx`.
-2. Add a row to `games.csv`: the file, the team and opponent as they should appear in the app, and the week. `drop_plays` / `drop_offense_plays` are optional PLAY #s to remove (space-separated); the rest get renumbered.
+2. Add a row to `games.csv`: the file, the team and opponent as they should appear in the app, and the season. The week comes from the game date: Week 1 is the season's first Friday (8/28/26 for 2026, set in `SEASON_WEEK1` in `build_data.py`), each Friday after is the next week, through Week 13. `drop_plays` / `drop_offense_plays` are optional PLAY #s to remove (space-separated); the rest get renumbered.
 3. Run `python build_data.py` to build every game and list anything that needs a look (repeated PLAY #s, drives that came out as "Error", film files not in `games.csv`).
 4. Commit and push. The app rebuilds whenever a film file or `games.csv` changes.
 

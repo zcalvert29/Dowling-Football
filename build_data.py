@@ -5,14 +5,14 @@ The app calls load_games() when it starts, so there's no combined data file to k
 Adding a game:
     1. Save the Hudl export as  <team>-vs-<opponent>-MMDDYY.xlsx  in Dowling/ (our games) or Scout/ (scout film).
        For our games, save the offense film as  dowling-vs-<opponent>-offense.xlsx  next to it.
-    2. Add a row to games.csv (team and opponent as they should appear in the app, and the week).
+    2. Add a row to games.csv (team and opponent as they should appear in the app, and the season).
     3. Run  python build_data.py  to check it, then commit and push.
 
 games.csv columns:
     file                path to the game export, e.g. Dowling/dowling-vs-valley-082826.xlsx (the date comes from
                         the MMDDYY at the end of the name)
     team, opponent      the filming team and who they played
-    week                week of the season
+    season              the season (e.g. 2026); the week comes from the game date (see week_of)
     drop_plays          optional: PLAY #s to remove from the game file (space-separated); the rest are renumbered
     drop_offense_plays  optional: the same for the offense file
 
@@ -26,6 +26,7 @@ import os
 import re
 import sys
 from dataclasses import dataclass
+from datetime import date, timedelta
 from functools import lru_cache
 
 import pandas as pd
@@ -38,24 +39,57 @@ FILM_FOLDERS = ("Dowling", "Scout")
 TEAM = "Dowling Catholic"
 DATE_IN_NAME = re.compile(r"-(\d{2})(\d{2})(\d{2})\.xlsx$", re.IGNORECASE)
 
+# Week 1 of each season, a Friday; each Friday after that is the next week, through LAST_WEEK. A season that isn't
+# listed starts on the last Friday of August (2026's does too). Add a season here if its Week 1 is different.
+SEASON_WEEK1 = {2026: date(2026, 8, 28)}
+LAST_WEEK = 13
+
+
+def week1(season: int) -> date:
+    if season in SEASON_WEEK1:
+        return SEASON_WEEK1[season]
+    d = date(season, 8, 31)
+    return d - timedelta(days=(d.weekday() - 4) % 7)  # last Friday of August
+
+
+def week_of(game_day: date, season: int) -> int:
+    """Week of the season for a game on game_day: Week 1 is the season's first Friday, Week 2 the next Friday, and
+    so on through LAST_WEEK. A Thursday or Saturday game counts toward the nearest Friday."""
+    first = week1(season)
+    week = round((game_day - first).days / 7) + 1
+    if not 1 <= week <= LAST_WEEK:
+        last = first + timedelta(weeks=LAST_WEEK - 1)
+        raise ValueError(f"{game_day:%m/%d/%Y} isn't in the {season} season (Week 1 is {first:%m/%d/%Y}, "
+                         f"Week {LAST_WEEK} is {last:%m/%d/%Y}). Check the date and season.")
+    return week
+
 
 @dataclass(frozen=True)
 class Game:
     file: str
     team: str
     opponent: str
-    week: int
+    season: int
     drop_plays: tuple[int, ...] = ()
     drop_offense_plays: tuple[int, ...] = ()
 
     @property
-    def date(self) -> str:
-        """'2026_08_28' from the MMDDYY at the end of the file name."""
+    def game_day(self) -> date:
+        """From the MMDDYY at the end of the file name."""
         m = DATE_IN_NAME.search(self.file)
         if not m:
             raise ValueError(f"{self.file}: the file name should end in -MMDDYY.xlsx (e.g. -082826.xlsx)")
         mm, dd, yy = m.groups()
-        return f"20{yy}_{mm}_{dd}"
+        return date(2000 + int(yy), int(mm), int(dd))
+
+    @property
+    def date(self) -> str:
+        """'2026_08_28', the form game_ids use."""
+        return f"{self.game_day:%Y_%m_%d}"
+
+    @property
+    def week(self) -> int:
+        return week_of(self.game_day, self.season)
 
     @property
     def offense_file(self) -> str | None:
@@ -79,7 +113,7 @@ def read_manifest(path: str = MANIFEST) -> list[Game]:
     m = pd.read_csv(path, dtype=str).fillna("")
     m.columns = m.columns.str.strip()
     return [Game(file=r["file"].strip(), team=r["team"].strip(), opponent=r["opponent"].strip(),
-                 week=int(r["week"]), drop_plays=_play_list(r.get("drop_plays") or None),
+                 season=int(r["season"]), drop_plays=_play_list(r.get("drop_plays") or None),
                  drop_offense_plays=_play_list(r.get("drop_offense_plays") or None))
             for _, r in m.iterrows() if r["file"].strip()]
 
@@ -166,6 +200,7 @@ def curate_game(g: Game) -> tuple[pd.DataFrame, list[str]]:
         off = cp.curate_play_by_play_data(plays=off_raw, team=g.team, opponent=g.opponent, date=g.date,
                                           week=g.week)
         df = cp.add_dowling_offense_plays(df, off)
+    df["SEASON"] = g.season
     problems += _error_drive_notes(g.file, df, pd.read_excel(_path(g.file)))
     return df, problems
 
@@ -238,7 +273,7 @@ def main(argv: list[str]) -> int:
     if plays.empty:
         print("No games built.")
     else:
-        summary = plays.groupby("game_id", sort=False).agg(week=("WEEK", "first"), plays=("PLAY #", "size"))
+        summary = plays.groupby("game_id", sort=False).agg(season=("SEASON", "first"), week=("WEEK", "first"), plays=("PLAY #", "size"))
         print(summary.to_string())
         print(f"\n{len(summary)} games, {len(plays):,} plays.")
     if problems:

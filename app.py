@@ -13,7 +13,8 @@ Folder layout (everything sits next to this file):
     cfb_benchmarks.csv  FBS team-by-team metric table the radar charts compare against
     curate_pbp.py       curation pipeline: turns one game's Hudl export into the app's columns
     build_data.py       builds the season from games.csv + the Dowling/ and Scout/ film files when the app starts
-    games.csv           one row per game: film file, team, opponent, week
+    games.csv           one row per game: film file, team, opponent, season (the week comes from the date)
+    good_teams.py       the Good Teams filter and its page; the list is in good_teams.csv
     fourth_down_core.py 4th Down Bot decision math (shared with the 4th-down review)
     Fourth_Downs.py     4th Down Bot page
     Go_for_2.py         Go for 2 Bot page
@@ -24,6 +25,7 @@ import streamlit as st
 
 import breakdowns as bd
 import build_data
+import good_teams
 import insights as ins
 import profiles
 import qol
@@ -146,9 +148,17 @@ def dchs_d_red_zone():
                        key="rz_d")
 
 
+def _game_filters(d):
+    """The sidebar filters that pick whole games: Season and Good Teams."""
+    if set(sel_seasons) != set(ALL_SEASONS):
+        d = d[d["SEASON"].isin(sel_seasons)]
+    return good_teams.apply(d, good_mode, focus_teams())
+
+
 def _week_games():
-    """Whole games from the selected weeks: for anything that needs full drives or the previous snap."""
-    return df_all[df_all["WEEK"].isin(sel_weeks)]
+    """Whole games from the selected seasons, weeks, and Good Teams choice: for anything that needs full drives or
+    the previous snap."""
+    return _game_filters(df_all[df_all["WEEK"].isin(sel_weeks)])
 
 
 # ---- Pages: DCHS defense -----------------------------------------------------
@@ -232,8 +242,8 @@ def matchup():
 def team_profiles():
     page_header("Team Profiles", show_definitions=False)
     # Offense/defense axes follow every sidebar filter; special teams and
-    # drives need whole games, so they only follow the Week filter.
-    profiles.render_profiles_page(df, df_all[df_all["WEEK"].isin(sel_weeks)], opponent)
+    # drives need whole games, so they only follow the game-level filters (season, week, good teams).
+    profiles.render_profiles_page(df, _week_games(), opponent)
 
 
 def scouting_report():
@@ -351,8 +361,8 @@ def win_prob_fourth_downs():
 # ---- Pages: special teams -------------------------------------------------------
 def special_teams_page():
     page_header("Special Teams", show_definitions=False)
-    st.caption("Special teams use whole games, so only the Week filter applies here.")
-    special_teams.render_special_teams_page(df_all[df_all["WEEK"].isin(sel_weeks)])
+    st.caption("Special teams use whole games, so only the Season, Week, and Good Teams filters apply here.")
+    special_teams.render_special_teams_page(_week_games())
 
 
 # ---- Pages: home and tools -------------------------------------------------------
@@ -387,6 +397,11 @@ def tagging_coverage():
 def add_game():
     page_header("Add a Game", show_definitions=False, show_filters=False)
     ins.render_add_game()
+
+
+def good_teams_page():
+    page_header("Good Teams Filter", show_definitions=False, show_filters=False)
+    good_teams.render_page(df_all)
 
 
 HOME_PAGE = st.Page(home, title="Home", icon=":material/home:", url_path="home", default=True)
@@ -437,6 +452,7 @@ OTHER_PAGES = {
     "Data": [
         st.Page(tagging_coverage, title="Tagging Coverage", url_path="tagging-coverage"),
         st.Page(add_game, title="Add a Game", url_path="add-a-game"),
+        st.Page(good_teams_page, title="Good Teams Filter", url_path="good-teams"),
     ],
 }
 # Kept under its old name for anything that still refers to it.
@@ -474,12 +490,12 @@ if not st.session_state.get("_landed"):
 
 
 # ---- Sidebar filters (only drawn on the DCHS and Scouting pages) --------------
-def dropdown_multiselect(label, options, key, fmt=str):
+def dropdown_multiselect(label, options, key, fmt=str, default=None):
     """Compact dropdown: a button that opens a checklist, with a one-line summary.
-    Everything is checked by default."""
+    Everything is checked by default (or just `default`, if given)."""
     keys = {o: f"{key}_{o}" for o in options}
-    for k in keys.values():
-        st.session_state.setdefault(k, True)
+    for o, k in keys.items():
+        st.session_state.setdefault(k, default is None or o in default)
 
     def set_all(value):
         for k in keys.values():
@@ -511,12 +527,15 @@ def _summary(selected, options, fmt=str, all_text="All"):
 def active_filter_chips() -> list[str]:
     week_labels = v.week_labels(df_all)
     chips = [
+        _summary(sel_seasons, ALL_SEASONS, str, "All seasons" if len(ALL_SEASONS) > 1 else str(ALL_SEASONS[0])),
         _summary(sel_weeks, ALL_WEEKS, lambda w: week_labels.get(w, f"W{w}").split(" ")[0], "All weeks"),
         _summary(sel_downs, ALL_DOWNS, lambda d: {1: "1st", 2: "2nd", 3: "3rd", 4: "4th"}[d], "All downs"),
         _summary(sel_dist, v.DISTANCE_ORDER, lambda s: s.split(" (")[0], "All distances"),
     ]
     if situation != "All plays":
         chips.append(situation)
+    if good_mode != good_teams.ALL:
+        chips.append(good_mode.replace(" only", "") if good_mode == good_teams.OTHER else "Vs good teams")
     if min_plays > 1:
         chips.append(f"Rows with {min_plays}+ plays")
     if any(pg is p for p in FILTERED_PAGES["Scouting"]):
@@ -527,7 +546,7 @@ def active_filter_chips() -> list[str]:
 def filtered(use_week: bool = True, use_down: bool = True):
     """Apply the sidebar filters. A filter with everything selected is skipped,
     so plays with a blank Down or Distance aren't dropped unless you narrow it."""
-    d = df_all
+    d = _game_filters(df_all)
     if use_week:
         d = d[d["WEEK"].isin(sel_weeks)]
     if use_down and set(sel_downs) != set(ALL_DOWNS):
@@ -538,6 +557,12 @@ def filtered(use_week: bool = True, use_down: bool = True):
 
 
 SITUATION_NAMES = list(ins.SITUATIONS)
+
+
+def focus_teams() -> list[str]:
+    """The teams being studied, for the Good Teams filter: Dowling, plus the scouted team on the Scouting pages."""
+    on_scouting = any(pg is p for p in FILTERED_PAGES["Scouting"])
+    return [v.TEAM] + ([opponent] if on_scouting else [])
 
 
 def _apply_query_params():
@@ -561,6 +586,9 @@ def _apply_query_params():
 
     set_multi("down", "f_down", ALL_DOWNS, int)
     set_multi("dist", "f_dist", v.DISTANCE_ORDER, lambda i: v.DISTANCE_ORDER[int(i)])
+    set_multi("season", "f_season", ALL_SEASONS, int)
+    if qp.get("good", "").isdigit() and int(qp["good"]) < len(good_teams.MODES):
+        st.session_state["f_good"] = good_teams.MODES[int(qp["good"])]
     set_multi("week", "f_week", ALL_WEEKS, lambda w: type(ALL_WEEKS[0])(float(w)) if ALL_WEEKS else w)
     if qp.get("opp") in OPPONENTS:
         st.session_state["f_opp"] = qp["opp"]
@@ -574,8 +602,12 @@ def _write_query_params():
         params["down"] = ",".join(str(d) for d in sel_downs)
     if set(sel_dist) != set(v.DISTANCE_ORDER):
         params["dist"] = ",".join(str(v.DISTANCE_ORDER.index(s)) for s in sel_dist)
+    if set(sel_seasons) != {DEFAULT_SEASON}:
+        params["season"] = ",".join(str(x) for x in sel_seasons)
     if set(sel_weeks) != set(ALL_WEEKS):
         params["week"] = ",".join(str(int(w)) for w in sel_weeks)
+    if good_mode != good_teams.ALL:
+        params["good"] = str(good_teams.MODES.index(good_mode))
     if situation != "All plays":
         params["sit"] = str(SITUATION_NAMES.index(situation))
     if any(pg is p for p in FILTERED_PAGES["Scouting"]):
@@ -588,7 +620,10 @@ def _reset_filters():
     for k in list(st.session_state.keys()):
         if k.startswith(("f_down_", "f_dist_", "f_week_")):
             st.session_state[k] = True
+        if k.startswith("f_season_"):
+            st.session_state[k] = k == f"f_season_{DEFAULT_SEASON}"
     st.session_state["f_sit"] = "All plays"
+    st.session_state["f_good"] = good_teams.ALL
     st.session_state["f_minplays"] = 1
 
 
@@ -608,7 +643,10 @@ if st.session_state.get("f_opp") not in OPPONENTS:
 if any(pg is p for group in FILTERED_PAGES.values() for p in group):
     ALL_DOWNS = [1, 2, 3, 4]
     ALL_WEEKS = sorted(df_all["WEEK"].dropna().unique().tolist())
+    ALL_SEASONS = sorted(int(x) for x in df_all["SEASON"].dropna().unique())
+    DEFAULT_SEASON = ALL_SEASONS[-1]  # the latest season, so weeks from different years don't mix by default
     st.session_state.setdefault("f_sit", "All plays")
+    st.session_state.setdefault("f_good", good_teams.ALL)
     st.session_state.setdefault("f_minplays", 1)
     _apply_query_params()
 
@@ -616,7 +654,13 @@ if any(pg is p for group in FILTERED_PAGES.values() for p in group):
         st.header("Filters")
         sel_downs = dropdown_multiselect("Down", ALL_DOWNS, key="f_down")
         sel_dist = dropdown_multiselect("Distance", v.DISTANCE_ORDER, key="f_dist")
+        sel_seasons = dropdown_multiselect("Season", ALL_SEASONS, key="f_season", default=[DEFAULT_SEASON])
         sel_weeks = dropdown_multiselect("Week", ALL_WEEKS, key="f_week", fmt=lambda w: f"Week {w}")
+        good_mode = st.selectbox("Good Teams", good_teams.MODES, key="f_good",
+                                 help="Games against the teams checked on Data > Good Teams Filter (judged by the "
+                                      "opponent of Dowling, or of the scouted team on the Scouting pages).")
+        st.page_link(_all_pages["good-teams"], label=f"Edit good teams ({len(good_teams.current())})",
+                     icon=":material/edit:")
         situation = st.selectbox("Situation", SITUATION_NAMES, key="f_sit")
         if situation == "Neutral":
             st.caption(f"Score within {ins.NEUTRAL_MARGIN} at the snap, and not the last 2 minutes of either half "

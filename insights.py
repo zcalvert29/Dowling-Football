@@ -100,10 +100,10 @@ def game_date_of(game_id: str) -> str:
 
 
 def games(df: pd.DataFrame) -> list[str]:
-    """game_ids in week order (game date breaks ties when two games share a week)."""
+    """game_ids in date order (weeks come from the date, so this is week order within a season)."""
     g = df.dropna(subset=["game_id"]).groupby("game_id")["WEEK"].min().reset_index()
     g["_date"] = ["_".join(str(x).split("_")[2:5]) for x in g["game_id"]]
-    return g.sort_values(["WEEK", "_date"], kind="stable")["game_id"].tolist()
+    return g.sort_values(["_date", "WEEK"], kind="stable")["game_id"].tolist()
 
 
 def teams_in_game(g: pd.DataFrame) -> list[str]:
@@ -1391,10 +1391,13 @@ def build_data_offense_name(game_file: str) -> str:
     return build_data.DATE_IN_NAME.sub("-offense.xlsx", game_file)
 
 
-def process_new_game(film, offense_film, team: str, opponent: str, game_day: _date, week: int) -> pd.DataFrame:
-    """The new game, curated the same way build_data.py will curate it once it's in games.csv."""
+def process_new_game(film, offense_film, team: str, opponent: str, game_day: _date, season: int) -> pd.DataFrame:
+    """The new game, curated the same way build_data.py will curate it once it's in games.csv. The week comes
+    from the game date (build_data.week_of), so a date outside the season raises ValueError."""
+    import build_data
     import curate_pbp as cp
 
+    week = build_data.week_of(game_day, season)
     date_str = game_day.strftime("%Y_%m_%d")
     plays = _read_upload(film)
     new = cp.curate_play_by_play_data(plays=plays, team=team, opponent=opponent, date=date_str, week=week)
@@ -1402,16 +1405,17 @@ def process_new_game(film, offense_film, team: str, opponent: str, game_day: _da
         off = _read_upload(offense_film) if offense_film is not None else plays
         off = cp.curate_play_by_play_data(plays=off, team=team, opponent=opponent, date=date_str, week=week)
         new = cp.add_dowling_offense_plays(new, off)
+    new["SEASON"] = season
     return new
 
 
-def updated_manifest(game_file: str, team: str, opponent: str, week: int, current: str | None = None) -> bytes:
+def updated_manifest(game_file: str, team: str, opponent: str, season: int, current: str | None = None) -> bytes:
     """games.csv with this game added, or its row updated in place if the game is already listed. current = the
     games.csv text to start from (the newest copy in the repo when saving to GitHub); default the app's copy."""
     import build_data
 
     m = pd.read_csv(io.StringIO(current) if current is not None else build_data.MANIFEST, dtype=str)
-    row = {"file": game_file, "team": team, "opponent": opponent, "week": str(week)}
+    row = {"file": game_file, "team": team, "opponent": opponent, "season": str(season)}
     same = m["file"].str.strip() == game_file
     if same.any():
         for k, val in row.items():
@@ -1433,12 +1437,12 @@ def to_xlsx_bytes(df: pd.DataFrame) -> bytes:
     return buf.getvalue()
 
 
-def _process_upload(film, offense_film, team: str, opponent: str, game_day: _date, week: int) -> dict:
+def _process_upload(film, offense_film, team: str, opponent: str, game_day: _date, season: int) -> dict:
     """Curate the upload and collect everything the page shows, so it survives reruns (Save, downloads)."""
     import build_data
     import qol  # local import: qol imports this module
 
-    new = process_new_game(film, offense_film, team, opponent, game_day, week)
+    new = process_new_game(film, offense_film, team, opponent, game_day, season)
     film.seek(0)
     existing = _existing_game(team, opponent, game_day)
     game_file, offense_file = new_game_files(team, opponent, game_day)
@@ -1446,7 +1450,7 @@ def _process_upload(film, offense_film, team: str, opponent: str, game_day: _dat
     if offense_film is not None:
         files[offense_file] = _as_xlsx(offense_film)
     return {
-        "new": new, "team": team, "opponent": opponent, "week": week, "game_file": game_file, "files": files,
+        "new": new, "team": team, "opponent": opponent, "season": season, "week": int(new["WEEK"].iat[0]), "game_file": game_file, "files": files,
         "existing": existing.file if existing is not None else None,
         "errors": int((new["drive_result"] == "Error").sum() + (new["SERIES_RESULT"] == "Error").sum()),
         "notes": build_data._error_drive_notes(film.name, new, _read_upload(film)),
@@ -1500,12 +1504,12 @@ def _render_save(res: dict) -> None:
     if not st.button("Save to app", type="primary", disabled=not confirmed):
         return
     verb = "Update" if res["existing"] else "Add"
-    message = (f"{verb} game: {res['team']} vs {res['opponent']} (Week {res['week']})\n\n"
+    message = (f"{verb} game: {res['team']} vs {res['opponent']} ({res['season']} Week {res['week']})\n\n"
                "Uploaded from the app's Add a Game page.")
 
     def build_files(read):
         current = read("games.csv")
-        manifest = updated_manifest(res["game_file"], res["team"], res["opponent"], res["week"], current)
+        manifest = updated_manifest(res["game_file"], res["team"], res["opponent"], res["season"], current)
         return {**res["files"], "games.csv": manifest}
 
     try:
@@ -1530,17 +1534,23 @@ def render_add_game() -> None:
     team = c0.text_input("Team on film", TEAM, key="add_team").strip()
     opponent = c1.text_input("Opponent (as it should appear in the app)", key="add_opp").strip()
     game_day = c2.date_input("Game date", key="add_date")
-    week = int(c3.number_input("Week", 1, 20, 1, key="add_week"))
+    season = int(c3.number_input("Season", 2020, 2100, 2026, key="add_season"))
     film = st.file_uploader("Game film export (.xlsx or .csv)", type=["xlsx", "xls", "csv"], key="add_film")
     offense_film = None
     if team == TEAM:
         offense_film = st.file_uploader("Dowling offense film export (optional, fills OFF FORM / OFF PLAY for our "
                                         "offense)", type=["xlsx", "xls", "csv"], key="add_off_film")
-    inputs = (team, opponent, game_day, week, getattr(film, "file_id", None), getattr(offense_film, "file_id", None))
+    import build_data
+
+    try:
+        c2.caption(f"Week {build_data.week_of(game_day, season)} of {season}")
+    except ValueError as e:
+        st.warning(str(e))
+    inputs = (team, opponent, game_day, season, getattr(film, "file_id", None), getattr(offense_film, "file_id", None))
     if st.button("Process game", type="primary", disabled=not (film and opponent and team)):
         try:
             st.session_state["add_game"] = {"inputs": inputs, **_process_upload(film, offense_film, team, opponent,
-                                                                                game_day, week)}
+                                                                                game_day, season)}
         except Exception as e:  # noqa: BLE001 — show the coach what went wrong instead of a stack trace
             st.session_state.pop("add_game", None)
             st.error(f"Couldn't process that file: {e}")
@@ -1553,7 +1563,7 @@ def render_add_game() -> None:
 
     new = res["new"]
     last = new.iloc[-1]
-    st.success(f"Processed {new['game_id'].iat[0]}: {len(new)} plays, final {team} {int(last['team_score'])}, "
+    st.success(f"Processed {new['game_id'].iat[0]} ({res['season']} Week {res['week']}): {len(new)} plays, final {team} {int(last['team_score'])}, "
                f"{opponent} {int(last['opponent_score'])}.")
     if res["dup"]:
         st.warning(f"{res['dup']} PLAY # value(s) appear more than once. Is more than one game or cut-up in this "
@@ -1583,7 +1593,7 @@ def render_add_game() -> None:
             d[i].download_button(f"Download {path.split('/')[-1]}", data, file_name=path.split("/")[-1], mime=xlsx,
                                  on_click="ignore")
         d[2].download_button("Download updated games.csv",
-                             updated_manifest(res["game_file"], team, opponent, week), file_name="games.csv",
+                             updated_manifest(res["game_file"], team, opponent, season), file_name="games.csv",
                              mime="text/csv", on_click="ignore")
         folder = res["game_file"].split("/")[0]
         st.caption(f"Put the film file{'s' if len(res['files']) > 1 else ''} in the `{folder}/` folder"
