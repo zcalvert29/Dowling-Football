@@ -69,7 +69,7 @@ def validate_plays(df: pd.DataFrame) -> pd.DataFrame:
     issues = []
     for gid, g in df.groupby("game_id", sort=False):
         g = g.sort_values("PLAY #").reset_index(drop=True)
-        label = ins.game_label(df, gid) if "WEEK" in df else gid
+        label = ins.full_game_label(df, gid) if "WEEK" in df else gid
         add = lambda r, msg: issues.append({"Game": label, "PLAY #": r["PLAY #"], "QTR": r.get("QTR"), "Issue": msg})
 
         dup = g[g["PLAY #"].duplicated(keep=False)]

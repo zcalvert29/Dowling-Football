@@ -149,6 +149,19 @@ def score_for(row: pd.Series, team: str) -> tuple[int, int]:
     return (a, b) if team == first else (b, a)
 
 
+def full_game_label(df: pd.DataFrame, game_id: str) -> str:
+    """'W1-2026 Dowling Catholic vs Valley': week, season, then the filming team vs its opponent."""
+    g = df.loc[df["game_id"] == game_id]
+    week = g["WEEK"].min() if "WEEK" in g else np.nan
+    season = g["SEASON"].min() if "SEASON" in g else np.nan
+    if pd.isna(season):  # no SEASON column: the year in the game_id (seasons don't cross New Year's)
+        parts = str(game_id).split("_")
+        season = parts[2] if len(parts) >= 5 and parts[2].isdigit() else np.nan
+    a, b = game_teams(game_id)
+    prefix = (f"W{int(week)}" + (f"-{int(season)}" if pd.notna(season) else "") + " ") if pd.notna(week) else ""
+    return f"{prefix}{a} vs {b}"
+
+
 def game_label(df: pd.DataFrame, game_id: str) -> str:
     week = df.loc[df["game_id"] == game_id, "WEEK"].min()
     wk = f"W{int(week)} · " if pd.notna(week) else ""
@@ -828,7 +841,7 @@ def tagging_coverage(df: pd.DataFrame) -> pd.DataFrame:
     rows = {}
     for gid in games(df):
         g = df[df["game_id"] == gid]
-        rows[game_label(df, gid)] = {
+        rows[full_game_label(df, gid)] = {
             label: (_tag_scope(g, scope)[col].notna().mean() if len(_tag_scope(g, scope)) else np.nan)
             for col, label, scope in TAG_CHECKS
         }
@@ -855,7 +868,7 @@ def render_tagging_coverage(df: pd.DataFrame) -> None:
 
     st.markdown("**Find the untagged plays**")
     c1, c2 = st.columns(2)
-    gid = c1.selectbox("Game", games(df)[::-1], format_func=lambda g: game_label(df, g), key="tag_game")
+    gid = c1.selectbox("Game", games(df)[::-1], format_func=lambda g: full_game_label(df, g), key="tag_game")
     label = c2.selectbox("Tag", [lab for _, lab, _ in TAG_CHECKS], key="tag_col")
     col, _, scope = next(x for x in TAG_CHECKS if x[1] == label)
     missing = _tag_scope(df[df["game_id"] == gid], scope)

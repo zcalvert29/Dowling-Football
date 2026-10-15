@@ -111,3 +111,9 @@ def test_field_position_drive_starts_add_up(df):
     dr = bd.season_drives(df, "Valley")
     s = bd.field_position_summary(bd._team_plays(df, "Valley"), dr)
     assert sum(z["drive_starts"] for z in s["zones"].values()) == len(dr) == 10
+
+
+def test_full_game_label(df):
+    assert ins.full_game_label(df, "Dowling Catholic_Valley_2026_08_28") == "W1-2026 Dowling Catholic vs Valley"
+    assert ins.full_game_label(df, "SEP_Iowa City High_2026_10_02") == "W6-2026 SEP vs Iowa City High"
+    assert "W1-2026 Dowling Catholic vs Valley" in ins.tagging_coverage(df).index
