@@ -39,9 +39,16 @@ FILM_FOLDERS = ("Dowling", "Scout")
 TEAM = "Dowling Catholic"
 DATE_IN_NAME = re.compile(r"-(\d{2})(\d{2})(\d{2})\.xlsx$", re.IGNORECASE)
 
-# Week 1 of each season, a Friday; each Friday after that is the next week, through LAST_WEEK. A season that isn't
-# listed starts on the last Friday of August (2026's does too). Add a season here if its Week 1 is different.
-SEASON_WEEK1 = {2026: date(2026, 8, 28)}
+# Week 1 of each season; each week after that is 7 days later, through LAST_WEEK. A season that isn't listed
+# starts on the last Friday of August. Add a season here if its Week 1 is different.
+SEASON_WEEK1 = {
+    2021: date(2021, 8, 27),
+    2022: date(2022, 8, 26),
+    2023: date(2023, 8, 26),  # a Saturday; Friday 8/25/23 games still round to Week 1
+    2024: date(2024, 8, 30),
+    2025: date(2025, 8, 29),
+    2026: date(2026, 8, 28),
+}
 LAST_WEEK = 13
 
 
@@ -53,8 +60,9 @@ def week1(season: int) -> date:
 
 
 def week_of(game_day: date, season: int) -> int:
-    """Week of the season for a game on game_day: Week 1 is the season's first Friday, Week 2 the next Friday, and
-    so on through LAST_WEEK. A Thursday or Saturday game counts toward the nearest Friday."""
+    """Week of the season for a game on game_day: Week 1 starts on the season's SEASON_WEEK1 date, Week 2 is 7
+    days later, and so on through LAST_WEEK. A game a day or two off (Thursday, Saturday) counts toward the
+    nearest week."""
     first = week1(season)
     week = round((game_day - first).days / 7) + 1
     if not 1 <= week <= LAST_WEEK:

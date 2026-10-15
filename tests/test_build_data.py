@@ -50,6 +50,20 @@ def test_week_from_date():
     assert b.week1(2027) == date(2027, 8, 27)               # unlisted season: last Friday of August
 
 
+def test_past_seasons():
+    from datetime import date
+    for season, first in {2025: date(2025, 8, 29), 2024: date(2024, 8, 30), 2023: date(2023, 8, 26),
+                          2022: date(2022, 8, 26), 2021: date(2021, 8, 27)}.items():
+        assert b.week_of(first, season) == 1
+        assert b.week_of(date.fromordinal(first.toordinal() + 7), season) == 2
+        assert b.week_of(date.fromordinal(first.toordinal() + 84), season) == 13
+    assert b.week_of(date(2023, 8, 25), 2023) == 1          # Friday before 2023's Saturday Week 1 date
+    assert b.week_of(date(2023, 9, 1), 2023) == 2
+    assert b.week_of(date(2025, 11, 21), 2025) == 13
+    with pytest.raises(ValueError, match="isn't in the 2024 season"):
+        b.week_of(date(2024, 8, 23), 2024)
+
+
 def test_built_games_have_season_and_week():
     df, _ = b.build()
     per_game = df.groupby("game_id")[["SEASON", "WEEK"]].nunique()
