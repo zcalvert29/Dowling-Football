@@ -196,6 +196,11 @@ def _s_row_notes(f: str, raw: pd.DataFrame) -> list[str]:
             f"change its ODK to O, D, or K in Hudl; if it's a duplicate clip, this can be ignored."]
 
 
+def is_s_row_note(note: str) -> bool:
+    """True for a _s_row_notes note (the app's sidebar leaves these out; Add a Game and the command line show them)."""
+    return "tagged ODK 'S'" in note
+
+
 def _error_drive_notes(f: str, df: pd.DataFrame, raw: pd.DataFrame) -> list[str]:
     """One plain-English note per drive whose result came out 'Error': what the last play was, and what the
     film shows next, so the play to fix in Hudl is easy to find."""
