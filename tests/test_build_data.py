@@ -1,4 +1,6 @@
 """Checks for build_data.py: the plain-English notes about drives that come out as 'Error'."""
+import dataclasses
+
 import pandas as pd
 import pytest
 
@@ -7,8 +9,12 @@ import build_data as b
 LINN_MAR = b.Game(file="Scout/crk-vs-linn-mar-091826.xlsx", team="CR Kennedy", opponent="Linn-Mar", season=2026)
 
 
-def test_missing_punt_names_the_plays():
-    _, notes = b.curate_game(LINN_MAR)
+def test_missing_punt_names_the_plays(tmp_path):
+    # #48 is now tagged as an interception; tagged Incomplete, the ball changes hands with no punt in between.
+    raw = pd.read_excel(b._path(LINN_MAR.file))
+    raw.loc[raw["PLAY #"] == 48, "RESULT"] = "Incomplete"
+    raw.to_excel(tmp_path / "crk-vs-linn-mar-091826.xlsx", index=False)
+    _, notes = b.curate_game(dataclasses.replace(LINN_MAR, file=str(tmp_path / "crk-vs-linn-mar-091826.xlsx")))
     assert len(notes) == 1
     assert "from CR Kennedy to Linn-Mar after #48 (Q2, 3rd & 13, Pass, Incomplete)" in notes[0]
     assert "Next play: #49" in notes[0]
