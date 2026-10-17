@@ -1457,16 +1457,20 @@ def _process_upload(film, offense_film, team: str, opponent: str, game_day: _dat
 
     new = process_new_game(film, offense_film, team, opponent, game_day, season)
     film.seek(0)
+    raw = _read_upload(film)  # the export as uploaded, before curation drops S rows and timeouts
+    film.seek(0)
     existing = _existing_game(team, opponent, game_day)
     game_file, offense_file = new_game_files(team, opponent, game_day)
     files = {game_file: _as_xlsx(film)}
     if offense_film is not None:
         files[offense_file] = _as_xlsx(offense_film)
     return {
-        "new": new, "team": team, "opponent": opponent, "season": season, "week": int(new["WEEK"].iat[0]), "game_file": game_file, "files": files,
+        "new": new, "team": team, "opponent": opponent, "season": season, "week": int(new["WEEK"].iat[0]),
+        "game_file": game_file, "files": files,
         "existing": existing.file if existing is not None else None,
         "errors": int((new["drive_result"] == "Error").sum() + (new["SERIES_RESULT"] == "Error").sum()),
-        "notes": build_data._error_drive_notes(film.name, new, _read_upload(film)),
+        "notes": build_data._error_drive_notes(film.name, new, raw),
+        "s_notes": [n.split(": ", 1)[1] for n in build_data._s_row_notes(film.name, raw)],
         "dup": int(new["PLAY #"].duplicated().sum()),
         "issues": qol.validate_plays(new),
         "saved": None,
@@ -1584,6 +1588,8 @@ def render_add_game() -> None:
     if res["errors"]:
         st.warning(f"{res['errors']} rows came out as 'Error' in drive_result/SERIES_RESULT. Check the tagging."
                    + "".join(f"\n- {n.split(': ', 1)[1]}" for n in res["notes"]))
+    for n in res.get("s_notes", []):
+        st.warning(n[0].upper() + n[1:])
     st.markdown("**Tagging check for this game**")
     st.dataframe(tagging_coverage(new).style.format("{:.0%}", na_rep="–"), width="stretch")
     st.markdown("**Possible tagging mistakes in this game**")
