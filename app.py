@@ -29,6 +29,7 @@ import good_teams
 import insights as ins
 import profiles
 import qol
+import season_comparison
 import special_projects
 import special_teams
 import visuals as v
@@ -326,6 +327,11 @@ def season_drives_page():
     bd.render_season_drives(df_all)
 
 
+def season_comparison_page():
+    page_header("Season Comparison", show_definitions=False, show_filters=False)
+    season_comparison.render_page(df_all)
+
+
 def special_projects_offense():
     page_header("Special Projects: Offense", show_definitions=False, show_filters=False)
     games = special_projects.select_weeks(df_all, "sp_weeks_offense")
@@ -431,6 +437,9 @@ FILTERED_PAGES = {
     ],
 }
 OTHER_PAGES = {
+    "Season Comparison": [
+        st.Page(season_comparison_page, title="Season Comparison", url_path="season-comparison"),
+    ],
     "Special Projects": [
         st.Page(special_projects_offense, title="Offense", url_path="special-projects"),
         st.Page(special_projects_defense, title="Defense", url_path="special-projects-defense"),
