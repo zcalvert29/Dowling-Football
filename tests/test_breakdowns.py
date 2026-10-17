@@ -74,7 +74,7 @@ def test_aggressiveness_matches_ledger(df):
 # --- Defensive touchdowns split drives (curate_pbp.assign_drives, applied at load) ---
 
 def test_defensive_td_ends_the_drive(df):
-    g = df[df["game_id"].str.contains("Waterloo")]
+    g = df[df["game_id"] == "Dowling Catholic_Waterloo West_2026_09_25"]   # one game (2025 has two more)
     drives = ins.drive_summary(g, "Waterloo West")
     assert (drives["result"] == "Turnover, Def TD").sum() == 3
     # every play that scored for the defense is the last snap of its drive
