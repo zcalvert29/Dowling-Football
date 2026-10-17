@@ -4,6 +4,8 @@ defense, special teams) and summary tables for offense, defense, and special tea
 """
 from __future__ import annotations
 
+import html
+
 import numpy as np
 import pandas as pd
 import streamlit as st
@@ -14,8 +16,19 @@ import special_projects as sp
 import special_teams as stm
 import visuals as v
 
-GOOD = "background-color:#E1F5EE;color:#085041"
-BAD = "background-color:#FCEBEB;color:#791F1F"
+# Mid-tone text on a light tint of the same color, so the Change column reads in both light and dark themes.
+GOOD = "background:rgba(29,158,117,.16);color:#1D9E75;font-weight:600"
+BAD = "background:rgba(226,75,74,.14);color:#E24B4A;font-weight:600"
+TABLE_CSS = """<style>
+.sc-table{width:100%;max-width:860px;border-collapse:collapse;font-size:14px;font-family:inherit;color:inherit}
+.sc-table th{font-weight:600;font-size:12px;opacity:.65;text-align:right;padding:6px 12px;
+  border-bottom:1px solid rgba(128,128,128,.35)}
+.sc-table th:first-child,.sc-table td:first-child{text-align:left}
+.sc-table td{padding:6px 12px;border-bottom:1px solid rgba(128,128,128,.15);text-align:right;
+  font-variant-numeric:tabular-nums}
+.sc-table tr.sc-band td{background:rgba(128,128,128,.12);font-weight:700;font-size:12px;letter-spacing:.06em;
+  text-transform:uppercase;text-align:left;border-bottom:1px solid rgba(128,128,128,.3);padding:7px 12px}
+</style>"""
 
 
 def team_color(team: str) -> str:
@@ -220,9 +233,24 @@ def st_table(a: dict, b: dict, sa: int, sb: int) -> tuple[pd.DataFrame, list[int
     return pd.DataFrame(rows), tones
 
 
-def _styled(t: pd.DataFrame, tones: list[int]):
-    return t.style.apply(lambda _: [GOOD if s > 0 else BAD if s < 0 else "" for s in tones], subset=["Change"],
-                         axis=0)
+def grouped_table_html(t: pd.DataFrame, tones: list[int], group: str) -> str:
+    """
+    The table as HTML with one shaded header band per group (EFFICIENCY, PASSING, ...) instead of repeating the
+    group on every row. The value columns are right-aligned so the numbers line up; only Change is colored.
+    """
+    cols = [c for c in t.columns if c != group]
+    head = "".join(f"<th>{html.escape(str(c))}</th>" for c in cols)
+    rows, last = [], None
+    for (_, r), tone in zip(t.iterrows(), tones):
+        if r[group] != last:
+            last = r[group]
+            rows.append(f'<tr class="sc-band"><td colspan="{len(cols)}">{html.escape(str(last))}</td></tr>')
+        cells = []
+        for c in cols:
+            style = (GOOD if tone > 0 else BAD if tone < 0 else "") if c == "Change" else ""
+            cells.append(f'<td style="{style}">{html.escape(str(r[c]))}</td>')
+        rows.append(f"<tr>{''.join(cells)}</tr>")
+    return f'{TABLE_CSS}<table class="sc-table"><thead><tr>{head}</tr></thead><tbody>{"".join(rows)}</tbody></table>'
 
 
 # ---------------------------------------------------------------------------
@@ -279,7 +307,6 @@ def render_page(df_all: pd.DataFrame) -> None:
                    "FBS median in FBS standard deviations (special teams: from the average kick in our film); "
                    "farther out is better. Hollow points are small samples.")
 
-    height = lambda t: 35 * (len(t) + 1) + 3
     for side, title, note in (
             ("offense", "Offense", "Runs and passes on 1st-4th down (penalties left out). Early downs = 1st and 2nd. "
                                    "Explosive = a run of 10+ or a pass of 20+. Points/drive counts what each drive "
@@ -289,12 +316,12 @@ def render_page(df_all: pd.DataFrame) -> None:
         a, b = unit_stats(ga, team, side), unit_stats(gb, team, side)
         t, tones = unit_table(a, b, sa, sb, side)
         st.subheader(title)
-        st.dataframe(_styled(t, tones), hide_index=True, width="stretch", height=height(t))
+        st.html(grouped_table_html(t, tones, "Section"))
         st.caption(f"{note} {sa}: {a['_snaps']} snaps, {a['_drives']} drives · {sb}: {b['_snaps']} snaps, "
                    f"{b['_drives']} drives.")
     t, tones = st_table(st_stats(ga, team), st_stats(gb, team), sa, sb)
     st.subheader("Special Teams")
-    st.dataframe(_styled(t, tones), hide_index=True, width="stretch", height=height(t))
+    st.html(grouped_table_html(t, tones, "Unit"))
     st.caption("Kicks are measured by where the next drive started, since kick and return yards are rarely tagged. "
                "EPA per kick is the same as the Special Teams page and the radar (number of kicks in parentheses): "
                "above 0 is good for this team.")

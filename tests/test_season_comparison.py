@@ -50,3 +50,12 @@ def test_special_teams_has_epa_for_each_phase(df):
         assert key in s and s[key][0] != "–"
     t, tones = sc.st_table(s, s, 2026, 2026)
     assert set(tones) == {0}                                             # same season both sides: nothing colored
+
+
+def test_grouped_table_shows_each_group_once(df):
+    a = sc.unit_stats(sc.season_games(df, TEAM, 2025), TEAM, "offense")
+    t, tones = sc.unit_table(a, a, 2025, 2026, "offense")
+    out = sc.grouped_table_html(t, tones, "Section")
+    for group in t["Section"].unique():
+        assert out.count(f'<tr class="sc-band"><td colspan="4">{group}</td></tr>') == 1
+    assert "<th>Section</th>" not in out and out.count("<tr>") == len(t) + 1   # header row + one row per stat
