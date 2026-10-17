@@ -1547,11 +1547,11 @@ def render_add_game() -> None:
         "rebuilds with it for everyone. Uploading a game that's already in the app replaces it."
     )
     xlsx = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    c0, c1, c2, c3 = st.columns(4)
+    c0, c1, c2 = st.columns(3)
     team = c0.text_input("Team on film", TEAM, key="add_team").strip()
     opponent = c1.text_input("Opponent (as it should appear in the app)", key="add_opp").strip()
     game_day = c2.date_input("Game date", key="add_date")
-    season = int(c3.number_input("Season", 2020, 2100, 2026, key="add_season"))
+    season = game_day.year  # seasons run Aug-Nov, so the game date's year is the season
     film = st.file_uploader("Game film export (.xlsx or .csv)", type=["xlsx", "xls", "csv"], key="add_film")
     offense_film = None
     if team == TEAM:
@@ -1561,8 +1561,8 @@ def render_add_game() -> None:
 
     try:
         c2.caption(f"Week {build_data.week_of(game_day, season)} of {season}")
-    except ValueError as e:
-        st.warning(str(e))
+    except ValueError as e:  # the season is the date's year here, so only the date can be off
+        st.warning(str(e).replace("Check the date and season.", "Check the date."))
     inputs = (team, opponent, game_day, season, getattr(film, "file_id", None), getattr(offense_film, "file_id", None))
     if st.button("Process game", type="primary", disabled=not (film and opponent and team)):
         try:

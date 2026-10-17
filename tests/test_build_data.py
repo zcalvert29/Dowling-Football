@@ -67,5 +67,7 @@ def test_past_seasons():
 def test_built_games_have_season_and_week():
     df, _ = b.build()
     per_game = df.groupby("game_id")[["SEASON", "WEEK"]].nunique()
-    assert (per_game == 1).all().all() and set(df["SEASON"]) == {2026}
+    assert (per_game == 1).all().all()
+    seasons = df.groupby("game_id")["SEASON"].first()
+    assert all(int(gid.split("_")[2]) == season for gid, season in seasons.items())   # season = the date's year
     assert df.loc[df["game_id"] == "Dowling Catholic_Waukee_2026_10_09", "WEEK"].iat[0] == 7

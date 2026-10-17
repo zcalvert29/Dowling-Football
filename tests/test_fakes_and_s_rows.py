@@ -67,3 +67,10 @@ def test_blank_s_rows_are_not_flagged_but_tagged_ones_are_named(tmp_path):
                                     season=2026))
     assert any("#97 (Punt)" in n for n in notes)
     assert any("#97 is an S row tagged Punt" in n for n in notes)
+
+
+def test_sidebar_issues_leave_out_s_row_notes():
+    _, problems = b.build()
+    s_notes = [p for p in problems if b.is_s_row_note(p)]
+    assert s_notes and all("tagged ODK 'S'" in p for p in s_notes)
+    assert not any(b.is_s_row_note(p) for p in problems if "the ball goes from" in p)

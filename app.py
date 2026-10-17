@@ -629,7 +629,8 @@ def _reset_filters():
 
 df_all = st.cache_data(ins.add_game_state, show_spinner=False)(v.load_data())
 st.sidebar.caption(ins.last_updated_text(df_all))
-_data_problems = build_data.load_games()[1]
+# Tagged-S-row notes are left out here: they're shown on Add a Game when the film is uploaded.
+_data_problems = [p for p in build_data.load_games()[1] if not build_data.is_s_row_note(p)]
 if _data_problems:
     with st.sidebar.expander(f"⚠️ {len(_data_problems)} data issue{'s' if len(_data_problems) != 1 else ''}"):
         for _p in _data_problems:
