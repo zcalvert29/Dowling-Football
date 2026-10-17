@@ -22,7 +22,7 @@ def test_seasons_and_colors(df):
 
 def test_down_conversions_match_the_plays(df):
     g = sc.season_games(df, TEAM, 2026)
-    s = sc.unit_stats(g, TEAM, "offense")
+    s = sc.unit_stats(g, g, TEAM, "offense")
     rate, made, att = s["3rd Down Conv. Rate"]
     snaps = v.run_pass(g[g["offense"] == TEAM])
     third = snaps[(snaps["DN"] == 3) & (snaps["RESULT"] != "Penalty")]
@@ -32,7 +32,7 @@ def test_down_conversions_match_the_plays(df):
 
 
 def test_defense_rows_count_lower_as_better(df):
-    a = sc.unit_stats(sc.season_games(df, TEAM, 2025), TEAM, "defense")
+    a = sc.unit_stats(sc.season_games(df, TEAM, 2025), sc.season_games(df, TEAM, 2025), TEAM, "defense")
     b = dict(a, **{"EPA/Play": a["EPA/Play"] - 0.2, "Avg 3rd Down Distance": a["Avg 3rd Down Distance"] + 3})
     t, tones = sc.unit_table(a, b, 2025, 2026, "defense")
     tone = dict(zip(t["Stat"], tones))
@@ -54,7 +54,7 @@ def test_special_teams_has_epa_for_each_phase(df):
 
 
 def test_grouped_table_shows_each_group_once(df):
-    a = sc.unit_stats(sc.season_games(df, TEAM, 2025), TEAM, "offense")
+    a = sc.unit_stats(sc.season_games(df, TEAM, 2025), sc.season_games(df, TEAM, 2025), TEAM, "offense")
     t, tones = sc.unit_table(a, a, 2025, 2026, "offense")
     out = sc.grouped_table_html(t, tones, "Section")
     for group in t["Section"].unique():
@@ -83,3 +83,13 @@ def test_run_comparison_colors_only_real_samples():
     big, tiny = out.split("<b>BIG</b>")[1].split("</tr>")[0], out.split("<b>TINY</b>")[1].split("</tr>")[0]
     assert big.count(sc.GOOD) == 4 and sc.GOOD not in tiny                  # small sample: shown, not colored
     assert '<tr class="small">' in out
+
+
+def test_filtered_plays_change_play_stats_but_not_drive_stats(df):
+    g = sc.season_games(df, TEAM, 2026)
+    first_down = g[g["DN"] == 1]
+    whole, filt = sc.unit_stats(g, g, TEAM, "offense"), sc.unit_stats(first_down, g, TEAM, "offense")
+    assert filt["_snaps"] < whole["_snaps"]                              # the Down filter shrinks the snaps
+    assert filt["3rd Down Conv. Rate"][2] == 0                           # no 3rd downs left
+    for stat in ("EPA/Drive", "Points/Drive", "Starting Field Pos."):    # drives still use whole games
+        assert filt[stat] == whole[stat]
