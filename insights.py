@@ -1395,13 +1395,13 @@ def new_game_files(team: str, opponent: str, game_day: _date) -> tuple[str, str 
         return g.file, (build_data_offense_name(g.file) if team == TEAM else None)
     folder, who = ("Dowling", "dowling") if team == TEAM else ("Scout", _slug(team))
     base = f"{folder}/{who}-vs-{_slug(opponent)}"
-    return f"{base}-{game_day:%m%d%y}.xlsx", (f"{base}-offense.xlsx" if team == TEAM else None)
+    return f"{base}-{game_day:%m%d%y}.xlsx", (f"{base}-{game_day:%m%d%y}-offense.xlsx" if team == TEAM else None)
 
 
 def build_data_offense_name(game_file: str) -> str:
     import build_data
 
-    return build_data.DATE_IN_NAME.sub("-offense.xlsx", game_file)
+    return build_data.offense_name(game_file)
 
 
 def process_new_game(film, offense_film, team: str, opponent: str, game_day: _date, season: int) -> pd.DataFrame:
