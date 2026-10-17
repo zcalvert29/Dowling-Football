@@ -71,6 +71,8 @@ def validate_plays(df: pd.DataFrame) -> pd.DataFrame:
         g = g.sort_values("PLAY #").reset_index(drop=True)
         label = ins.full_game_label(df, gid) if "WEEK" in df else gid
         add = lambda r, msg: issues.append({"Game": label, "PLAY #": r["PLAY #"], "QTR": r.get("QTR"), "Issue": msg})
+        # Tries, kickoffs, and the score columns are all from the filming team's side (Dowling, or the scouted team).
+        filmed = ins.game_teams(gid)[0]
 
         dup = g[g["PLAY #"].duplicated(keep=False)]
         for _, r in dup.drop_duplicates("PLAY #").iterrows():
@@ -106,7 +108,7 @@ def validate_plays(df: pd.DataFrame) -> pd.DataFrame:
                 onside = pt.startswith("Onside")
                 expected = ("Onside Kick" if we_kick else "Onside Kick Rec") if onside else ("KO" if we_kick else "KO Rec")
                 if pt != expected:
-                    add(r, f"Tagged {pt}, but {'Dowling' if last_scorer == 'us' else 'the opponent'} just scored, "
+                    add(r, f"Tagged {pt}, but {filmed if last_scorer == 'us' else 'the opponent'} just scored, "
                            f"so it should be {expected}")
                 last_scorer = None
             if pt in ("Onside Kick", "Onside Kick Rec") and str(r["RESULT"]).strip() not in ("Recovered", "Return", "Penalty"):
@@ -121,11 +123,11 @@ def validate_plays(df: pd.DataFrame) -> pd.DataFrame:
                     add(r, f"{pt} with no touchdown right before it")
                 else:
                     ours = pt in ("Extra Pt.", "2 Pt.")
-                    td_ours = (g.loc[j, "defense"] if "Def TD" in str(g.loc[j, "RESULT"]) else g.loc[j, "offense"]) == TEAM
+                    td_ours = (g.loc[j, "defense"] if "Def TD" in str(g.loc[j, "RESULT"]) else g.loc[j, "offense"]) == filmed
                     if "offense" in g and ours != td_ours:
-                        add(r, f"{pt} after a {'Dowling' if td_ours else 'opponent'} touchdown: the tag says it's "
-                               f"{'our' if ours else 'their'} try")
-                    elif "offense" in g and (r["offense"] == TEAM) != ours:
+                        scorer, trier = (f"a {filmed}", f"the opponent's") if td_ours else ("an opponent", f"{filmed}'s")
+                        add(r, f"{pt} after {scorer} touchdown: the tag says it's {trier} try")
+                    elif "offense" in g and (r["offense"] == filmed) != ours:
                         add(r, f"{pt} is credited to {r['offense']} in the curated file. Rebuild with the current "
                                "curate_pbp.py, which credits tries after defensive touchdowns correctly")
             # A missed field goal can't be followed by the kicking team kicking off (same half).
