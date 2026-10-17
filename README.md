@@ -25,6 +25,7 @@ A multipage Streamlit app built on Dowling's tagged play-by-play data.
 | **Scouting Report & Matchup** | Printable opponent report and side-by-side matchup view |
 | **Play Finder & Sideline Mode** | Fast filtering for specific situations and a phone-friendly view for game day |
 | **Season Comparison** | One team, two seasons: offense/defense/special teams radars side by side, and summary tables (EPA, success, explosives, 3rd/4th downs, points per drive, special teams by phase) with the change between seasons |
+| **DCHS Run Game Comparison** | DCHS O Run Game's Run Scheme Detail for two seasons side by side: runs, success, EPA, yards per carry, and explosive rate per scheme, with the change |
 | **Add a Game** | Upload a new film-tagging export, check its tagging, and save it to the app for everyone |
 | **Good Teams Filter** | Pick which teams count as good; the sidebar's Good Teams filter then shows only games against good teams (or only the rest) |
 

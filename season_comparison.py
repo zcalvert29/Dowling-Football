@@ -325,3 +325,106 @@ def render_page(df_all: pd.DataFrame) -> None:
     st.caption("Kicks are measured by where the next drive started, since kick and return yards are rarely tagged. "
                "EPA per kick is the same as the Special Teams page and the radar (number of kicks in parentheses): "
                "above 0 is good for this team.")
+
+
+# ---------------------------------------------------------------------------
+# DCHS Run Game Comparison: the DCHS O Run Game "Run Scheme Detail" table, one row per scheme, each stat with
+# both seasons and the change side by side.
+# ---------------------------------------------------------------------------
+RUN_MIN = 10   # under this many runs in either season, a scheme's row is faded and its changes aren't colored
+# (column in v.run_scheme_table, header, kind, threshold for a "clear" change)
+RUN_METRICS = [("Success Rate", "Success", "pct", 0.05), ("EPA per Play", "EPA / run", "epa", 0.10),
+               ("Avg Yards Gained", "Yds / carry", "yds", 0.75), ("Explosive Rate", "Explosive", "pct", 0.05)]
+RUN_CSS = """<style>
+.rc{width:100%;border-collapse:collapse;font-size:13.5px;font-family:inherit;color:inherit}
+.rc th{font-weight:600;font-size:11.5px;opacity:.7;text-align:right;padding:5px 9px;
+  border-bottom:1px solid rgba(128,128,128,.35)}
+.rc th.grp{text-align:center;font-size:11px;letter-spacing:.06em;text-transform:uppercase;opacity:.85;
+  border-bottom:1px solid rgba(128,128,128,.25)}
+.rc th:first-child,.rc td:first-child{text-align:left}
+.rc td{padding:5px 9px;border-bottom:1px solid rgba(128,128,128,.15);text-align:right;font-variant-numeric:tabular-nums}
+.rc .sep{border-left:1px solid rgba(128,128,128,.3)}
+.rc tr.small td{opacity:.55}
+.rc .tag{font-size:11px;opacity:.7;font-weight:600}
+</style>"""
+
+
+def run_scheme_seasons(df: pd.DataFrame, sa: int, sb: int) -> tuple[pd.DataFrame, pd.DataFrame, list[str]]:
+    """Dowling's Run Scheme Detail table for each season (df = Dowling games only), and every scheme run in
+    either season, most runs first."""
+    ta = v.run_scheme_table(df[df["SEASON"] == sa])
+    tb = v.run_scheme_table(df[df["SEASON"] == sb])
+    total = ta["Plays"].add(tb["Plays"], fill_value=0)
+    return ta, tb, list(total.sort_values(ascending=False, kind="stable").index)
+
+
+def _cell(t: pd.DataFrame, scheme: str, col: str):
+    return t.at[scheme, col] if scheme in t.index else np.nan
+
+
+def _run_fmt(kind: str, x) -> str:
+    if pd.isna(x):
+        return "–"
+    return {"pct": f"{x:.0%}", "epa": f"{x:+.2f}", "yds": f"{x:.1f}"}[kind]
+
+
+def _run_change(kind: str, a, b) -> str:
+    if pd.isna(a) or pd.isna(b):
+        return "–"
+    d = b - a
+    if abs(d) < {"pct": 0.005, "epa": 0.005, "yds": 0.05}[kind]:   # rounds to zero: 0, not -0
+        return {"pct": "0", "epa": "0.00", "yds": "0.0"}[kind]
+    return {"pct": f"{d * 100:+.0f}", "epa": f"{d:+.2f}", "yds": f"{d:+.1f}"}[kind]
+
+
+def run_comparison_html(ta: pd.DataFrame, tb: pd.DataFrame, schemes: list[str], sa: int, sb: int) -> str:
+    """One row per scheme; Runs, then each stat as `sa | sb | ±`. Higher is better for every stat, so a clear
+    rise is green and a clear drop red, except on small samples."""
+    head1 = ('<tr><th></th><th class="grp sep" colspan="2">Runs</th>'
+             + "".join(f'<th class="grp sep" colspan="3">{lab}</th>' for _, lab, _, _ in RUN_METRICS) + "</tr>")
+    head2 = (f'<tr><th>Scheme</th><th class="sep">{sa}</th><th>{sb}</th>'
+             + "".join(f'<th class="sep">{sa}</th><th>{sb}</th><th>±</th>' for _ in RUN_METRICS) + "</tr>")
+    rows = []
+    for s in schemes:
+        na, nb = (int(_cell(t, s, "Plays")) if s in t.index else 0 for t in (ta, tb))
+        small = na < RUN_MIN or nb < RUN_MIN
+        tag = (f' <span class="tag">new in {sb}</span>' if not na else
+               f' <span class="tag">not run in {sb}</span>' if not nb else "")
+        cells = [f"<td><b>{html.escape(str(s))}</b>{tag}</td>",
+                 f'<td class="sep">{na or "–"}</td><td>{nb or "–"}</td>']
+        for col, _, kind, thr in RUN_METRICS:
+            a, b = _cell(ta, s, col), _cell(tb, s, col)
+            tone = 0 if small or pd.isna(a) or pd.isna(b) or abs(b - a) < thr else (1 if b > a else -1)
+            style = GOOD if tone > 0 else BAD if tone < 0 else ""
+            cells.append(f'<td class="sep">{_run_fmt(kind, a)}</td><td>{_run_fmt(kind, b)}</td>'
+                         f'<td style="{style}">{_run_change(kind, a, b)}</td>')
+        rows.append(f'<tr class="{"small" if small else ""}">{"".join(cells)}</tr>')
+    return f'{RUN_CSS}<table class="rc"><thead>{head1}{head2}</thead><tbody>{"".join(rows)}</tbody></table>'
+
+
+def render_run_page(df_all: pd.DataFrame) -> None:
+    dc = ins.dowling_only(df_all)
+    seasons = team_seasons(dc, v.TEAM)
+    if len(seasons) < 2:
+        st.info("Dowling needs film from two seasons to compare.")
+        return
+    c = st.columns([1, 1, 2])
+    sa = c[0].selectbox("Season", seasons, index=len(seasons) - 2, key="rc_a")
+    sb = c[1].selectbox("Compared to", seasons, index=len(seasons) - 1, key="rc_b")
+    same_weeks = c[2].toggle("Same weeks only", key="rc_same_weeks",
+                             help="Compare only the weeks both seasons have film for.")
+    if same_weeks:
+        weeks = set(dc.loc[dc["SEASON"] == sa, "WEEK"]) & set(dc.loc[dc["SEASON"] == sb, "WEEK"])
+        dc = dc[dc["WEEK"].isin(weeks)]
+    ta, tb, schemes = run_scheme_seasons(dc, sa, sb)
+    if not schemes:
+        st.info("No tagged run schemes in these seasons.")
+        return
+    games = lambda s: dc.loc[dc["SEASON"] == s, "game_id"].nunique()
+    st.caption(f"Dowling's runs by run scheme (read from OFF PLAY), the same numbers as DCHS O Run Game's Run Scheme "
+               f"Detail. {sa}: {int(ta['Plays'].sum())} runs in {games(sa)} games · {sb}: {int(tb['Plays'].sum())} "
+               f"runs in {games(sb)} games.")
+    st.html(run_comparison_html(ta, tb, schemes, sa, sb))
+    st.caption(f"± is the change from {sa} to {sb} (percentage points for Success and Explosive). Green/red = a clear "
+               f"rise/drop. Faded rows have under {RUN_MIN} runs in a season and aren't colored. Explosive = a run of "
+               "10+ yards.")

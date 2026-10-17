@@ -332,6 +332,11 @@ def season_comparison_page():
     season_comparison.render_page(df_all)
 
 
+def run_game_comparison_page():
+    page_header("DCHS Run Game Comparison", show_definitions=False, show_filters=False)
+    season_comparison.render_run_page(df_all)
+
+
 def special_projects_offense():
     page_header("Special Projects: Offense", show_definitions=False, show_filters=False)
     games = special_projects.select_weeks(df_all, "sp_weeks_offense")
@@ -439,6 +444,7 @@ FILTERED_PAGES = {
 OTHER_PAGES = {
     "Season Comparison": [
         st.Page(season_comparison_page, title="Season Comparison", url_path="season-comparison"),
+        st.Page(run_game_comparison_page, title="DCHS Run Game Comparison", url_path="run-game-comparison"),
     ],
     "Special Projects": [
         st.Page(special_projects_offense, title="Offense", url_path="special-projects"),
