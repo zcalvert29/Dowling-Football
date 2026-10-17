@@ -328,13 +328,15 @@ def season_drives_page():
 
 
 def season_comparison_page():
-    page_header("Season Comparison", show_definitions=False, show_filters=False)
-    season_comparison.render_page(df_all)
+    page_header("Season Comparison", show_definitions=False)
+    # Play-level numbers follow every sidebar filter; drives, field position, and special teams need whole games,
+    # so they follow only Week and Good Teams (the same split as Team Profiles).
+    season_comparison.render_page(df, _week_games())
 
 
 def run_game_comparison_page():
-    page_header("DCHS Run Game Comparison", show_definitions=False, show_filters=False)
-    season_comparison.render_run_page(df_all)
+    page_header("DCHS Run Game Comparison", show_definitions=False)
+    season_comparison.render_run_page(df)
 
 
 def special_projects_offense():
@@ -440,12 +442,12 @@ FILTERED_PAGES = {
         st.Page(team_profiles, title="Team Profiles", url_path="team-profiles"),
         st.Page(scouting_report, title="Scouting Report", url_path="scouting-report"),
     ],
-}
-OTHER_PAGES = {
     "Season Comparison": [
         st.Page(season_comparison_page, title="Season Comparison", url_path="season-comparison"),
         st.Page(run_game_comparison_page, title="DCHS Run Game Comparison", url_path="run-game-comparison"),
     ],
+}
+OTHER_PAGES = {
     "Special Projects": [
         st.Page(special_projects_offense, title="Offense", url_path="special-projects"),
         st.Page(special_projects_defense, title="Defense", url_path="special-projects-defense"),
@@ -541,8 +543,9 @@ def _summary(selected, options, fmt=str, all_text="All"):
 
 def active_filter_chips() -> list[str]:
     week_labels = v.week_labels(df_all)
-    chips = [
-        _summary(sel_seasons, ALL_SEASONS, str, "All seasons" if len(ALL_SEASONS) > 1 else str(ALL_SEASONS[0])),
+    chips = [] if on_season_comparison() else [
+        _summary(sel_seasons, ALL_SEASONS, str, "All seasons" if len(ALL_SEASONS) > 1 else str(ALL_SEASONS[0]))]
+    chips += [
         _summary(sel_weeks, ALL_WEEKS, lambda w: week_labels.get(w, f"W{w}").split(" ")[0], "All weeks"),
         _summary(sel_downs, ALL_DOWNS, lambda d: {1: "1st", 2: "2nd", 3: "3rd", 4: "4th"}[d], "All downs"),
         _summary(sel_dist, v.DISTANCE_ORDER, lambda s: s.split(" (")[0], "All distances"),
@@ -574,8 +577,16 @@ def filtered(use_week: bool = True, use_down: bool = True):
 SITUATION_NAMES = list(ins.SITUATIONS)
 
 
+def on_season_comparison() -> bool:
+    """The Season Comparison pages pick their own two seasons, so the sidebar's Season filter is left off there."""
+    return any(pg is p for p in FILTERED_PAGES["Season Comparison"])
+
+
 def focus_teams() -> list[str]:
-    """The teams being studied, for the Good Teams filter: Dowling, plus the scouted team on the Scouting pages."""
+    """The teams being studied, for the Good Teams filter: Dowling, plus the scouted team on the Scouting pages,
+    or the team picked on Season Comparison."""
+    if on_season_comparison():
+        return [st.session_state.get("sc_team", v.TEAM)]
     on_scouting = any(pg is p for p in FILTERED_PAGES["Scouting"])
     return [v.TEAM] + ([opponent] if on_scouting else [])
 
@@ -617,7 +628,7 @@ def _write_query_params():
         params["down"] = ",".join(str(d) for d in sel_downs)
     if set(sel_dist) != set(v.DISTANCE_ORDER):
         params["dist"] = ",".join(str(v.DISTANCE_ORDER.index(s)) for s in sel_dist)
-    if set(sel_seasons) != {DEFAULT_SEASON}:
+    if set(sel_seasons) != {DEFAULT_SEASON} and not on_season_comparison():
         params["season"] = ",".join(str(x) for x in sel_seasons)
     if set(sel_weeks) != set(ALL_WEEKS):
         params["week"] = ",".join(str(int(w)) for w in sel_weeks)
@@ -670,7 +681,10 @@ if any(pg is p for group in FILTERED_PAGES.values() for p in group):
         st.header("Filters")
         sel_downs = dropdown_multiselect("Down", ALL_DOWNS, key="f_down")
         sel_dist = dropdown_multiselect("Distance", v.DISTANCE_ORDER, key="f_dist")
-        sel_seasons = dropdown_multiselect("Season", ALL_SEASONS, key="f_season", default=[DEFAULT_SEASON])
+        if on_season_comparison():
+            sel_seasons = ALL_SEASONS   # the page has its own season pickers
+        else:
+            sel_seasons = dropdown_multiselect("Season", ALL_SEASONS, key="f_season", default=[DEFAULT_SEASON])
         sel_weeks = dropdown_multiselect("Week", ALL_WEEKS, key="f_week", fmt=lambda w: f"Week {w}")
         good_mode = st.selectbox("Good Teams", good_teams.MODES, key="f_good",
                                  help="Games against the teams checked on Data > Good Teams Filter (judged by the "

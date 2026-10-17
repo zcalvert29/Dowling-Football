@@ -57,24 +57,30 @@ def _rate(flags: pd.Series) -> tuple[float, int, int]:
     return (made / n if n else np.nan), made, n
 
 
-def unit_stats(g: pd.DataFrame, team: str, side: str) -> dict:
+def _snaps(d: pd.DataFrame, team: str, col: str) -> pd.DataFrame:
+    """Runs and passes on 1st-4th down, penalties left out (as on Team Profiles)."""
+    snaps = v.run_pass(d[d[col] == team])
+    return snaps[snaps["DN"].isin([1, 2, 3, 4]) & (snaps["RESULT"] != "Penalty")]
+
+
+def unit_stats(plays: pd.DataFrame, games: pd.DataFrame, team: str, side: str) -> dict:
     """
     One season's numbers for `team`'s offense (side="offense") or for the offenses its defense faced
-    (side="defense"). Snaps are runs and passes on 1st-4th down, penalties left out (as on Team Profiles).
+    (side="defense"). Play-level stats come from `plays` (which may be filtered by down, distance, or situation);
+    drive stats (EPA/Drive, Points/Drive, Starting Field Pos.) need whole drives, so they come from `games`.
     """
     col = "offense" if side == "offense" else "defense"
-    snaps = v.run_pass(g[g[col] == team])
-    snaps = snaps[snaps["DN"].isin([1, 2, 3, 4]) & (snaps["RESULT"] != "Penalty")]
+    snaps = _snaps(plays, team, col)
     early = snaps[snaps["DN"].isin([1, 2])]
     pas, rush = snaps[snaps["PLAY TYPE"] == "Pass"], snaps[snaps["PLAY TYPE"] == "Run"]
     third, fourth = snaps[snaps["DN"] == 3], snaps[snaps["DN"] == 4]
-    drives = sp.first_play_drives(g, team, side=side)          # points = what each drive actually scored
+    drives = sp.first_play_drives(games, team, side=side) if len(games) else pd.DataFrame()   # actual points
     n_drives = len(drives)
     explosive = lambda d: pd.to_numeric(d["explosive_play"], errors="coerce").mean()
     return {
         "EPA/Play": snaps["epa"].mean(),
         "Success Rate": snaps["success"].mean(),
-        "EPA/Drive": snaps["epa"].sum() / n_drives if n_drives else np.nan,
+        "EPA/Drive": _snaps(games, team, col)["epa"].sum() / n_drives if n_drives else np.nan,
         "Points/Drive": drives["points"].mean() if n_drives else np.nan,
         "Early Down EPA": early["epa"].mean(),
         "Early Down Success": early["success"].mean(),
@@ -256,23 +262,31 @@ def grouped_table_html(t: pd.DataFrame, tones: list[int], group: str) -> str:
 # ---------------------------------------------------------------------------
 # Page
 # ---------------------------------------------------------------------------
-def render_page(df_all: pd.DataFrame) -> None:
-    teams = sorted({t for t in df_all["offense"].dropna().unique() if t}, key=lambda t: (t != v.TEAM, t))
+def render_page(plays: pd.DataFrame, games: pd.DataFrame) -> None:
+    """
+    plays: the sidebar-filtered plays (play-level stats and the radars' offense/defense axes).
+    games: whole games for the selected weeks and Good Teams choice (drives, field position, special teams).
+    """
+    teams = sorted({t for t in games["offense"].dropna().unique() if t}, key=lambda t: (t != v.TEAM, t))
+    if not teams:
+        st.info("No games match the sidebar filters.")
+        return
     c = st.columns([2, 1, 1, 2])
     team = c[0].selectbox("Team", teams, key="sc_team")
-    seasons = team_seasons(df_all, team)
+    seasons = team_seasons(games, team)
     if len(seasons) < 2:
-        st.info(f"{team} has film from {'only ' + str(seasons[0]) if seasons else 'no season'}, so there's no "
-                "second season to compare yet.")
+        st.info(f"{team} has film from {'only ' + str(seasons[0]) if seasons else 'no season'} with these filters, "
+                "so there's no second season to compare.")
         return
     sa = c[1].selectbox("Season", seasons, index=len(seasons) - 2, key=f"sc_a_{team}")
     sb = c[2].selectbox("Compared to", seasons, index=len(seasons) - 1, key=f"sc_b_{team}")
     same_weeks = c[3].toggle("Same weeks only", key="sc_same_weeks",
                              help="Compare only the weeks both seasons have film for, e.g. Weeks 1-3.")
-    ga, gb = season_games(df_all, team, sa), season_games(df_all, team, sb)
+    ga, gb = season_games(games, team, sa), season_games(games, team, sb)
     if same_weeks:
         weeks = set(ga["WEEK"]) & set(gb["WEEK"])
         ga, gb = ga[ga["WEEK"].isin(weeks)], gb[gb["WEEK"].isin(weeks)]
+    pa, pb = (plays[plays["game_id"].isin(g["game_id"].unique())] for g in (ga, gb))
     na, nb = ga["game_id"].nunique(), gb["game_id"].nunique()
     if not na or not nb:
         st.info("No games in common weeks for these two seasons." if same_weeks else "No games for one of the seasons.")
@@ -280,7 +294,9 @@ def render_page(df_all: pd.DataFrame) -> None:
     plural = lambda n: f"{n} game{'' if n == 1 else 's'}"
     weeks_note = f" (Weeks {', '.join(str(int(w)) for w in sorted(set(ga['WEEK'])))})" if same_weeks else ""
     st.caption(f"{team}: {plural(na)} of film in {sa} · {plural(nb)} in {sb}{weeks_note}. Green/red in the tables = "
-               f"clearly better/worse in {sb} than {sa}; small changes aren't colored.")
+               f"clearly better/worse in {sb} than {sa}; small changes aren't colored. Down, Distance, and Situation "
+               "apply to play stats; drives, field position, and special teams use whole games (Week and Good Teams "
+               "only).")
 
     st.subheader("Profiles")
     try:
@@ -292,10 +308,13 @@ def render_page(df_all: pd.DataFrame) -> None:
         stats = profiles.benchmark_stats(bench)
         # Special teams are centered on the average kick across all our film, so both seasons share one center.
         stats = profiles.hs_centered_stats(stats, profiles.hs_special_teams_averages(
-            profiles.standardize_hudl(df_all, team)))
+            profiles.standardize_hudl(games, team)))
         frames = {}
-        for s, g in ((sa, ga), (sb, gb)):
-            m = profiles.team_metrics(profiles.standardize_hudl(g, team), team)
+        for s, p, g in ((sa, pa, ga), (sb, pb, gb)):
+            # Offense/defense axes from the filtered plays; drives and kicks from whole games (as on Team Profiles).
+            whole = profiles.standardize_hudl(g, team)
+            tables = {**whole, "plays": profiles.standardize_hudl(p, team)["plays"]} if len(p) else whole
+            m = profiles.team_metrics(tables, team)
             frames[s] = {u: profiles.score_team(m, stats, u) for u in profiles.UNITS}
         color = team_color(team)
         for unit, label in (("offense", "Offense"), ("defense", "Defense"), ("special_teams", "Special Teams")):
@@ -313,7 +332,7 @@ def render_page(df_all: pd.DataFrame) -> None:
                                    "actually scored."),
             ("defense", "Defense", "What opponents did against this defense, so lower is better (green), except "
                                    "Avg 3rd Down Distance, where longer is better.")):
-        a, b = unit_stats(ga, team, side), unit_stats(gb, team, side)
+        a, b = unit_stats(pa, ga, team, side), unit_stats(pb, gb, team, side)
         t, tones = unit_table(a, b, sa, sb, side)
         st.subheader(title)
         st.html(grouped_table_html(t, tones, "Section"))
@@ -402,11 +421,12 @@ def run_comparison_html(ta: pd.DataFrame, tb: pd.DataFrame, schemes: list[str], 
     return f'{RUN_CSS}<table class="rc"><thead>{head1}{head2}</thead><tbody>{"".join(rows)}</tbody></table>'
 
 
-def render_run_page(df_all: pd.DataFrame) -> None:
-    dc = ins.dowling_only(df_all)
+def render_run_page(plays: pd.DataFrame) -> None:
+    """plays: the sidebar-filtered plays (Down, Distance, Week, Good Teams, Situation all apply)."""
+    dc = ins.dowling_only(plays)
     seasons = team_seasons(dc, v.TEAM)
     if len(seasons) < 2:
-        st.info("Dowling needs film from two seasons to compare.")
+        st.info("Dowling needs film from two seasons (with these filters) to compare.")
         return
     c = st.columns([1, 1, 2])
     sa = c[0].selectbox("Season", seasons, index=len(seasons) - 2, key="rc_a")
@@ -417,6 +437,8 @@ def render_run_page(df_all: pd.DataFrame) -> None:
         weeks = set(dc.loc[dc["SEASON"] == sa, "WEEK"]) & set(dc.loc[dc["SEASON"] == sb, "WEEK"])
         dc = dc[dc["WEEK"].isin(weeks)]
     ta, tb, schemes = run_scheme_seasons(dc, sa, sb)
+    runs = lambda t, sc: int(t.at[sc, "Plays"]) if sc in t.index else 0
+    schemes = [sc for sc in schemes if max(runs(ta, sc), runs(tb, sc)) >= v.MIN_PLAYS]   # sidebar's min-plays slider
     if not schemes:
         st.info("No tagged run schemes in these seasons.")
         return
