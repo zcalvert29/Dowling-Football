@@ -160,14 +160,40 @@ def _play_text(r: pd.Series, offense: bool = True) -> str:
     return f"#{int(r['PLAY #'])} ({', '.join(str(b) for b in bits if b is not None and pd.notna(b))})"
 
 
+def _s_tags(r: pd.Series) -> str:
+    """What's tagged on a row besides down/distance/spot: 'FG, Good'. Empty for a blank row or a timeout."""
+    tags = [str(r[c]).strip() for c in ("PLAY TYPE", "RESULT") if pd.notna(r.get(c)) and str(r[c]).strip()]
+    return "" if tags == ["Timeout"] else ", ".join(t for t in tags if t != "Timeout")
+
+
 def _skipped_text(raw: pd.DataFrame, after: int, before: int | None) -> str:
-    """Rows of the export between two plays that curation drops (blank 'S' rows, timeouts)."""
+    """Rows of the export between two plays that curation drops ('S' rows, timeouts)."""
     between = raw[(raw["PLAY #"] > after) & ((raw["PLAY #"] < before) if before is not None else True)]
     if between.empty:
         return ""
-    kinds = [f"#{int(r['PLAY #'])} is {'a timeout' if r.get('RESULT') == 'Timeout' else 'a blank S row'}"
-             for _, r in between.iterrows()]
+
+    def kind(r):
+        if r.get("RESULT") == "Timeout":
+            return "a timeout"
+        tags = _s_tags(r)
+        return f"an S row tagged {tags}" if tags else "a blank S row"
+
+    kinds = [f"#{int(r['PLAY #'])} is {kind(r)}" for _, r in between.iterrows()]
     return f" In between, {', '.join(kinds)} (dropped when the game is built). Was that the missing play?"
+
+
+def _s_row_notes(f: str, raw: pd.DataFrame) -> list[str]:
+    """One note listing the rows tagged ODK 'S' that still have a play type or result tagged. 'S' rows are dropped
+    when the game is built, so a real play tagged S by mistake (a made field goal, a penalty) silently goes missing.
+    Blank S rows and timeouts aren't listed."""
+    s = raw[raw["ODK"] == "S"]
+    items = [f"#{int(r['PLAY #'])} ({tags})" for _, r in s.iterrows() if (tags := _s_tags(r))]
+    if not items:
+        return []
+    n = len(items)
+    return [f"{f}: {n} row{'s' if n != 1 else ''} tagged ODK 'S' {'have' if n != 1 else 'has'} a play tagged, so "
+            f"{'they are' if n != 1 else 'it is'} left out of the app: {', '.join(items)}. If one is a real play, "
+            f"change its ODK to O, D, or K in Hudl; if it's a duplicate clip, this can be ignored."]
 
 
 def _error_drive_notes(f: str, df: pd.DataFrame, raw: pd.DataFrame) -> list[str]:
@@ -209,7 +235,8 @@ def curate_game(g: Game) -> tuple[pd.DataFrame, list[str]]:
                                           week=g.week)
         df = cp.add_dowling_offense_plays(df, off)
     df["SEASON"] = g.season
-    problems += _error_drive_notes(g.file, df, pd.read_excel(_path(g.file)))
+    raw = pd.read_excel(_path(g.file))
+    problems += _s_row_notes(g.file, raw) + _error_drive_notes(g.file, df, raw)
     return df, problems
 
 

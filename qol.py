@@ -60,7 +60,7 @@ def check_password() -> bool:
 # ---------------------------------------------------------------------------
 # Tagging checks
 # ---------------------------------------------------------------------------
-KNOWN_PLAY_TYPES = {"Run", "Pass", "KO", "KO Rec", "Onside Kick", "Onside Kick Rec", "Punt", "Punt Rec", "Fake Punt", "FG", "FG Block", "Extra Pt.",
+KNOWN_PLAY_TYPES = {"Run", "Pass", "KO", "KO Rec", "Onside Kick", "Onside Kick Rec", "Punt", "Punt Rec", "Fake Punt", "Fake FG", "FG", "FG Block", "Extra Pt.",
                     "Extra Pt. Block", "2 Pt.", "2 Pt. Block", "2 Pt. Defend"}
 
 
@@ -347,7 +347,7 @@ def render_home(df: pd.DataFrame, opponents: list[str], pages: dict) -> None:
 # ---------------------------------------------------------------------------
 # Play finder
 # ---------------------------------------------------------------------------
-ST_PLAY_TYPES = {"KO", "KO Rec", "Onside Kick", "Onside Kick Rec", "Punt", "Punt Rec", "Fake Punt", "FG", "FG Block", "Extra Pt.", "Extra Pt. Block",
+ST_PLAY_TYPES = {"KO", "KO Rec", "Onside Kick", "Onside Kick Rec", "Punt", "Punt Rec", "Fake Punt", "Fake FG", "FG", "FG Block", "Extra Pt.", "Extra Pt. Block",
                  "2 Pt.", "2 Pt. Block", "2 Pt. Defend"}
 
 
@@ -361,7 +361,10 @@ def render_play_finder(df: pd.DataFrame) -> None:
     downs = c[2].multiselect("Down", [1, 2, 3, 4], key="pf_down")
     dist = c[3].multiselect("Distance", v.DISTANCE_ORDER, key="pf_dist")
     c = st.columns(4)
-    ptype = c[0].multiselect("Play type", sorted(df["PLAY TYPE"].dropna().unique()), key="pf_type")
+    fakes = set(df["FAKE"].dropna()) if "FAKE" in df else set()
+    ptype = c[0].multiselect("Play type", sorted(set(df["PLAY TYPE"].dropna()) | fakes), key="pf_type",
+                             help="A fake punt or fake field goal counts as the run or pass it was; pick Fake Punt "
+                                  "to find just the fakes.")
     base = df[df["offense"].isin(offense)] if offense else df
     form = c[1].multiselect("Formation", sorted(base["OFF FORM"].dropna().astype(str).unique()), key="pf_form")
     call = c[2].text_input("Play call contains", key="pf_call")
@@ -373,7 +376,9 @@ def render_play_finder(df: pd.DataFrame) -> None:
     negative = c[3].checkbox("Negative plays only", key="pf_neg")
 
     d = base
-    for col, sel in (("WEEK", weeks), ("DN", downs), ("Distance", dist), ("PLAY TYPE", ptype),
+    if ptype:
+        d = d[d["PLAY TYPE"].isin(ptype) | (d["FAKE"].isin(ptype) if "FAKE" in d else False)]
+    for col, sel in (("WEEK", weeks), ("DN", downs), ("Distance", dist),
                      ("OFF FORM", form), ("HASH", hash_)):
         if sel:
             d = d[d[col].astype(str).isin([str(s) for s in sel])] if col == "OFF FORM" else d[d[col].isin(sel)]
@@ -403,6 +408,9 @@ def render_play_finder(df: pd.DataFrame) -> None:
     cols = ["game_id", "QTR", "DN", "DIST", "YARD LN", "HASH", "offense", "PLAY TYPE", "OFF FORM",
             "OFF PLAY", "PLAY DIR", "RESULT", "GN/LS", "epa"]
     t = d[[c for c in cols if c in d]].copy()
+    if "FAKE" in d:  # 'Run (Fake Punt)'
+        t["PLAY TYPE"] = np.where(d["FAKE"].notna(), t["PLAY TYPE"] + " (" + d["FAKE"].astype(str) + ")",
+                                  t["PLAY TYPE"])
     succ = pd.to_numeric(d["success"], errors="coerce")
     t["Success"] = np.select([succ == 1, succ == 0], ["Yes", "No"], default="")
     mine = ins.dowling_game_ids(df)

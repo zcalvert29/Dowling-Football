@@ -18,6 +18,14 @@ PUNT_TYPES = {"Punt", "Punt Rec"}
 XP_TYPES = {"Extra Pt.", "Extra Pt. Block"}
 TWO_PT_TYPES = {"2 Pt.", "2 Pt. Block", "2 Pt. Defend"}
 FG_TYPES = {"FG", "FG Block"}
+# Fakes are tagged as kicks (ODK "K") but are really a run or a pass by the kicking team. resolve_fakes turns them
+# into ordinary snaps, keeping the original label in the FAKE column. Any PLAY TYPE starting "Fake" counts
+# ("Fake Punt", "Fake FG", ...).
+FAKE_PASS_RESULTS = ("Complete", "Incomplete", "Interception", "Sack", "Scramble")
+
+
+def is_fake(play_type) -> bool:
+    return str(play_type).strip().lower().startswith("fake")
 
 # Kicking plays that don't represent a live down/distance situation. They
 # get fixed ep values instead of the down/distance formula (see
@@ -105,7 +113,7 @@ def assign_offense_defense(team, opponent, plays):
                 off, defn = team, opponent
             elif pt in THEIR_TRIES:
                 off, defn = opponent, team
-            elif pt in SAME_AS_PREV_OFFENSE:
+            elif pt in SAME_AS_PREV_OFFENSE or is_fake(pt):
                 off, defn = prev_offense, prev_defense
             else:
                 print(f"WARNING: unrecognized K play type {pt!r} at PLAY # {row['PLAY #']}; "
@@ -122,6 +130,26 @@ def assign_offense_defense(team, opponent, plays):
     df["offense"] = offense_col
     df["defense"] = defense_col
 
+    return df
+
+
+def resolve_fakes(plays, team):
+    """
+    A fake punt or fake field goal is a snap like any other: the kicking team runs or throws it, it can convert
+    (or fail on) 4th down, and it belongs in the run/pass numbers. Each fake row becomes ODK "O"/"D" (for whoever
+    ran it, from the offense column) and PLAY TYPE "Pass" if its RESULT is a pass result (Complete, Incomplete,
+    Interception, Sack, Scramble), else "Run". The original PLAY TYPE is kept in FAKE (blank for every other play).
+    Runs after assign_offense_defense, which needs the original label to know the kicking team kept the ball.
+    """
+    df = plays.copy()
+    df["FAKE"] = None
+    fake = df["PLAY TYPE"].map(is_fake) & df["offense"].notna()
+    if not fake.any():
+        return df
+    res = df.loc[fake, "RESULT"].fillna("").astype(str)
+    df.loc[fake, "FAKE"] = df.loc[fake, "PLAY TYPE"]
+    df.loc[fake, "PLAY TYPE"] = np.where(res.str.contains("|".join(FAKE_PASS_RESULTS)), "Pass", "Run")
+    df.loc[fake, "ODK"] = np.where(df.loc[fake, "offense"] == team, "O", "D")
     return df
 
 
@@ -905,6 +933,7 @@ def add_dowling_offense_plays(plays: pd.DataFrame, offense_plays: pd.DataFrame) 
 
 def curate_play_by_play_data(plays: pd.DataFrame, team: str, opponent: str, date: str, week):
     plays = assign_offense_defense(team=team, opponent=opponent, plays=plays)
+    plays = resolve_fakes(plays=plays, team=team)
     plays = fix_scoring_tags(plays=plays, team=team, opponent=opponent)
     plays = add_success_metrics(plays=plays)
     plays = add_score_columns(plays=plays, team=team, opponent=opponent)
