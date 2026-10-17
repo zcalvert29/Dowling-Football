@@ -90,7 +90,7 @@ streamlit run app.py
 
 The app builds its play-by-play straight from the Hudl exports when it starts, so there's no combined data file to maintain.
 
-1. Save the export as `<team>-vs-<opponent>-MMDDYY.xlsx` in `Dowling/` (our games) or `Scout/` (scout film). For our games, save the offense film next to it as `dowling-vs-<opponent>-offense.xlsx`.
+1. Save the export as `<team>-vs-<opponent>-MMDDYY.xlsx` in `Dowling/` (our games) or `Scout/` (scout film). For our games, save the offense film next to it with `-offense` added after the date: `dowling-vs-<opponent>-MMDDYY-offense.xlsx`. The play calls are copied from it to the game, matched play by play (quarter, ODK, play type), so its PLAY #s don't have to line up exactly.
 2. Add a row to `games.csv`: the file, the team and opponent as they should appear in the app, and the season. The week comes from the game date: Week 1 is the season's first Friday (8/28/26 for 2026, set in `SEASON_WEEK1` in `build_data.py`), each Friday after is the next week, through Week 13. `drop_plays` / `drop_offense_plays` are optional PLAY #s to remove (space-separated); the rest get renumbered.
 3. Run `python build_data.py` to build every game and list anything that needs a look (repeated PLAY #s, drives that came out as "Error", film files not in `games.csv`).
 4. Commit and push. The app rebuilds whenever a film file or `games.csv` changes.

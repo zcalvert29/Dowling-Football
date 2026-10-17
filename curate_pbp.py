@@ -892,26 +892,60 @@ def add_play_detail_columns(df: pd.DataFrame, team: str, opponent: str, date: st
     return df
 
 
+def _align_key(df: pd.DataFrame) -> list[tuple]:
+    """What has to agree for a row in the game film and the offense film to be the same play: quarter, ODK, play
+    type, and down (not on kicks, where the down is often tagged differently). The offense film usually has no yard
+    line, gain, or distance tagged, so those can't be used."""
+    def num(col):  # the same number reads as 1 in one export and 1.0 in another
+        return [None if pd.isna(x) else int(round(x)) for x in pd.to_numeric(df[col], errors="coerce")]
+    return list(zip(num("QTR"), df["ODK"].astype(str), df["PLAY TYPE"].astype(str)))
+
+
+def align_offense_film(plays: pd.DataFrame, offense_plays: pd.DataFrame) -> pd.Series:
+    """
+    For each row of `plays` (by position), the position of the same play in `offense_plays`, or -1. The films are
+    two cut-ups of the same game, but their PLAY #s don't always line up (a clip missing from one, a drop/renumber),
+    so rows are matched by content, in order, with difflib: runs of identical keys line up, and a run of changed
+    rows of the same length on both sides is matched one-to-one.
+    """
+    import difflib
+
+    a, o = _align_key(plays), _align_key(offense_plays)
+    out = np.full(len(a), -1)
+    for tag, i1, i2, j1, j2 in difflib.SequenceMatcher(None, a, o, autojunk=False).get_opcodes():
+        if tag == "equal" or (tag == "replace" and i2 - i1 == j2 - j1):
+            out[i1:i2] = np.arange(j1, j2)
+    return pd.Series(out, index=plays.index)
+
+
+def offense_film_match(plays: pd.DataFrame, offense_plays: pd.DataFrame) -> float:
+    """Share of Dowling's run/pass snaps in `plays` that align_offense_film finds in `offense_plays` (0 to 1).
+    Low means the offense film is from a different game."""
+    p = plays.reset_index(drop=True)
+    snaps = ((p["offense"] == "Dowling Catholic") & p["PLAY TYPE"].isin(["Run", "Pass"])).to_numpy()
+    if not snaps.any():
+        return 1.0
+    pos = align_offense_film(p, offense_plays.reset_index(drop=True)).to_numpy()
+    return float((pos[snaps] >= 0).mean())
+
+
 def add_dowling_offense_plays(plays: pd.DataFrame, offense_plays: pd.DataFrame) -> pd.DataFrame:
     """
-    Return a copy of `plays` where, for every row with offense ==
-    "Dowling Catholic", the OFF FORM and OFF PLAY values are replaced
-    with the corresponding values from `offense_plays`, matched on
-    PLAY #.
-
-    `plays` and `offense_plays` are expected to have identical columns
-    and rows, differing only in OFF FORM / OFF PLAY.
+    Return a copy of `plays` where, for every row with offense == "Dowling Catholic", OFF FORM and OFF PLAY come
+    from the same play in `offense_plays` (the offense film, which has the play calls tagged). Plays are matched by
+    content, not PLAY # (see align_offense_film); a Dowling snap with no match keeps the game film's own tags.
     """
     df = plays.copy()
-    lookup = offense_plays.set_index("PLAY #")[["OFF FORM", "OFF PLAY"]]
-
-    is_dowling = df["offense"] == "Dowling Catholic"
-    play_nums = df.loc[is_dowling, "PLAY #"]
+    pos = align_offense_film(df.reset_index(drop=True), offense_plays.reset_index(drop=True)).to_numpy()
+    lookup = offense_plays.reset_index(drop=True)[["OFF FORM", "OFF PLAY"]]
 
     # object first: an all-blank column reads in as numbers, and newer pandas won't put text into it
     df[["OFF FORM", "OFF PLAY"]] = df[["OFF FORM", "OFF PLAY"]].astype(object)
-    df.loc[is_dowling, "OFF FORM"] = play_nums.map(lookup["OFF FORM"])
-    df.loc[is_dowling, "OFF PLAY"] = play_nums.map(lookup["OFF PLAY"])
+    take = ((df["offense"] == "Dowling Catholic").to_numpy()) & (pos >= 0)
+    for col in ("OFF FORM", "OFF PLAY"):
+        vals = df[col].to_numpy(dtype=object, copy=True)
+        vals[take] = lookup[col].to_numpy(dtype=object)[pos[take]]
+        df[col] = vals
 
     schemes = [
         "HERKY", "STORM", "BULLDOGS", "PANTHERS", "CYCLONES", "HAWKEYES",

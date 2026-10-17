@@ -5,7 +5,7 @@ import pandas as pd
 import build_data as b
 
 SEP = "Dowling/dowling-vs-sep-091826.xlsx"        # SEP's fake punt: #106, 4th & 8, Rush for 14
-SEP_OFF = "Dowling/dowling-vs-sep-offense.xlsx"
+SEP_OFF = "Dowling/dowling-vs-sep-091826-offense.xlsx"
 
 
 def _sep_copy(tmp_path, change):

@@ -4,7 +4,7 @@ The app calls load_games() when it starts, so there's no combined data file to k
 
 Adding a game:
     1. Save the Hudl export as  <team>-vs-<opponent>-MMDDYY.xlsx  in Dowling/ (our games) or Scout/ (scout film).
-       For our games, save the offense film as  dowling-vs-<opponent>-offense.xlsx  next to it.
+       For our games, save the offense film next to it with -offense added: dowling-vs-<opponent>-MMDDYY-offense.xlsx.
     2. Add a row to games.csv (team and opponent as they should appear in the app, and the season).
     3. Run  python build_data.py  to check it, then commit and push.
 
@@ -101,12 +101,23 @@ class Game:
 
     @property
     def offense_file(self) -> str | None:
-        """Our games: the -offense file next to the game file, or the game file itself if there isn't one (its
-        OFF FORM / OFF PLAY are used as-is). Scout games: None."""
+        """Our games: the game file's own offense film (offense_name), or the game file itself if there isn't one
+        (its OFF FORM / OFF PLAY are used as-is). Scout games: None."""
         if self.team != TEAM:
             return None
-        off = DATE_IN_NAME.sub("-offense.xlsx", self.file)
+        off = offense_name(self.file)
         return off if os.path.exists(_path(off)) else self.file
+
+
+def offense_name(game_file: str) -> str:
+    """The offense film's name for a game file:
+        dowling-vs-valley-082826.xlsx -> dowling-vs-valley-082826-offense.xlsx
+    The date stays in the name, so two seasons against the same opponent can't pick up each other's offense film."""
+    return re.sub(r"\.xlsx$", "-offense.xlsx", game_file, flags=re.IGNORECASE)
+
+
+# An offense film is only used if this share of the game's Dowling snaps can be matched to a play in it.
+MIN_OFFENSE_MATCH = 0.8
 
 
 def _path(f: str) -> str:
@@ -238,7 +249,13 @@ def curate_game(g: Game) -> tuple[pd.DataFrame, list[str]]:
             problems += _film_problems(g.offense_file, off_raw)
         off = cp.curate_play_by_play_data(plays=off_raw, team=g.team, opponent=g.opponent, date=g.date,
                                           week=g.week)
-        df = cp.add_dowling_offense_plays(df, off)
+        matched = cp.offense_film_match(df, off)
+        if matched >= MIN_OFFENSE_MATCH:
+            df = cp.add_dowling_offense_plays(df, off)
+        else:
+            problems.append(f"{g.offense_file}: only {matched:.0%} of Dowling's snaps in {g.file} match a play in "
+                            f"this offense film, so it doesn't look like the same game. It's ignored: OFF FORM and "
+                            f"OFF PLAY come from the game file instead.")
     df["SEASON"] = g.season
     raw = pd.read_excel(_path(g.file))
     problems += _s_row_notes(g.file, raw) + _error_drive_notes(g.file, df, raw)

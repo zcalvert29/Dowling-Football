@@ -10,13 +10,13 @@ import insights as ins
 def test_reupload_keeps_existing_file_names():
     # Typed opponent differs from the file name's "crk", and in case.
     assert ins.new_game_files("Dowling Catholic", "cr kennedy", date(2026, 10, 2)) == \
-        ("Dowling/dowling-vs-crk-100226.xlsx", "Dowling/dowling-vs-crk-offense.xlsx")
+        ("Dowling/dowling-vs-crk-100226.xlsx", "Dowling/dowling-vs-crk-100226-offense.xlsx")
     assert ins.new_game_files("Waukee", "Ankeny", date(2026, 9, 4)) == ("Scout/waukee-vs-ankeny-090426.xlsx", None)
 
 
 def test_new_game_names():
     assert ins.new_game_files("Dowling Catholic", "Ankeny", date(2026, 10, 16)) == \
-        ("Dowling/dowling-vs-ankeny-101626.xlsx", "Dowling/dowling-vs-ankeny-offense.xlsx")
+        ("Dowling/dowling-vs-ankeny-101626.xlsx", "Dowling/dowling-vs-ankeny-101626-offense.xlsx")
     assert ins.new_game_files("Ankeny Centennial", "Ankeny", date(2026, 10, 16)) == \
         ("Scout/ankeny-centennial-vs-ankeny-101626.xlsx", None)
 
