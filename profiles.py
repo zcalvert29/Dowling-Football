@@ -24,6 +24,8 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
+import curate_pbp as cp
+
 BENCHMARK_PATH = "cfb_benchmarks.csv"
 HS_TOUCHBACK = 20     # high school touchback spot (yards from own goal)
 CFB_TOUCHBACK = 25    # college touchback spot
@@ -185,9 +187,14 @@ def _ep_many(ytg, down, dist) -> np.ndarray:
     return mu._ep_booster.predict(xgb.DMatrix(x, feature_names=mu.EP_FEATURE_ORDER))
 
 
+RETURN_TD_POINTS = cp.TD_POINTS + cp.XP_EP   # a kick returned for a touchdown: 6 + the expected extra point
+
+
 def _first_down_ep(ytg) -> np.ndarray:
-    ytg = np.clip(np.asarray(ytg, dtype=float), 1, 99)
-    return _ep_many(ytg, np.ones(len(ytg)), np.minimum(10.0, ytg))
+    """EP of 1st & 10 (or goal) at each yards-to-goal; 0 yards to go means the receiver scored (a return TD)."""
+    raw = np.asarray(ytg, dtype=float)
+    ytg = np.clip(raw, 1, 99)
+    return np.where(raw <= 0, RETURN_TD_POINTS, _ep_many(ytg, np.ones(len(ytg)), np.minimum(10.0, ytg)))
 
 
 def add_st_epa(kicks: pd.DataFrame, fgs: pd.DataFrame, touchback_ytg: float) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -259,6 +266,17 @@ def standardize_hudl(df: pd.DataFrame, team: str = "Dowling Catholic") -> dict:
         scrim = g.index[g["DN"].isin([1, 2, 3, 4]) & ~g["PLAY TYPE"].isin(_KICKOFFS | _ONSIDES | _TRIES)
                         & g["YARDLINE_100"].notna()].to_numpy()
         for i, r in g[g["PLAY TYPE"].isin(_KICKOFFS | _PUNTS)].iterrows():
+            scorer = cp.return_td_scorer(r)
+            if scorer is not None:   # returned for a touchdown: recv_ytg 0 is priced as the touchdown
+                kicker = b if scorer == a else a
+                if r["PLAY TYPE"] in _KICKOFFS:
+                    kicks.append({"kind": "ko", "kicker": kicker, "receiver": scorer, "value": 100 - HS_TOUCHBACK,
+                                  "recv_ytg": 0.0, "spot_ytg": np.nan, "down": np.nan, "dist": np.nan})
+                else:
+                    kicks.append({"kind": "punt", "kicker": kicker, "receiver": scorer,
+                                  "value": r["YARDLINE_100"] - 100, "recv_ytg": 0.0,
+                                  "spot_ytg": r["YARDLINE_100"], "down": r["DN"], "dist": r["DIST"]})
+                continue
             later = scrim[scrim > i]
             if not len(later):
                 continue

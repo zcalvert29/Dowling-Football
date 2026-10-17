@@ -153,6 +153,23 @@ def resolve_fakes(plays, team):
     return df
 
 
+def _return_td_text(res: str) -> str:
+    """'TD' -> 'Return, Def TD'; 'Block, TD' -> 'Block, Def TD'."""
+    return "Return, " + DEF_TD_MARK if res.strip() == "TD" else re.sub(r"\bTD\b", DEF_TD_MARK, res)
+
+
+def return_td_scorer(row) -> str | None:
+    """The team that scored a return touchdown on a kick, or None: a punt or field goal play marked Def TD (see
+    fix_scoring_tags) was scored by its defense, the returning team; a kickoff's offense is already the
+    receiving team, so a TD on one is theirs."""
+    res = str(row["RESULT"]) if pd.notna(row["RESULT"]) else ""
+    if DEF_TD_MARK in res and row["PLAY TYPE"] in (PUNT_TYPES | FG_TYPES):
+        return row["defense"]
+    if "TD" in res and DEF_TD_MARK not in res and row["PLAY TYPE"] in KICKOFF_TYPES:
+        return row["offense"]
+    return None
+
+
 def fix_scoring_tags(plays, team, opponent):
     """
     Repair the two scoring mistakes the score columns can't survive, using what the next play proves.
@@ -194,6 +211,13 @@ def fix_scoring_tags(plays, team, opponent):
                 result[i] = "Good"
                 print(f"FIXED PLAY # {r['PLAY #']}: FG tagged No Good, but {kicker} kicked off next, so it was "
                       f"good -> 'Good'. Fix the tag in Hudl too.")
+    # A touchdown on a punt or field goal play is a return touchdown, scored by the team that received the kick.
+    # Those rows' offense is the kicking team (it was their drive), so mark it the way a pick-six is marked:
+    # "Def TD" credits the defense. (Hudl tags it "TD" on the Punt Rec row, which gave the punting team 6.)
+    res_all = result.fillna("").astype(str)
+    kick_td = (df["PLAY TYPE"].isin(PUNT_TYPES | FG_TYPES) & res_all.str.contains(r"\bTD\b")
+               & ~res_all.str.contains(DEF_TD_MARK, regex=False))
+    result[kick_td] = res_all[kick_td].map(_return_td_text)
     df["RESULT"] = result
     return df
 
@@ -646,14 +670,16 @@ def assign_drives(game: pd.DataFrame) -> pd.DataFrame:
     def last_play_result(i):
         pt = str(df.at[i, "PLAY TYPE"])
         res = df.at[i, "RESULT"] if pd.notna(df.at[i, "RESULT"]) else ""
-        if DEF_TD_MARK in res:
-            return "Turnover, Def TD"
-        if pt in XP_TYPES or pt in TWO_PT_TYPES or ("TD" in res and DEF_TD_MARK not in res):
-            return "Touchdown"
+        # Kicks first: a punt or field goal returned for a touchdown still ends the kicking team's drive as a
+        # punt / field goal attempt, not a turnover.
         if pt in FG_TYPES:
             return "FG Attempt"
         if pt in PUNT_TYPES:
             return "Punt"
+        if DEF_TD_MARK in res:
+            return "Turnover, Def TD"
+        if pt in XP_TYPES or pt in TWO_PT_TYPES or ("TD" in res and DEF_TD_MARK not in res):
+            return "Touchdown"
         if df.at[i, "turnover"] == 1:
             return "Turnover"
         if "Safety" in res:

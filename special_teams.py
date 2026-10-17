@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
+import curate_pbp as cp
 import insights as ins
 
 TEAM = ins.TEAM
@@ -39,6 +40,16 @@ def kick_events(df: pd.DataFrame) -> pd.DataFrame:
         scrim = g.index[g["DN"].isin([1, 2, 3, 4]) & ~g["PLAY TYPE"].isin(KICKOFFS | ONSIDES | XPS | TWO_PTS)
                         & g["YARDLINE_100"].notna()].to_numpy()
         for i, r in g[g["PLAY TYPE"].isin(KICKOFFS | ONSIDES | PUNTS)].iterrows():
+            scorer = cp.return_td_scorer(r)
+            if scorer is not None:   # returned for a touchdown: the receiver "started" in the end zone
+                kicker = ins.other_team(g, scorer)
+                kind = "Punt" if r["PLAY TYPE"] in PUNTS else "Kickoff"
+                rows.append({"game": gid, "week": week, "opp": opp, "kind": kind, "kicker": kicker,
+                             "receiver": scorer, "QTR": r["QTR"],
+                             "spot": 100 - r["YARDLINE_100"] if kind == "Punt" else np.nan, "start": 100.0,
+                             "net": r["YARDLINE_100"] - 100 if kind == "Punt" else np.nan, "result": r["RESULT"],
+                             "ret": r.get("RET YARDS", np.nan)})
+                continue
             later = scrim[scrim > i]
             if not len(later):
                 continue
