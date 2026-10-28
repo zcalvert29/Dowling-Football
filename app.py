@@ -21,6 +21,7 @@ Folder layout (everything sits next to this file):
     model_utils.py      EP/WP model loading used by the bots and win probability
     *.json              trained model files (optional)
 """
+import pandas as pd
 import streamlit as st
 
 import breakdowns as bd
@@ -281,50 +282,75 @@ def scouting_report():
 GAME_KINDS = ["Dowling games", "Scout games"]
 
 
-def _game_picker(allow_all: bool) -> tuple[str | None, str]:
+def _review_season() -> pd.DataFrame:
     """
-    Dowling games or scout film first, then the game. Returns (game_id or None for all Dowling games, team): the
-    team is the side the page is told from, Dowling for Dowling games and the first team in the game_id for scout
-    film. Scout games are labeled with both teams ("W1 Johnston vs Waukee").
+    The Season picker shared by the Game Review pages (latest season by default), and every game from that season.
+    The sidebar filters don't show on these pages, so this keeps seasons from being added together.
     """
-    kind = st.segmented_control("Games", GAME_KINDS, key="g_kind", default=GAME_KINDS[0]) or GAME_KINDS[0]
-    if kind == GAME_KINDS[0]:
-        options = ins.games(ins.dowling_only(df_all))[::-1]  # newest first
-        if allow_all:
-            options = options + ["__all__"]
-        pick = st.selectbox("Game", options, key="g_game_all" if allow_all else "g_game",
-                            format_func=lambda g: "All Dowling games" if g == "__all__" else ins.game_label(df_all, g))
-        return (None if pick == "__all__" else pick), v.TEAM
-    options = ins.games(ins.scout_only(df_all))[::-1]
-    if not options:
-        st.info("No scout games loaded yet.")
-        st.stop()
-    pick = st.selectbox("Game", options, key="g_game_scout", format_func=lambda g: ins.scout_game_label(df_all, g))
-    return pick, ins.game_teams(pick)[0]
+    seasons = ALL_SEASONS[::-1]  # newest first
+    if st.session_state.get("g_season") not in seasons:
+        st.session_state["g_season"] = DEFAULT_SEASON
+    season = st.selectbox("Season", seasons, key="g_season")
+    return df_all[df_all["SEASON"] == season]
+
+
+def _game_picker(allow_all: bool) -> tuple[pd.DataFrame, str | None, str]:
+    """
+    Season, Dowling games or scout film, then the game. Returns (that season's games, game_id or None for all
+    Dowling games that season, team): the team is the side the page is told from, Dowling for Dowling games and
+    the first team in the game_id for scout film. Games are labeled with season and week ("2026W1 · Valley",
+    "2026W1 Johnston vs Waukee").
+    """
+    c1, c2, c3 = st.columns([1, 2, 3])
+    with c1:
+        season_df = _review_season()
+    with c2:
+        kind = st.segmented_control("Games", GAME_KINDS, key="g_kind", default=GAME_KINDS[0]) or GAME_KINDS[0]
+    with c3:
+        if kind == GAME_KINDS[0]:
+            options = ins.games(ins.dowling_only(season_df))[::-1]  # newest first
+            if allow_all:
+                options = options + ["__all__"]
+            if not options:
+                st.info("No Dowling games loaded for this season.")
+                st.stop()
+            season = int(season_df["SEASON"].iat[0])
+            pick = st.selectbox("Game", options, key="g_game_all" if allow_all else "g_game",
+                                format_func=lambda g: f"All Dowling games ({season})" if g == "__all__"
+                                else ins.game_label(df_all, g, with_season=True))
+            return season_df, (None if pick == "__all__" else pick), v.TEAM
+        options = ins.games(ins.scout_only(season_df))[::-1]
+        if not options:
+            st.info("No scout games loaded for this season.")
+            st.stop()
+        pick = st.selectbox("Game", options, key="g_game_scout",
+                            format_func=lambda g: ins.scout_game_label(df_all, g, with_season=True))
+        return season_df, pick, ins.game_teams(pick)[0]
 
 
 def game_recap():
     page_header("Game Recap", show_filters=False)
-    c1, c2 = st.columns([2, 3])
-    with c1:
-        gid, team = _game_picker(allow_all=True)
-    with c2:
-        half = st.radio("Show", ["Full game", "First half", "Second half"], horizontal=True, key="g_half")
+    season_df, gid, team = _game_picker(allow_all=True)
+    half = st.radio("Show", ["Full game", "First half", "Second half"], horizontal=True, key="g_half")
     if gid is None:
         st.caption("All Dowling games: drive charts and the scoreboard need a single game, so this shows the "
                    "head-to-head numbers and play logs for the whole season.")
-        ins.render_game_recap(ins.dowling_only(df_all), None, half)
+        ins.render_game_recap(ins.dowling_only(season_df), None, half)
         return
     scout = team != v.TEAM
-    label = ins.scout_game_label(df_all, gid) if scout else ins.game_label(df_all, gid)
+    label = (ins.scout_game_label(df_all, gid, with_season=True) if scout
+             else ins.game_label(df_all, gid, with_season=True))
     qol.notes_box("game", gid, label)
     ins.render_game_recap(df_all, gid, half, team=team)
 
 
 def season_drives_page():
     page_header("Season Drives", show_filters=False)
+    c1, _ = st.columns([1, 5])
+    with c1:
+        season_df = _review_season()
     st.caption("Every possession this season: where drives start, how far they get, and how they end.")
-    bd.render_season_drives(df_all)
+    bd.render_season_drives(season_df)
 
 
 def season_comparison_page():
@@ -355,9 +381,9 @@ def special_projects_defense():
 
 def win_prob_fourth_downs():
     page_header("Win Probability & 4th Downs", show_definitions=False, show_filters=False)
-    gid, team = _game_picker(allow_all=True)
+    season_df, gid, team = _game_picker(allow_all=True)
     if gid is None:
-        ins.render_fourth_down_review(ins.dowling_only(df_all))
+        ins.render_fourth_down_review(ins.dowling_only(season_df))
         return
     g = df_all[df_all["game_id"] == gid]
     other = ins.other_team(g, team) or ins.game_teams(gid)[1]
@@ -661,6 +687,8 @@ if _data_problems:
     with st.sidebar.expander(f"⚠️ {len(_data_problems)} data issue{'s' if len(_data_problems) != 1 else ''}"):
         for _p in _data_problems:
             st.caption(_p)
+ALL_SEASONS = sorted(int(x) for x in df_all["SEASON"].dropna().unique())
+DEFAULT_SEASON = ALL_SEASONS[-1]  # the latest season, so weeks from different years don't mix by default
 OPPONENTS = sorted(o for o in df_all["offense"].dropna().unique() if o != v.TEAM)
 if st.session_state.get("f_opp") not in OPPONENTS:
     # Default opponent: next_opponent from the app's secrets (set weekly), else SEP, else the first one.
@@ -670,8 +698,6 @@ if st.session_state.get("f_opp") not in OPPONENTS:
 if any(pg is p for group in FILTERED_PAGES.values() for p in group):
     ALL_DOWNS = [1, 2, 3, 4]
     ALL_WEEKS = sorted(df_all["WEEK"].dropna().unique().tolist())
-    ALL_SEASONS = sorted(int(x) for x in df_all["SEASON"].dropna().unique())
-    DEFAULT_SEASON = ALL_SEASONS[-1]  # the latest season, so weeks from different years don't mix by default
     st.session_state.setdefault("f_sit", "All plays")
     st.session_state.setdefault("f_good", good_teams.ALL)
     st.session_state.setdefault("f_minplays", 1)
