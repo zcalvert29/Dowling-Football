@@ -135,10 +135,23 @@ def game_teams(game_id: str) -> tuple[str, str]:
     return parts[0], (parts[1] if len(parts) > 1 else "")
 
 
-def scout_game_label(df: pd.DataFrame, game_id: str) -> str:
-    """'W1 Johnston vs Waukee'."""
+def season_week(df: pd.DataFrame, game_id: str) -> str:
+    """'2026W1' (or 'W1' when the season is unknown, '' when the week is)."""
+    g = df.loc[df["game_id"] == game_id]
+    week = g["WEEK"].min()
+    if pd.isna(week):
+        return ""
+    season = g["SEASON"].min() if "SEASON" in g else np.nan
+    return (f"{int(season)}" if pd.notna(season) else "") + f"W{int(week)}"
+
+
+def scout_game_label(df: pd.DataFrame, game_id: str, with_season: bool = False) -> str:
+    """'W1 Johnston vs Waukee' ('2026W1 Johnston vs Waukee' with_season)."""
     week = df.loc[df["game_id"] == game_id, "WEEK"].min()
     a, b = game_teams(game_id)
+    if with_season:
+        wk = season_week(df, game_id)
+        return (f"{wk} " if wk else "") + f"{a} vs {b}"
     return (f"W{int(week)} " if pd.notna(week) else "") + f"{a} vs {b}"
 
 
@@ -162,7 +175,11 @@ def full_game_label(df: pd.DataFrame, game_id: str) -> str:
     return f"{prefix}{a} vs {b}"
 
 
-def game_label(df: pd.DataFrame, game_id: str) -> str:
+def game_label(df: pd.DataFrame, game_id: str, with_season: bool = False) -> str:
+    """'W1 · Valley' ('2026W1 · Valley' with_season)."""
+    if with_season:
+        wk = season_week(df, game_id)
+        return (f"{wk} · " if wk else "") + opponent_of(game_id)
     week = df.loc[df["game_id"] == game_id, "WEEK"].min()
     wk = f"W{int(week)} · " if pd.notna(week) else ""
     return f"{wk}{opponent_of(game_id)}"
@@ -1103,7 +1120,7 @@ def fourth_down_review(df: pd.DataFrame, team: str = TEAM) -> pd.DataFrame:
         us, them = int(r["pre_off_score"]), int(r["pre_def_score"])
         score = f"up {us}-{them}" if us > them else f"down {us}-{them}" if us < them else f"tied {us}-{them}"
         rows.append({
-            "game": gid, "Game": game_label(df, gid) if team == TEAM else scout_game_label(df, gid), "opp": opp, "Est. clock": r["clock"], "score_text": score,
+            "game": gid, "Game": game_label(df, gid, True) if team == TEAM else scout_game_label(df, gid, True), "opp": opp, "Est. clock": r["clock"], "score_text": score,
             "dist": int(r["DIST"]), "ytg": float(r["YARDLINE_100"]),
             "Situation": f"4th & {int(r['DIST'])} at {_spot_text(r['YARDLINE_100'], opp)}",
             "We chose": did, "Model": best,
