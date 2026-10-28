@@ -288,19 +288,25 @@ def drive_chart_html(drives: pd.DataFrame, ink: str = "inherit") -> str:
     )
 
 
+def drive_chart_stats(drives: pd.DataFrame) -> list[tuple[str, object]]:
+    """The boxes under the drive chart. Turnovers on downs get their own box instead of counting as turnovers."""
+    return [
+        ("Drives", len(drives)),
+        ("Touchdowns", int((drives["result"] == "Touchdown").sum())),
+        ("Avg start", _yard_label(drives["start"].mean())),
+        ("3-and-outs", int(drives["three_and_out"].sum())),
+        ("Turnovers", int(drives["result"].isin(["Turnover", "Turnover, Def TD"]).sum())),
+        ("Turnover on Downs", int((drives["result"] == "Turnover on Downs").sum())),
+    ]
+
+
 def render_drive_chart(g: pd.DataFrame, team: str, title: str) -> pd.DataFrame:
     st.markdown(f"**{title}**")
     drives = drive_summary(g, team)
     if drives.empty:
         st.info("No drives for this team in the selected game.")
         return drives
-    stats = [
-        ("Drives", len(drives)),
-        ("Touchdowns", int((drives["result"] == "Touchdown").sum())),
-        ("Avg start", _yard_label(drives["start"].mean())),
-        ("3-and-outs", int(drives["three_and_out"].sum())),
-        ("Turnovers", int(drives["result"].isin(["Turnover", "Turnover, Def TD", "Turnover on Downs"]).sum())),
-    ]
+    stats = drive_chart_stats(drives)
     stats_html = (
         '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">'
         + "".join(f'<div style="background:rgba(128,128,128,.08);border-radius:8px;padding:6px 12px">'

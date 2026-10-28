@@ -117,3 +117,11 @@ def test_full_game_label(df):
     assert ins.full_game_label(df, "Dowling Catholic_Valley_2026_08_28") == "W1-2026 Dowling Catholic vs Valley"
     assert ins.full_game_label(df, "SEP_Iowa City High_2026_10_02") == "W6-2026 SEP vs Iowa City High"
     assert "W1-2026 Dowling Catholic vs Valley" in ins.tagging_coverage(df).index
+
+
+def test_drive_chart_counts_downs_separately_from_turnovers(df):
+    g = df[df["game_id"] == "Dowling Catholic_IC Liberty_2025_11_21"]
+    drives = ins.drive_summary(g, "IC Liberty")                          # 2 turnovers, 2 turnovers on downs
+    stats = dict(ins.drive_chart_stats(drives))
+    assert stats["Turnovers"] == int(drives["result"].isin(["Turnover", "Turnover, Def TD"]).sum()) == 2
+    assert stats["Turnover on Downs"] == int((drives["result"] == "Turnover on Downs").sum()) == 2
