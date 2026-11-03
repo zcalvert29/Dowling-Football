@@ -34,6 +34,48 @@ def _secret(key, default=None):
 
 
 # ---------------------------------------------------------------------------
+# GoBound (teams.py), read at most every few hours. A page that can't be read caches as empty / None, so the
+# app falls back to teams.csv and next_opponent in the secrets instead of waiting on GoBound every rerun.
+# ---------------------------------------------------------------------------
+@st.cache_data(ttl=3 * 3600, show_spinner=False)
+def gobound_teams() -> list[str]:
+    import teams
+
+    try:
+        return teams.gobound_teams()
+    except Exception:  # noqa: BLE001 — offline, blocked, or the page changed
+        return []
+
+
+@st.cache_data(ttl=3 * 3600, show_spinner=False)
+def gobound_next_game() -> dict | None:
+    """{"opponent", "gobound_name", "day"} for the next game on Dowling's GoBound schedule, or None."""
+    import teams
+
+    try:
+        g = teams.gobound_next_opponent()
+    except Exception:  # noqa: BLE001
+        return None
+    return None if g is None else {"opponent": g.opponent, "gobound_name": g.gobound_name, "day": g.day}
+
+
+def default_opponent(opponents: list[str]) -> tuple[str | None, str]:
+    """(opponent, where it came from) for the app's default opponent: the next game on Dowling's GoBound schedule,
+    else next_opponent in the secrets, else SEP, else the first team. Only teams with film count."""
+    nxt = gobound_next_game()
+    if nxt and nxt["opponent"] in opponents:
+        day = f" on {nxt['day']:%a %-m/%-d}" if nxt.get("day") else ""
+        return nxt["opponent"], f"Next on Dowling's GoBound schedule{day}."
+    secret = _secret("next_opponent")
+    why = (f"GoBound's next opponent ({nxt['opponent']}) has no film in the app yet. " if nxt else
+           "Couldn't read Dowling's GoBound schedule. ")
+    if secret in opponents:
+        return secret, why + "Using next_opponent from the app's secrets."
+    pick = "SEP" if "SEP" in opponents else (opponents[0] if opponents else None)
+    return pick, why.strip()
+
+
+# ---------------------------------------------------------------------------
 # Login gate
 # ---------------------------------------------------------------------------
 def check_password() -> bool:
@@ -286,15 +328,18 @@ def render_home(df: pd.DataFrame, opponents: list[str], pages: dict) -> None:
     st.title("Dowling Scouting Dashboard")
     st.caption(ins.last_updated_text(df))
     dchs = ins.dowling_only(df)
-    default_opp = _secret("next_opponent") or st.session_state.get("f_opp") or (opponents[0] if opponents else None)
-    st.session_state.setdefault("f_opp", default_opp if default_opp in opponents else (opponents[0] if opponents else None))
+    default_opp, default_why = default_opponent(opponents)
+    st.session_state.setdefault("f_opp", default_opp)
 
     c1, c2 = st.columns([3, 2])
     with c1:
         with st.container(border=True):
             opp = st.selectbox("Up next", opponents, key="f_opp",
-                               help="Sets the opponent for every Scouting page too. An admin can set a default "
-                                    "with next_opponent in the app's secrets.")
+                               help="Sets the opponent for every Scouting page too. Opens on the next game on "
+                                    "Dowling's GoBound schedule; if GoBound can't be read, on next_opponent from "
+                                    "the app's secrets.")
+            if opp == default_opp and default_why:
+                st.caption(default_why)
             n_games = df.loc[(df["offense"] == opp) | (df["defense"] == opp), "game_id"].nunique()
             st.caption(f"{n_games} game(s) of film on {opp}")
             tells = _opponent_tells(df, opp)
