@@ -33,6 +33,23 @@ def _secret(key, default=None):
         return default
 
 
+def default_opponent(opponents: list[str], df: pd.DataFrame) -> tuple[str | None, str]:
+    """(opponent, where it came from) for the app's default opponent: the next game saved on the Schedule page,
+    else next_opponent in the secrets, else SEP, else the first team. Only teams with film count."""
+    import schedule
+
+    nxt = schedule.next_game(df)
+    if nxt is not None and nxt["opponent"] in opponents:
+        return nxt["opponent"], f"Up next on the Schedule page ({schedule.when(nxt)})."
+    why = (f"{nxt['opponent']} is up next on the Schedule page but has no film in the app yet. " if nxt is not None
+           else "No next game set on the Schedule page. ")
+    secret = _secret("next_opponent")
+    if secret in opponents:
+        return secret, why + "Using next_opponent from the app's secrets."
+    pick = "SEP" if "SEP" in opponents else (opponents[0] if opponents else None)
+    return pick, why.strip()
+
+
 # ---------------------------------------------------------------------------
 # Login gate
 # ---------------------------------------------------------------------------
@@ -286,15 +303,17 @@ def render_home(df: pd.DataFrame, opponents: list[str], pages: dict) -> None:
     st.title("Dowling Scouting Dashboard")
     st.caption(ins.last_updated_text(df))
     dchs = ins.dowling_only(df)
-    default_opp = _secret("next_opponent") or st.session_state.get("f_opp") or (opponents[0] if opponents else None)
-    st.session_state.setdefault("f_opp", default_opp if default_opp in opponents else (opponents[0] if opponents else None))
+    default_opp, default_why = default_opponent(opponents, df)
+    st.session_state.setdefault("f_opp", default_opp)
 
     c1, c2 = st.columns([3, 2])
     with c1:
         with st.container(border=True):
             opp = st.selectbox("Up next", opponents, key="f_opp",
-                               help="Sets the opponent for every Scouting page too. An admin can set a default "
-                                    "with next_opponent in the app's secrets.")
+                               help="Sets the opponent for every Scouting page too. Opens on the next game set on "
+                                    "Data > Schedule (or next_opponent in the app's secrets if none is set).")
+            if opp == default_opp and default_why:
+                st.caption(default_why)
             n_games = df.loc[(df["offense"] == opp) | (df["defense"] == opp), "game_id"].nunique()
             st.caption(f"{n_games} game(s) of film on {opp}")
             tells = _opponent_tells(df, opp)

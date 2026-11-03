@@ -20,8 +20,8 @@ import insights as ins
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 FILE = os.path.join(HERE, "good_teams.csv")
-DEFAULT = ["SEP", "Dowling Catholic", "Johnston", "Ankeny", "Waukee", "Waukee Northwest", "Sioux City East",
-           "Indianola", "Valley", "DCG", "Iowa City Liberty", "Iowa City High", "Cedar Falls", "Bettendorf",
+DEFAULT = ["SEP", "Dowling Catholic", "Johnston", "Ankeny", "Waukee", "Waukee NW", "SC East",
+           "Indianola", "Valley", "DCG", "IC Liberty", "IC High", "Cedar Falls", "Bettendorf",
            "Pleasant Valley", "Urbandale"]
 ALL, GOOD, OTHER = "All opponents", "Good teams only", "Other teams only"
 MODES = [ALL, GOOD, OTHER]
