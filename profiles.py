@@ -454,7 +454,14 @@ def score_team(metrics: dict, stats: dict, unit: str) -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 # Radar chart (Chart.js in a components iframe, so hover tooltips work)
 # ---------------------------------------------------------------------------
-TEAM_COLORS = ["#8C1D2C", "#185FA5"]  # Dowling maroon, comparison blue
+TEAM_COLORS = ["#8C1D2C", "#185FA5"]  # fallbacks for a team with no color in teams.csv: Dowling maroon, blue
+
+
+def team_color(team: str) -> str:
+    """The team's primary color from teams.csv (Dowling is Maroon); maroon / blue if it has none."""
+    import teams
+
+    return teams.colors().get(team) or (TEAM_COLORS[0] if team == "Dowling Catholic" else TEAM_COLORS[1])
 
 
 def _esc(x) -> str:
@@ -625,8 +632,8 @@ def profile_charts(df_plays: pd.DataFrame, df_games: pd.DataFrame, opponent: str
     plural = lambda n: f"{n} game{'' if n == 1 else 's'}"
     pairs = [(("offense", "Offense"), ("defense", "Defense")), (("defense", "Defense"), ("offense", "Offense")),
              (("special_teams", "Special Teams"), ("special_teams", "Special Teams"))]
-    rows = [((f"{team} {ol}", plural(n_ours), team, score_team(ours, stats, ou), TEAM_COLORS[0]),
-             (f"{opponent} {tl}", plural(n_theirs), opponent, score_team(theirs, stats, tu), TEAM_COLORS[1]))
+    rows = [((f"{team} {ol}", plural(n_ours), team, score_team(ours, stats, ou), team_color(team)),
+             (f"{opponent} {tl}", plural(n_theirs), opponent, score_team(theirs, stats, tu), team_color(opponent)))
             for (ou, ol), (tu, tl) in pairs]
     return {"season": int(bench["season"].iat[0]), "n_ours": n_ours, "n_theirs": n_theirs, "rows": rows}
 

@@ -32,8 +32,8 @@ TABLE_CSS = """<style>
 
 
 def team_color(team: str) -> str:
-    """Dowling maroon for Dowling; every other team gets the comparison blue (per-team colors can come later)."""
-    return profiles.TEAM_COLORS[0] if team == v.TEAM else profiles.TEAM_COLORS[1]
+    """The team's primary color from teams.csv (profiles.team_color)."""
+    return profiles.team_color(team)
 
 
 def season_games(df: pd.DataFrame, team: str, season: int) -> pd.DataFrame:

@@ -17,7 +17,9 @@ def test_seasons_and_colors(df):
     assert sc.team_seasons(df, TEAM)[-2:] == [2025, 2026]
     one_season = [t for t in df["offense"].dropna().unique() if len(sc.team_seasons(df, t)) == 1]
     assert one_season                                                    # e.g. a scout team with only 2026 film
-    assert sc.team_color(TEAM) == "#8C1D2C" and sc.team_color("Waukee") == "#185FA5"
+    assert sc.team_color(TEAM) == "#8C1D2C"                              # Maroon
+    assert sc.team_color("Waukee") == "#4B2E83"                         # Purple, from teams.csv
+    assert sc.team_color("Not A Team") == "#185FA5"                     # no color set: blue
 
 
 def test_down_conversions_match_the_plays(df):
