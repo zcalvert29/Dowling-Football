@@ -17,11 +17,10 @@ import pandas as pd
 import streamlit as st
 
 import insights as ins
-import teams
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 FILE = os.path.join(HERE, "good_teams.csv")
-DEFAULT = ["SEP", "Dowling Catholic", "Johnston", "Ankeny", "Waukee", "Waukee NW", "Sioux City East",
+DEFAULT = ["SEP", "Dowling Catholic", "Johnston", "Ankeny", "Waukee", "Waukee NW", "SC East",
            "Indianola", "Valley", "DCG", "IC Liberty", "IC High", "Cedar Falls", "Bettendorf",
            "Pleasant Valley", "Urbandale"]
 ALL, GOOD, OTHER = "All opponents", "Good teams only", "Other teams only"
@@ -35,7 +34,7 @@ def load(path: str = FILE) -> list[str]:
     if not os.path.exists(path):
         return list(DEFAULT)
     t = pd.read_csv(path, dtype=str)["team"].dropna().str.strip()
-    return list(dict.fromkeys(teams.app_name(x) for x in t if x))   # GoBound spellings saved earlier -> app names
+    return [x for x in t if x]
 
 
 def to_csv(teams) -> bytes:
@@ -62,7 +61,7 @@ def keep_games(df: pd.DataFrame, good, mode: str, focus) -> list[str]:
     team played, of the filming team, the first name in the game_id): "Good teams only" keeps the game if one of
     those opponents is on the list, "Other teams only" if one isn't. When Dowling plays the scouted team, the game
     can count both ways (Dowling's opponent and the scouted team's opponent are different teams)."""
-    good = {teams.app_name(t).casefold() for t in good}
+    good = {t.casefold() for t in good}
     focus = set(focus)
     keep = []
     for gid, opp in opponents_by_game(df).items():

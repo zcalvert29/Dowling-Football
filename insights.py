@@ -1387,14 +1387,13 @@ def render_fourth_down_review(df: pd.DataFrame, team: str = TEAM) -> None:
 # Add a game: check a Hudl export with the curation code, then hand back the
 # film file(s) named the way build_data.py expects plus the updated games.csv
 # ---------------------------------------------------------------------------
-def add_game_team_options(gobound_names=()) -> list[str]:
-    """The Team on film / Opponent dropdowns: GoBound's standings plus teams.csv and every team in games.csv, in the
-    app's spelling, Dowling first."""
+def add_game_team_options() -> list[str]:
+    """The team dropdowns (Add a Game, Schedule): teams.csv plus every team in games.csv, Dowling first."""
     import build_data
     import teams
 
     listed = [n for g in build_data.read_manifest() for n in (g.team, g.opponent)]
-    return teams.team_options(listed, gobound_names=gobound_names)
+    return teams.team_options(listed)
 
 
 def _read_upload(f) -> pd.DataFrame:
@@ -1580,23 +1579,18 @@ def render_add_game() -> None:
         "rebuilds with it for everyone. Uploading a game that's already in the app replaces it."
     )
     xlsx = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    import qol  # local import: qol imports this module
     import teams
 
     c0, c1, c2 = st.columns(3)
-    gobound_names = qol.gobound_teams()
-    options = add_game_team_options(gobound_names)
-    longs = teams.long_names(gobound_names)
-    label = lambda t: teams.option_label(t, longs)  # noqa: E731 — searchable by either spelling
-    team = c0.selectbox("Team on film", options, index=options.index(TEAM), key="add_team", format_func=label,
-                        accept_new_options=True, help="Type to narrow the list. Teams come from GoBound's IHSAA "
-                                                      "standings and the teams already in the app.")
+    options = add_game_team_options()
+    team = c0.selectbox("Team on film", options, index=options.index(TEAM), key="add_team",
+                        format_func=teams.option_label, accept_new_options=True,
+                        help="Type to narrow the list. A team that isn't listed can be typed in.")
     opponent = c1.selectbox("Opponent", options, index=None, key="add_opp", accept_new_options=True,
-                            format_func=label, placeholder="Type to search", help="Type to narrow the list. A team that isn't listed "
-                                                               "can be typed in; GoBound spellings like Cedar "
-                                                               "Rapids Kennedy are saved as CR Kennedy.")
-    team = teams.app_name(team or "")
-    opponent = teams.app_name(opponent or "")
+                            format_func=teams.option_label, placeholder="Type to search",
+                            help="Type to narrow the list. A team that isn't listed can be typed in, spelled the "
+                                 "way it should appear in the app.")
+    team, opponent = (team or "").strip(), (opponent or "").strip()
     game_day = c2.date_input("Game date", key="add_date")
     season = game_day.year  # seasons run Aug-Nov, so the game date's year is the season
     film = st.file_uploader("Game film export (.xlsx or .csv)", type=["xlsx", "xls", "csv"], key="add_film")

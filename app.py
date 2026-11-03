@@ -31,6 +31,7 @@ import insights as ins
 import profiles
 import qol
 import rankings
+import schedule
 import season_comparison
 import special_projects
 import special_teams
@@ -439,6 +440,11 @@ def add_game():
     ins.render_add_game()
 
 
+def schedule_page():
+    page_header("Schedule", show_definitions=False, show_filters=False)
+    schedule.render_page(df_all)
+
+
 def rankings_page():
     page_header("Rankings", show_definitions=False, show_filters=False)
     rankings.render_page(df_all)
@@ -504,6 +510,7 @@ OTHER_PAGES = {
     "Data": [
         st.Page(tagging_coverage, title="Tagging Coverage", url_path="tagging-coverage"),
         st.Page(add_game, title="Add a Game", url_path="add-a-game"),
+        st.Page(schedule_page, title="Schedule", url_path="schedule"),
         st.Page(good_teams_page, title="Good Teams Filter", url_path="good-teams"),
     ],
 }
@@ -700,9 +707,9 @@ ALL_SEASONS = sorted(int(x) for x in df_all["SEASON"].dropna().unique())
 DEFAULT_SEASON = ALL_SEASONS[-1]  # the latest season, so weeks from different years don't mix by default
 OPPONENTS = sorted(o for o in df_all["offense"].dropna().unique() if o != v.TEAM)
 if st.session_state.get("f_opp") not in OPPONENTS:
-    # Default opponent: the next game on Dowling's GoBound schedule, else next_opponent from the app's secrets,
+    # Default opponent: the next game set on the Schedule page, else next_opponent from the app's secrets,
     # else SEP, else the first one (qol.default_opponent).
-    st.session_state["f_opp"] = qol.default_opponent(OPPONENTS)[0]
+    st.session_state["f_opp"] = qol.default_opponent(OPPONENTS, df_all)[0]
 
 if any(pg is p for group in FILTERED_PAGES.values() for p in group):
     ALL_DOWNS = [1, 2, 3, 4]

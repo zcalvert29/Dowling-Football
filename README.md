@@ -28,6 +28,7 @@ A multipage Streamlit app built on Dowling's tagged play-by-play data.
 | **DCHS Run Game Comparison** | DCHS O Run Game's Run Scheme Detail for two seasons side by side: runs, success, EPA, yards per carry, and explosive rate per scheme, with the change |
 | **Add a Game** | Upload a new film-tagging export, check its tagging, and save it to the app for everyone |
 | **Rankings** | Every team in the data side by side: offense, defense, and special teams numbers, each with the team's rank in parentheses (e.g. `+0.20 (12)`). Sortable by any column, filterable by season, minimum games, and good teams; team names shaded in each team's color (`teams.csv`) |
+| **Schedule** | Any team's games on film by week, with opponent and final score (Dowling's by default), plus *Add Next Game* to set and save who Dowling plays next |
 | **Good Teams Filter** | Pick which teams count as good; the sidebar's Good Teams filter then shows only games against good teams (or only the rest) |
 
 Coach notes can optionally be saved to a Google Sheet, and the app can be password-protected (see [Configuration](#configuration)).
@@ -67,7 +68,8 @@ build_data.py           Builds the season from games.csv + the film folders (the
 games.csv               One row per game: film file, team, opponent, season
 good_teams.py           Good Teams filter; the list of good teams is good_teams.csv
 rankings.py             Rankings page
-teams.py                Team names (GoBound -> app spelling), colors (teams.csv), and Dowling's GoBound schedule
+schedule.py             Schedule page; Dowling's next game is schedule.csv
+teams.py                The app's team names and colors (teams.csv)
 Dowling/, Scout/        Hudl exports: our games (plus -offense files) and scout film
 fourth_down_core.py     4th Down Bot decision math (no Streamlit code)
 Fourth_Downs.py         4th Down Bot page
@@ -103,7 +105,9 @@ The app builds its play-by-play straight from the Hudl exports when it starts, s
 
 Or use the **Add a Game** page: upload the film, review the tagging checks, and click **Save to app**. It commits the film file(s) and the updated `games.csv` to GitHub in one commit, and the app redeploys with the new game for everyone in a minute or two. Uploading a game that's already in the app replaces it. (Needs the `[github]` secrets below; without them the page offers the files as downloads instead.)
 
-Team names follow the app's spelling: GoBound's "Cedar Rapids …" and "Iowa City …" become "CR …" and "IC …", Dallas Center-Grimes is DCG, and Waukee Northwest is Waukee NW (`teams.app_name`). The Add a Game dropdowns list every team on [GoBound's IHSAA standings](https://www.gobound.com/ia/ihsaa/football/2026-27/standings) plus `teams.csv`; `python teams.py` shows what the app reads from GoBound, and `python teams.py --refresh` adds new GoBound teams to `teams.csv`.
+Team names come from `teams.csv` (one row per team, with its primary color): the Add a Game and Schedule dropdowns list those teams plus any already in `games.csv`, and team names in filters and tables use the same spelling (CR Kennedy, IC High, DCG, Waukee NW, SC East, …).
+
+**Next game:** on **Data > Schedule**, *Add Next Game* sets who Dowling plays next. Saving commits `schedule.csv` to GitHub (like Add a Game), and the Home and Scouting pages open on that opponent for everyone. Once that game's film is added (or its date passes), set the next one.
 
 For Tableau, `python build_data.py --excel` writes `curated-pbp.xlsx`.
 
@@ -120,7 +124,7 @@ To retrain the models, run `cfb_ep_model.R` and `cfb_wp_model.R` in R (requires 
 Copy `secrets.toml.example` to `.streamlit/secrets.toml` (or paste it into Streamlit Cloud → Settings → Secrets). Every entry is optional:
 
 - `app_password`: require a password to open the app
-- `next_opponent`: fallback default opponent on the Home and Scouting pages. The app opens on the next game on [Dowling's GoBound schedule](https://www.gobound.com/ia/ihsaa/football/2026-27/dowling/v/schedule) and only uses this when GoBound can't be read
+- `next_opponent`: fallback default opponent on the Home and Scouting pages, used when no next game is set on the Schedule page
 - `notes_sheet_url` and `[gcp_service_account]`: save coach notes to a Google Sheet
 - `[github]` (`token`, `repo`, `branch`): lets the Add a Game page save games to the repo. Use a [fine-grained personal access token](https://github.com/settings/personal-access-tokens) limited to this repository with **Contents: Read and write**, and set `branch` to the branch the app deploys from
 - `upload_password`: only people who know it can save games from the Add a Game page

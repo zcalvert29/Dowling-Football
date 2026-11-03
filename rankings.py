@@ -83,7 +83,7 @@ def _mean(s: pd.Series) -> float:
     return float(s.mean()) if len(s) else np.nan
 
 
-def _finals(df: pd.DataFrame) -> pd.DataFrame:
+def final_scores(df: pd.DataFrame) -> pd.DataFrame:
     """One row per (game, team): points for and against, from the filming team's running score."""
     rows = []
     for gid, g in df.groupby("game_id", sort=False):
@@ -112,7 +112,7 @@ def team_table(df: pd.DataFrame) -> pd.DataFrame:
     ev = special_teams.kick_events(df)
     if ev.empty:
         ev = pd.DataFrame(columns=["kind", "kicker", "receiver", "result", "start", "net"])
-    finals = _finals(df)
+    finals = final_scores(df)
     tries = df[df["PLAY TYPE"].isin(special_teams.XPS) & (df["RESULT"] != "Penalty")]
     fg_plays = df[df["PLAY TYPE"].isin(special_teams.FGS)]
 
@@ -293,21 +293,21 @@ def _render_color_editor(team_names: list[str], colors: dict[str, str]) -> None:
     missing = [t for t in team_names if t not in colors]
     label = "Team colors" + (f" ({len(missing)} not set)" if missing else "")
     with st.expander(label):
-        st.caption("Each team's primary color, as a hex code like #8C1D2C. Saved in teams.csv.")
+        st.caption("Each team's primary color. Saved in teams.csv.")
         saved = tm.load()
         names = sorted(set(team_names) | set(saved["team"]), key=str.casefold)
         current = dict(zip(saved["team"], saved["color"]))
         table = pd.DataFrame({"Team": names, "Color": [current.get(t, "") for t in names]})
         edited = st.data_editor(
             table, hide_index=True, width="stretch", key="rk_colors", disabled=["Team"],
-            column_config={"Color": st.column_config.TextColumn(validate=r"^(#[0-9A-Fa-f]{6})?$",
-                                                                help="Hex color, e.g. #8C1D2C. Blank = no color.")})
+            column_config={"Color": st.column_config.SelectboxColumn(options=list(tm.COLOR_HEX),
+                                                                     help="Blank = no color.")})
         new = saved.set_index("team")
         for t, color in zip(edited["Team"], edited["Color"].fillna("")):
             if t in new.index:
-                new.loc[t, "color"] = str(color).strip().upper()
+                new.loc[t, "color"] = str(color).strip()
             else:
-                new.loc[t] = pd.Series({"gobound": "", "color": str(color).strip().upper()})
+                new.loc[t] = pd.Series({"color": str(color).strip()})
         new = new.reset_index().rename(columns={"index": "team"})
         if dict(zip(new["team"], new["color"])) == {t: current.get(t, "") for t in new["team"]}:
             return
