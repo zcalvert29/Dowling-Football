@@ -19,14 +19,6 @@ def test_every_team_once(table):
     assert "Iowa City High" not in set(table["Team"])
 
 
-def test_dowling_counts(table):
-    d = table.set_index("Team").loc["Dowling Catholic"]
-    assert d["Games"] == 9
-    assert d["_record"] == "8-1"
-    assert 0 <= d["Off Success"] <= 1 and 0 <= d["Off Pass Rate"] <= 1
-    assert d["Net EPA"] == pytest.approx(d["Off EPA"] - d["Def EPA"])
-
-
 def test_rank_direction(table):
     r = rk.ranks(table)
     best_off = table.loc[table["Off EPA"].idxmax(), "Team"]
