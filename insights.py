@@ -247,110 +247,377 @@ def _yard_label(x: float) -> str:
     return f"Own {x}" if x < 50 else f"Opp {100 - x}"
 
 
-def drive_chart_html(drives: pd.DataFrame, ink: str = "inherit") -> str:
-    if drives.empty:
-        return ""
-    muted = "opacity:.65"
-    ticks = "".join(
+# Kicking plays a return or block touchdown can come from (scrimmage plays are covered by "Def TD").
+_RETURN_TD_TYPES = KICKOFF_TYPES | {"Punt", "Punt Rec"} | FG_TYPES
+
+
+def _score_before(full: pd.DataFrame, play: float, team: str) -> tuple[int, int]:
+    """team-first score just before PLAY # `play` (score columns are kept after each play)."""
+    prior = full[full["PLAY #"] < play]
+    return score_for(prior.iloc[-1], team) if len(prior) else (0, 0)
+
+
+def _score_after(full: pd.DataFrame, play: float, team: str) -> tuple[int, int]:
+    """team-first score after PLAY # `play` and the try that follows it, if any."""
+    i = int(np.flatnonzero(full["PLAY #"].to_numpy() == play)[-1])
+    while i + 1 < len(full) and full["PLAY TYPE"].iat[i + 1] in TRY_TYPES:
+        i += 1
+    return score_for(full.iloc[i], team)
+
+
+def scoring_events(g: pd.DataFrame, team: str) -> list[dict]:
+    """
+    Scores by `team` that aren't offensive drives: kick/punt return TDs, blocked kick TDs, pick-sixes,
+    fumble-return TDs, and safeties. The drive chart shows them between the drives.
+    """
+    out = []
+    for _, r in g.sort_values("PLAY #").iterrows():
+        res, pt = str(r["RESULT"]), r["PLAY TYPE"]
+        if "Safety" in res and pt in ("Run", "Pass"):
+            scorer, label, unit = r["defense"], "Safety", "defense"
+        elif "TD" in res and (pt in _RETURN_TD_TYPES or "Def TD" in res):
+            scorer = r["defense"] if "Def TD" in res else r["offense"]   # a kickoff is the returning team's play
+            if pt in ("Run", "Pass"):
+                label = ("Pick-six" if "Interception" in res else "Fumble return TD" if "Fumble" in res
+                         else "Defensive TD")
+                unit = "defense"
+            else:
+                kind = "punt" if "Punt" in pt else "field goal" if pt in FG_TYPES else "kick"
+                label = f"Blocked {kind} TD" if "Blocked" in res else f"{kind.capitalize()} return TD"
+                unit = "special teams"
+        else:
+            continue
+        if scorer == team:
+            out.append({"play": r["PLAY #"], "QTR": int(r["QTR"]), "label": label, "unit": unit})
+    return out
+
+
+def drive_rows(g: pd.DataFrame, team: str, full: pd.DataFrame | None = None) -> tuple[pd.DataFrame, list[dict]]:
+    """
+    `team`'s drives (drive_summary, plus snap_deepest for red-zone trips) and, in game order, one row per drive
+    or scoring event: {"kind": "drive"/"event", "row": drive Series or event dict, "score": team-first score after
+    it (and its try), "points": what `team` scored on it}. `full` is the whole game, for the score before the
+    first row when `g` is one half.
+    """
+    full = (g if full is None else full).sort_values("PLAY #")
+    drives = drive_summary(g, team)
+    if not drives.empty:
+        snaps = v.run_pass(g[g["offense"] == team])
+        closest = (100 - snaps.groupby("drive")["YARDLINE_100"].min()).reindex(drives["drive"]).to_numpy()
+        drives["snap_deepest"] = np.fmax(closest, drives["start"].to_numpy())
+    plays = g.groupby("drive")["PLAY #"]
+    first, last = plays.min(), plays.max()
+    items = [("drive", first[r["drive"]], last[r["drive"]], r) for _, r in drives.iterrows()]
+    items += [("event", e["play"], e["play"], e) for e in scoring_events(g, team)]
+    rows = []
+    for kind, a, b, x in sorted(items, key=lambda t: t[1]):
+        after = _score_after(full, b, team)
+        rows.append({"kind": kind, "row": x, "score": after, "points": after[0] - _score_before(full, a, team)[0]})
+    return drives, rows
+
+
+def _yard_ticks(muted: str) -> str:
+    return "".join(
         f'<span style="position:absolute;left:{x}%;transform:translateX(-50%)">'
         f'{"G" if x in (0, 100) else (x if x <= 50 else 100 - x)}</span>'
         for x in range(0, 101, 10)
     )
+
+
+def drive_chart_html(drives: pd.DataFrame, ink: str = "inherit", rows: list[dict] | None = None) -> str:
+    """
+    One row per drive. With `rows` (from drive_rows), scoring events sit between the drives as green bands and
+    every row ends with the points scored on it (+7) and the score after it, this team first.
+    """
+    if drives.empty and not rows:
+        return ""
+    muted = "opacity:.65"
     yard_lines = "".join(
         f'<span style="position:absolute;top:0;bottom:0;left:{x}%;border-left:'
         f'{"1px solid rgba(128,128,128,.55)" if x == 50 else "0.5px solid rgba(128,128,128,.3)"}"></span>'
         for x in range(10, 100, 10)
     )
-    rows = []
-    for _, r in drives.iterrows():
+    rows = rows if rows is not None else [{"kind": "drive", "row": r, "score": None, "points": 0}
+                                          for _, r in drives.iterrows()]
+    scored = rows and rows[0]["score"] is not None
+    html = []
+    for item in rows:
+        r = item["row"]
+        right = ""
+        if scored:
+            pts, (us, them) = item["points"], item["score"]
+            badge = (f'<span style="display:inline-block;min-width:26px;text-align:center;border-radius:4px;'
+                     f'background:rgba(29,158,117,.16);color:{GREEN};font-weight:700;font-size:11px">+{pts}</span>'
+                     if pts > 0 else '<span style="display:inline-block;min-width:26px"></span>')
+            right = (f'<div style="font-size:12px;display:flex;gap:6px;justify-content:flex-end;align-items:center;'
+                     f'font-variant-numeric:tabular-nums">{badge}<span style="{"font-weight:600" if pts > 0 else muted}'
+                     f'">{us}-{them}</span></div>')
+        if item["kind"] == "event":
+            html.append(
+                f'<div style="font-size:12px;{muted}">Q{r["QTR"]}</div>'
+                f'<div style="grid-column:2 / span 2;display:flex;align-items:center;gap:10px;height:22px;'
+                f'border-left:3px solid {GREEN};background:rgba(29,158,117,.10);border-radius:0 4px 4px 0;'
+                f'padding:0 10px;font-size:12px;overflow:hidden;white-space:nowrap"><b style="color:{GREEN}">'
+                f'{r["label"]}</b><span style="{muted}">{r["unit"]} · not a drive</span></div>{right}'
+            )
+            continue
         color = DRIVE_COLORS.get(r["result"], GRAY)
         left, width = min(r["start"], r["end"]), max(abs(r["end"] - r["start"]), 1.2)
         tip = f'{_yard_label(r["start"])} to {"end zone" if r["end"] >= 100 else _yard_label(r["end"])}'
         result = "3-and-out" if r["three_and_out"] else r["result"]
-        rows.append(
+        html.append(
             f'<div style="font-size:12px;{muted}">Q{r["QTR"]}</div>'
             f'<div style="position:relative;height:22px;background:rgba(128,128,128,.08);border-radius:4px">'
             f'{yard_lines}<span title="{tip}" style="position:absolute;top:4px;height:14px;border-radius:3px;'
             f'left:{left}%;width:{width}%;background:{color}"></span></div>'
-            f'<div style="font-size:12px">{r["plays"]} play{"" if r["plays"] == 1 else "s"} · {result}</div>'
+            f'<div style="font-size:12px">{r["plays"]} play{"" if r["plays"] == 1 else "s"} · {result}</div>{right}'
         )
     legend = "".join(
         f'<span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;'
         f'border-radius:2px;background:{c}"></span>{lab}</span>' for lab, c in DRIVE_LEGEND
     )
+    cols = "36px 1fr 150px 72px" if scored else "36px 1fr 150px"
+    score_head = f'<div style="font-size:11px;text-align:right;{muted}">Score</div>' if scored else ""
     return (
         f'<div style="max-width:860px;color:{ink};font-family:inherit">'
         f'<div style="display:flex;flex-wrap:wrap;gap:14px;font-size:12px;margin-bottom:8px;{muted}">{legend}'
         f'<span style="margin-left:auto">Driving left to right</span></div>'
-        f'<div style="display:grid;grid-template-columns:36px 1fr 150px;gap:6px 10px;align-items:center">'
-        f'<div></div><div style="position:relative;height:14px;font-size:11px;{muted}">{ticks}</div><div></div>'
-        f'{"".join(rows)}</div></div>'
+        f'<div style="display:grid;grid-template-columns:{cols};gap:6px 10px;align-items:center">'
+        f'<div></div><div style="position:relative;height:14px;font-size:11px;{muted}">{_yard_ticks(muted)}</div>'
+        f'<div></div>{score_head}{"".join(html)}</div></div>'
     )
 
 
-def drive_chart_stats(drives: pd.DataFrame) -> list[tuple[str, object]]:
-    """The boxes under the drive chart. Turnovers on downs get their own box instead of counting as turnovers."""
+def drive_chart_stats(drives: pd.DataFrame, rows: list[dict]) -> list[tuple[str, list[tuple[str, object, str]]]]:
+    """
+    The boxes under the drive chart, in groups: [(group, [(label, value, note)])]. Points and Touchdowns count
+    scoring events too, so they add up to the scoreboard; turnovers on downs have their own box.
+    """
+    events = [i for i in rows if i["kind"] == "event"]
+    off_pts = sum(i["points"] for i in rows if i["kind"] == "drive")
+    st_pts = sum(i["points"] for i in events if i["row"]["unit"] == "special teams")
+    def_pts = sum(i["points"] for i in events if i["row"]["unit"] == "defense")
+    n = len(drives)
+    res = drives["result"] if n else pd.Series(dtype=str)
+    td = int((res == "Touchdown").sum())
+    ret_td = sum(1 for i in events if i["row"]["unit"] == "special teams")
+    def_td = sum(1 for i in events if i["row"]["unit"] == "defense" and i["row"]["label"] != "Safety")
+    fg_made, fg_att = int((res == "FG Made").sum()), int(res.isin(["FG Made", "FG Missed"]).sum())
+    rz = drives[drives["snap_deepest"] >= 80] if n else drives
+    to = int(res.isin(["Turnover", "Turnover, Def TD"]).sum())
+    to_td = int((res == "Turnover, Def TD").sum())
+
+    def split(parts):
+        return " · ".join(f"{k} {lab}" for k, lab in parts if k)
+
     return [
-        ("Drives", len(drives)),
-        ("Touchdowns", int((drives["result"] == "Touchdown").sum())),
-        ("Avg start", _yard_label(drives["start"].mean())),
-        ("3-and-outs", int(drives["three_and_out"].sum())),
-        ("Turnovers", int(drives["result"].isin(["Turnover", "Turnover, Def TD"]).sum())),
-        ("Turnover on Downs", int((drives["result"] == "Turnover on Downs").sum())),
+        ("Scoring", [
+            ("Points", off_pts + st_pts + def_pts, split([(off_pts, "off"), (st_pts, "ST"), (def_pts, "def")])
+             if st_pts or def_pts else ""),
+            ("Pts / drive", f"{off_pts / n:.1f}" if n else "–", ""),
+            ("Touchdowns", td + ret_td + def_td, split([(td, "off"), (ret_td, "ret"), (def_td, "def")])
+             if ret_td or def_td else ""),
+            ("Field goals", f"{fg_made}/{fg_att}", ""),
+        ]),
+        ("Moving the ball", [
+            ("Avg start", _yard_label(drives["start"].mean()) if n else "–", ""),
+            ("Red zone TDs", f'{int((rz["result"] == "Touchdown").sum())}/{len(rz)}', "trips inside the 20"),
+            ("Yards / drive", f'{drives["yards"].mean():.0f}' if n else "–", ""),
+        ]),
+        ("Giveaways", [
+            ("3-and-outs", int(drives["three_and_out"].sum()) if n else 0, ""),
+            ("Turnovers", to, f"{to_td} returned for a TD" if to_td else ""),
+            ("Turnover on Downs", int((res == "Turnover on Downs").sum()), ""),
+        ]),
     ]
 
 
-def render_drive_chart(g: pd.DataFrame, team: str, title: str) -> pd.DataFrame:
+def drive_stats_html(groups: list[tuple[str, list[tuple[str, object, str]]]]) -> str:
+    box = ('<div style="background:rgba(128,128,128,.08);border-radius:8px;padding:6px 12px">'
+           '<div style="font-size:12px;opacity:.65">{}</div>'
+           '<div style="font-size:18px;font-weight:600">{}</div>{}</div>')
+    note = '<div style="font-size:11px;opacity:.65;margin-top:1px">{}</div>'
+    return '<div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">' + "".join(
+        f'<div><div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;opacity:.65;'
+        f'margin:0 0 4px 2px">{name}</div><div style="display:flex;flex-wrap:wrap;gap:6px">'
+        + "".join(box.format(k, val, note.format(sub) if sub else "") for k, val, sub in items) + "</div></div>"
+        for name, items in groups) + "</div>"
+
+
+def render_drive_chart(g: pd.DataFrame, team: str, title: str, full: pd.DataFrame | None = None) -> pd.DataFrame:
     st.markdown(f"**{title}**")
-    drives = drive_summary(g, team)
-    if drives.empty:
+    drives, rows = drive_rows(g, team, full)
+    if not rows:
         st.info("No drives for this team in the selected game.")
         return drives
-    stats = drive_chart_stats(drives)
-    stats_html = (
-        '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">'
-        + "".join(f'<div style="background:rgba(128,128,128,.08);border-radius:8px;padding:6px 12px">'
-                  f'<div style="font-size:12px;opacity:.65">{k}</div>'
-                  f'<div style="font-size:18px;font-weight:600">{val}</div></div>' for k, val in stats)
-        + "</div>"
-    )
-    st.html(drive_chart_html(drives) + stats_html)
+    st.html(drive_chart_html(drives, rows=rows) + drive_stats_html(drive_chart_stats(drives, rows)))
     return drives
 
 
 # ---------------------------------------------------------------------------
 # Game recap
 # ---------------------------------------------------------------------------
-# How each head-to-head row is compared: (better direction, value used, display)
-def _unit_stats(d: pd.DataFrame) -> dict:
-    """Head-to-head numbers for one offense: {row: (sort value, display text)}."""
-    rp = v.run_pass(d)
-    third, fourth = rp[rp["DN"] == 3], rp[rp["DN"] == 4]
-    expl = int(pd.to_numeric(rp["explosive_play"], errors="coerce").sum())
+def _points_off_turnovers(g: pd.DataFrame, team: str) -> tuple[int, int]:
+    """
+    (team's, opponents') points off turnovers in these games: defensive TDs, plus whatever the next drive scored
+    after the other side turned it over.
+    """
+    ours = theirs = 0
+    for gid in games(g):
+        gg = g[g["game_id"] == gid]
+        opp = other_team(gg, team)
+        if opp is None:
+            continue
+        sides = {t: drive_rows(gg, t)[1] for t in (team, opp)}
+        for t, o in ((team, opp), (opp, team)):
+            lost = {i["row"]["drive"] for i in sides[o]
+                    if i["kind"] == "drive" and i["row"]["result"] in ("Turnover", "Turnover, Def TD")}
+            pts = sum(i["points"] for i in sides[t] if (i["kind"] == "drive" and i["row"]["drive"] - 1 in lost)
+                      or (i["kind"] == "event" and i["row"]["unit"] == "defense" and i["row"]["label"] != "Safety"))
+            if t == team:
+                ours += pts
+            else:
+                theirs += pts
+    return ours, theirs
 
-    def conv(rows, col):
-        if not len(rows):
-            return np.nan, "–"
-        made = int(rows[col].sum())
-        return made / len(rows), f"{made}/{len(rows)} ({made / len(rows):.0%})"
 
-    epa, sr = rp["epa"].mean(), rp["success"].mean()
-    avg3 = third["DIST"].mean() if len(third) else np.nan
+def _unit_stats(g: pd.DataFrame, team: str, us: bool) -> dict:
+    """
+    Head-to-head numbers for one side's offense, by group: {group: {row: (value, text)}}. us=True is `team`'s
+    offense, us=False is everyone it played. Runs and passes on 1st-4th down, like the rest of the page; yards
+    leave out penalty snaps (their yards are the penalty's).
+    """
+    off = g["offense"] == team if us else (g["offense"] != team) & g["offense"].notna()
+    rp = v.run_pass(g[off])
+    live = rp[rp["RESULT"].astype(str) != "Penalty"]
+    runs, drops = live[live["PLAY TYPE"] == "Run"], live[live["PLAY TYPE"] == "Pass"]
+    att = drops[(drops["SACK"] == 0) & (drops["QB_SCRAMBLE"] == 0)]
+    third, fourth, early = rp[rp["DN"] == 3], rp[rp["DN"] == 4], rp[rp["DN"].isin([1, 2])]
+    yds = live["GN/LS"].fillna(0)
+    expl = pd.to_numeric(rp["explosive_play"], errors="coerce").fillna(0)
+    r_ex, p_ex = int(expl[rp["PLAY TYPE"] == "Run"].sum()), int(expl[rp["PLAY TYPE"] == "Pass"].sum())
+    ints, tos = int(rp["interception"].sum()), int(rp["turnover"].sum())
+
+    def num(x, fmt):
+        return (x, "–" if pd.isna(x) else fmt.format(x))
+
+    def rate(d, col, fmt):
+        return num(d[col].mean() if len(d) else np.nan, fmt)
+
+    def conv(d, col):
+        made = int(d[col].sum())
+        return (made / len(d), f"{made}/{len(d)} ({made / len(d):.0%})") if len(d) else (np.nan, "–")
+
+    stuffed = runs["GN/LS"] <= 0
+    comp = int((att["completion"] == 1).sum())
+    # Penalties: the sign of the yards on a penalty snap says which side the flag was on. Only the count is shown,
+    # since some penalty snaps are tagged with the play's yards (an 81-yard gain) instead of the penalty's.
+    snap = g["PLAY TYPE"].isin(["Run", "Pass"]) | g["PLAY TYPE"].isna()   # not kicks: whose flag it was isn't kept
+    pen = g[(g["PENALTY"].astype(str) == "1") & snap & g["GN/LS"].notna()]
+    d_side = g["defense"] == team if us else (g["defense"] != team) & g["defense"].notna()
+    flags = pen[(off[pen.index] & (pen["GN/LS"] < 0)) | (d_side[pen.index] & (pen["GN/LS"] > 0))]
     return {
-        "Plays": (len(rp), f"{len(rp)}"),
-        "EPA / play": (epa, "–" if pd.isna(epa) else f"{epa:+.2f}"),
-        "Success": (sr, "–" if pd.isna(sr) else f"{sr:.0%}"),
-        "Explosive plays": (expl, f"{expl}"),
-        "3rd down": conv(third, "THIRD_DOWN_CONVERTED"),
-        "Avg 3rd down distance": (avg3, "–" if pd.isna(avg3) else f"{avg3:.1f} yds"),
-        "4th down": conv(fourth, "FOURTH_DOWN_CONVERTED"),
-        "Turnovers": (int(rp["turnover"].sum()), f"{int(rp['turnover'].sum())}"),
+        "Overall": {
+            "Plays": (len(rp), f"{len(rp)}"),
+            "Total yards": num(yds.sum(), "{:.0f}"),
+            "Yards / play": num(yds.mean() if len(live) else np.nan, "{:.1f}"),
+            "EPA / play": rate(rp, "epa", "{:+.2f}"),
+            "Success": rate(rp, "success", "{:.0%}"),
+            "Explosive plays": (r_ex + p_ex, f"{r_ex + p_ex} ({r_ex} run · {p_ex} pass)"),
+        },
+        "Running": {
+            "Rushing": (runs["GN/LS"].fillna(0).sum(), f'{len(runs)} for {runs["GN/LS"].fillna(0).sum():.0f}'),
+            "Yards / carry": rate(runs, "GN/LS", "{:.1f}"),
+            "Rush EPA / play": rate(runs, "epa", "{:+.2f}"),
+            "Rush success": rate(runs, "success", "{:.0%}"),
+            "Stuffed runs (0 or less)": ((stuffed.mean(), f"{int(stuffed.sum())} ({stuffed.mean():.0%})")
+                                         if len(runs) else (np.nan, "–")),
+            "Tackles for loss allowed": (int(runs["TACKLE_FOR_LOSS"].sum()), f'{int(runs["TACKLE_FOR_LOSS"].sum())}'),
+        },
+        "Passing": {
+            "Completions": ((comp / len(att), f"{comp}/{len(att)} ({comp / len(att):.0%})") if len(att)
+                            else (np.nan, "–")),
+            "Passing yards (net of sacks)": num(drops["GN/LS"].fillna(0).sum(), "{:.0f}"),
+            "Yards / dropback": rate(drops, "GN/LS", "{:.1f}"),
+            "Pass EPA / play": rate(drops, "epa", "{:+.2f}"),
+            "Pass success": rate(drops, "success", "{:.0%}"),
+            "Sacks taken": (int(drops["SACK"].sum()), f'{int(drops["SACK"].sum())}'),
+            "QB scrambles": (int(drops["QB_SCRAMBLE"].sum()), f'{int(drops["QB_SCRAMBLE"].sum())}'),
+            "Interceptions": (ints, f"{ints}"),
+        },
+        "Situational": {
+            "Early-down success": rate(early, "success", "{:.0%}"),
+            "3rd down": conv(third, "THIRD_DOWN_CONVERTED"),
+            "Avg 3rd down distance": rate(third, "DIST", "{:.1f} yds"),
+            "4th down": conv(fourth, "FOURTH_DOWN_CONVERTED"),
+        },
+        "Turnovers & penalties": {
+            "Turnovers": (tos, f"{tos} ({ints} INT · {tos - ints} fumble)"),
+            "Turnover margin": (np.nan, "–"),          # filled in by head_to_head(), which sees both sides
+            "Points off turnovers": (np.nan, "–"),
+            "Penalties": (len(flags), f"{len(flags)}"),   # count only: some penalty snaps carry the play's yards
+        },
     }
 
 
-# Rows where a higher number is better for that offense (True) or lower (False).
-HEAD_TO_HEAD_BETTER = {"EPA / play": True, "Success": True, "Explosive plays": True, "3rd down": True,
-                       "Avg 3rd down distance": False, "4th down": True, "Turnovers": False}
+# Rows where a higher number is better for that offense (True) or lower (False); rows not listed get no edge.
+HEAD_TO_HEAD_BETTER = {
+    "Total yards": True, "Yards / play": True, "EPA / play": True, "Success": True, "Explosive plays": True,
+    "Rushing": True, "Yards / carry": True, "Rush EPA / play": True, "Rush success": True,
+    "Stuffed runs (0 or less)": False, "Tackles for loss allowed": False,
+    "Completions": True, "Passing yards (net of sacks)": True, "Yards / dropback": True, "Pass EPA / play": True,
+    "Pass success": True, "Sacks taken": False, "Interceptions": False,
+    "Early-down success": True, "3rd down": True, "Avg 3rd down distance": False, "4th down": True,
+    "Turnovers": False, "Turnover margin": True, "Points off turnovers": True, "Penalties": False,
+}
+# Differences this small get no edge (like Season Comparison, where small changes aren't colored).
+HEAD_TO_HEAD_CLOSE = {
+    "Total yards": 10, "Yards / play": 0.3, "EPA / play": 0.05, "Success": 0.05, "Rushing": 10, "Yards / carry": 0.3,
+    "Rush EPA / play": 0.05, "Rush success": 0.05, "Stuffed runs (0 or less)": 0.05, "Completions": 0.05,
+    "Passing yards (net of sacks)": 10, "Yards / dropback": 0.5, "Pass EPA / play": 0.05, "Pass success": 0.05,
+    "Early-down success": 0.05, "3rd down": 0.05, "Avg 3rd down distance": 0.5, "4th down": 0.05,
+}
+
+
+def head_to_head(g: pd.DataFrame, team: str, them: str) -> list[tuple[str, list[tuple[str, str, str, str]]]]:
+    """[(group, [(row, team's text, opponents' text, edge team or "")])] for the Head to head table."""
+    a, b = _unit_stats(g, team, True), _unit_stats(g, team, False)
+    ta, tb = a["Turnovers & penalties"]["Turnovers"][0], b["Turnovers & penalties"]["Turnovers"][0]
+    a["Turnovers & penalties"]["Turnover margin"] = (tb - ta, f"{tb - ta:+d}")
+    b["Turnovers & penalties"]["Turnover margin"] = (ta - tb, f"{ta - tb:+d}")
+    pa, pb = _points_off_turnovers(g, team)
+    a["Turnovers & penalties"]["Points off turnovers"] = (pa, f"{pa}")
+    b["Turnovers & penalties"]["Points off turnovers"] = (pb, f"{pb}")
+    out = []
+    for group, rows in a.items():
+        lines = []
+        for k, (va, txt_a) in rows.items():
+            vb, txt_b = b[group][k]
+            better_high, edge = HEAD_TO_HEAD_BETTER.get(k), ""
+            clear = pd.notna(va) and pd.notna(vb) and abs(va - vb) > HEAD_TO_HEAD_CLOSE.get(k, 0)
+            if better_high is not None and clear:
+                edge = team if (va > vb) == better_high else them
+            lines.append((k, txt_a, txt_b, edge))
+        out.append((group, lines))
+    return out
+
+
+def head_to_head_html(groups, team: str, them: str) -> str:
+    good = "background:rgba(29,158,117,.16);color:#1D9E75;font-weight:600"
+    bad = "background:rgba(226,75,74,.14);color:#E24B4A;font-weight:600"
+    body = []
+    for group, lines in groups:
+        body.append(f'<tr class="h2h-band"><td colspan="4">{group}</td></tr>')
+        body += [f'<tr><td>{k}</td><td>{a}</td><td>{b}</td>'
+                 f'<td style="{good if e == team else bad if e else ""}">{e}</td></tr>' for k, a, b, e in lines]
+    css = ("<style>.h2h{width:100%;border-collapse:collapse;font-size:14px;font-family:inherit;color:inherit}"
+           ".h2h th{font-weight:600;font-size:12px;opacity:.7;text-align:left;padding:6px 10px;"
+           "border-bottom:1px solid rgba(128,128,128,.35)}"
+           ".h2h td{padding:5px 10px;border-bottom:1px solid rgba(128,128,128,.15);font-variant-numeric:tabular-nums}"
+           ".h2h tr.h2h-band td{background:rgba(128,128,128,.12);font-weight:700;font-size:12px;letter-spacing:.06em;"
+           "text-transform:uppercase;border-bottom:1px solid rgba(128,128,128,.3);padding:7px 10px}</style>")
+    return (css + f'<table class="h2h"><thead><tr><th></th><th>{team} offense</th><th>{them} offense</th>'
+            f'<th>Edge</th></tr></thead><tbody>{"".join(body)}</tbody></table>')
 
 
 PLAY_COLS = ["WEEK", "QTR", "DN", "DIST", "YARD LN", "PLAY TYPE", "OFF FORM", "OFF PLAY", "RESULT", "GN/LS", "epa"]
@@ -433,33 +700,24 @@ def render_game_recap(df: pd.DataFrame, game_id: str, half: str, team: str = TEA
         when = {"First half": "at halftime", "Second half": "final"}.get(half, "final")
         st.subheader(f"{TEAM} {us}, {opp} {they} ({when})")
 
-    ours = _unit_stats(g[g["offense"] == TEAM])
-    theirs = _unit_stats(g[(g["offense"] != TEAM) & g["offense"].notna()])
     st.markdown("**Head to head**")
-    rows = []
-    for k in ours:
-        (a, a_txt), (b, b_txt) = ours[k], theirs[k]
-        better_high = HEAD_TO_HEAD_BETTER.get(k)
-        edge = ""
-        if better_high is not None and pd.notna(a) and pd.notna(b) and a != b:
-            edge = TEAM if (a > b) == better_high else them
-        rows.append((k, a_txt, b_txt, edge))
-    table = pd.DataFrame(rows, columns=["", f"{TEAM} offense", f"{them} offense", "Edge"]).set_index("")
-
-    def color(col):
-        return ["background-color:#E1F5EE;color:#085041" if x == TEAM else
-                "background-color:#FCEBEB;color:#791F1F" if x else "" for x in col]
-
-    st.dataframe(table.style.apply(color, subset=["Edge"]), width="stretch")
-    st.caption("3rd and 4th down count runs and passes only (punts and field goals aren't conversion tries). "
-               "A shorter average 3rd down distance is the edge.")
+    st.html(head_to_head_html(head_to_head(g, TEAM, them), TEAM, them))
+    st.caption("Runs and passes on 1st-4th down. Rush = designed runs; pass = dropbacks, including sacks and "
+               "scrambles. Explosive = a run of 10+ or a pass of 20+. Points off turnovers = defensive TDs plus "
+               "what the next drive scored after a turnover. Penalties count flags on snaps (the sign of the yards "
+               "shows which side), not on kicks. Edge is left blank when the difference is small, e.g. under 5 "
+               "points of success rate or 0.05 EPA.")
 
     if game_id is not None:
+        full = df[df["game_id"] == game_id]
         c1, c2 = st.columns(2)
         with c1:
-            render_drive_chart(g, TEAM, f"{TEAM} drives")
+            render_drive_chart(g, TEAM, f"{TEAM} drives", full)
         with c2:
-            render_drive_chart(g, opp, f"{opp} drives")
+            render_drive_chart(g, opp, f"{opp} drives", full)
+        st.caption("Score = this team first, after the drive and its try. +7 / +3 = what this team scored on the "
+                   "row. Green bands are scores that weren't offensive drives: return and block TDs, defensive "
+                   "TDs, and safeties. Red zone TDs count drives with a snap inside the 20.")
 
         by_q = g[g["PLAY TYPE"].isin(["Run", "Pass"])].assign(
             side=lambda d: np.where(d["offense"] == TEAM, f"{TEAM} offense", f"{opp} offense"))
@@ -1322,7 +1580,7 @@ def decision_card_html(r: pd.Series) -> str:
         if name == best:
             chips += '<span style="font-size:11px;padding:1px 8px;border-radius:999px;background:#E1F5EE;color:#085041;margin-right:4px">Model\'s call</span>'
         if name == did:
-            chips += '<span style="font-size:11px;padding:1px 8px;border-radius:999px;background:rgba(128,128,128,.18)">{our_call}</span>'
+            chips += f'<span style="font-size:11px;padding:1px 8px;border-radius:999px;background:rgba(128,128,128,.18)">{our_call}</span>'
         if o is None:
             why = "Not an option inside the 35" if name == "Punt" else "Out of field goal range"
             opts.append(f'<div style="display:grid;grid-template-columns:120px 1fr 60px;gap:12px;align-items:center;'

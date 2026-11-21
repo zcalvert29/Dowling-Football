@@ -390,12 +390,10 @@ def win_prob_fourth_downs():
     g = df_all[df_all["game_id"] == gid]
     other = ins.other_team(g, team) or ins.game_teams(gid)[1]
     ins.render_win_probability(g, other, team=team)
-    if team == v.TEAM:
-        ins.render_fourth_down_review(g)
-        return
-    # Scout film: both teams' 4th downs, one display each.
+    # Both teams' 4th downs, one display each: the filming team's first (Dowling's in Dowling games), then the
+    # opponent's, labeled as theirs.
     for side in (team, other):
-        st.subheader(f"{side} 4th downs")
+        st.subheader(f"{side} 4th downs" + (" (opponent)" if team == v.TEAM and side == other else ""))
         ins.render_fourth_down_review(g, team=side)
 
 
