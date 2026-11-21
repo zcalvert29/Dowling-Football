@@ -121,7 +121,7 @@ def test_full_game_label(df):
 
 def test_drive_chart_counts_downs_separately_from_turnovers(df):
     g = df[df["game_id"] == "Dowling Catholic_IC Liberty_2025_11_21"]
-    drives = ins.drive_summary(g, "IC Liberty")                          # 2 turnovers, 2 turnovers on downs
-    stats = dict(ins.drive_chart_stats(drives))
+    drives, rows = ins.drive_rows(g, "IC Liberty")                       # 2 turnovers, 2 turnovers on downs
+    stats = {k: val for _, items in ins.drive_chart_stats(drives, rows) for k, val, _ in items}
     assert stats["Turnovers"] == int(drives["result"].isin(["Turnover", "Turnover, Def TD"]).sum()) == 2
     assert stats["Turnover on Downs"] == int((drives["result"] == "Turnover on Downs").sum()) == 2
